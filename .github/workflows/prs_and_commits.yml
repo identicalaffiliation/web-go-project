@@ -28,3 +28,15 @@ jobs:
               exit 1
             fi
           done
+
+      - name: Check PR title
+        run: |
+          title="${{ github.event.pull_request.title }}"
+          
+          echo "Checking PR title: $title"
+          
+          if [[ ! "$title" =~ ^\[WKI-[0-9]+\]$ ]]; then
+            echo "❌ Invalid PR title: $title"
+            echo "Expected: [WKI-123]"
+            exit 1
+          fi
