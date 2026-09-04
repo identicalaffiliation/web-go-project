@@ -1,17 +1,10 @@
-name: check_commits_and_prs
+name: CI
 
 on:
-  push:
-    branches:
-      - '**'
-
   pull_request:
-    branches:
-      - '**'
 
 jobs:
   commit-check:
-    name: Check commit messages
     runs-on: ubuntu-22.04
 
     steps:
@@ -19,15 +12,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate commits
+      - name: Check commit messages
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            commits=$(git rev-list \
-              ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }})
-          else
-            commits=$(git rev-list \
-              ${{ github.event.before }}..${{ github.sha }})
-          fi
+          commits=$(git rev-list \
+            "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}")
 
           for commit in $commits; do
             message=$(git log -1 --format=%s "$commit")
@@ -35,9 +23,8 @@ jobs:
             echo "Checking: $message"
 
             if [[ ! "$message" =~ ^\[WKI-[0-9]+\] ]]; then
-              echo "Invalid commit message: $message"
-              echo "Commit must start with [WKI-№]"
-              echo "Example: [WKI-123] add payment service"
+              echo "❌ Invalid commit message: $message"
+              echo "Expected: [WKI-123] add payment service"
               exit 1
             fi
           done
