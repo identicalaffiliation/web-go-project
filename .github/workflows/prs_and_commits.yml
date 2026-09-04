@@ -4,7 +4,7 @@ on:
   pull_request:
 
 jobs:
-  commit-check:
+  validate-flow:
     runs-on: ubuntu-22.04
 
     steps:
@@ -12,7 +12,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check commit messages
+      - name: Check commits
         run: |
           commits=$(git rev-list \
             "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}")
@@ -24,7 +24,7 @@ jobs:
 
             if [[ ! "$message" =~ ^\[WKI-[0-9]+\] ]]; then
               echo "❌ Invalid commit message: $message"
-              echo "Expected: [WKI-123] add payment service"
+              echo "Expected: [WKI-№] some message"
               exit 1
             fi
           done
@@ -37,6 +37,6 @@ jobs:
           
           if [[ ! "$title" =~ ^\[WKI-[0-9]+\]$ ]]; then
             echo "❌ Invalid PR title: $title"
-            echo "Expected: [WKI-123]"
+            echo "Expected: [WKI-№]"
             exit 1
           fi
