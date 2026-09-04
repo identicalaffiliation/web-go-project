@@ -40,3 +40,14 @@ jobs:
             echo "Expected: [WKI-№]"
             exit 1
           fi
+
+      - name: Check branch name
+        run: |
+          branch="${{ github.head_ref }}"
+
+          echo "Checking branch: $branch"
+          if [[ ! "$branch" =~ ^feature/WKI-[0-9]+$ ]]; then
+            echo "❌ Invalid branch name: $branch"
+            echo "Expected: feature/WKI-№"
+            exit 1
+          fi
