@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  pull_request:
+
+jobs:
+  validate-flow:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check commits
+        run: |
+          commits=$(git rev-list \
+            "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}")
+
+          for commit in $commits; do
+            message=$(git log -1 --format=%s "$commit")
+
+            echo "Checking: $message"
+
+            if [[ ! "$message" =~ ^\[WKI-[0-9]+\] ]]; then
+              echo "❌ Invalid commit message: $message"
+              echo "Expected: [WKI-№] some message"
+              exit 1
+            fi
+          done
+
+      - name: Check PR title
+        run: |
+          title="${{ github.event.pull_request.title }}"
+          
+          echo "Checking PR title: $title"
+          
+          if [[ ! "$title" =~ ^\[WKI-[0-9]+\]$ ]]; then
+            echo "❌ Invalid PR title: $title"
+            echo "Expected: [WKI-№]"
+            exit 1
+          fi
+
+      - name: Check branch name
+        run: |
+          branch="${{ github.head_ref }}"
+
+          echo "Checking branch: $branch"
+          if [[ ! "$branch" =~ ^feature/WKI-[0-9]+$ ]]; then
+            echo "❌ Invalid branch name: $branch"
+            echo "Expected: feature/WKI-№"
+            exit 1
+          fi
