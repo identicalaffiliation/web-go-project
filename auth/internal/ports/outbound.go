@@ -16,7 +16,7 @@ type UserRepository interface {
 type RefreshTokenRepository interface {
 	Create(ctx context.Context, token domain.RefreshToken) error
 	GetByHash(ctx context.Context, hash string) (domain.RefreshToken, error)
-	Rotate(ctx context.Context, oldID string, next domain.RefreshToken, now time.Time)
+	Rotate(ctx context.Context, oldID string, next domain.RefreshToken, now time.Time) error
 	Revoke(ctx context.Context, id string, now time.Time) error
 }
 

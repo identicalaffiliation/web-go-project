@@ -12,8 +12,8 @@ type RegisterInput struct {
 }
 
 type LoginInput struct {
-	Email     string
-	Passsword string
+	Email    string
+	Password string
 }
 
 type AuthService interface {
