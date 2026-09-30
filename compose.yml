@@ -1,0 +1,160 @@
+services:
+
+  # INFRASTRUCTURE
+  auth-postgres:
+    container_name: auth-postgres
+    image: postgres:16-alpine
+
+    # basics environments
+    environment:
+      POSTGRES_DB: auth-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    # external connection: localhost:5430
+    ports:
+      - "5430:5432"
+
+    volumes:
+      - auth_postgres_data:/var/lib/postgresql
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d auth-db"]
+      retries: 5
+      timeout: 10s
+      interval: 10s
+
+  profile-postgres:
+    container_name: profile-postgres
+    image: postgres:16-alpine
+
+    # basics environments
+    environment:
+      POSTGRES_DB: profile-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    # external connection: localhost:5431
+    ports:
+      - "5431:5432"
+
+    volumes:
+      - profile_postgres_data:/var/lib/postgresql
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d profile-db" ]
+      retries: 5
+      timeout: 10s
+      interval: 10s
+
+  catalog-postgres:
+    container_name: catalog-postgres
+    image: postgres:16-alpine
+
+    # basics environments
+    environment:
+      POSTGRES_DB: catalog-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    # external connection: localhost:5432
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - catalog_postgres_data:/var/lib/postgresql
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d catalog-db" ]
+      retries: 5
+      timeout: 10s
+      interval: 10s
+
+  shop-zookeeper:
+    image: confluentinc/cp-zookeeper:7.7.8
+
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+    ports:
+      - "2181:2181"
+
+    healthcheck:
+      test: [ "CMD-SHELL", "bash -c '</dev/tcp/localhost/2181'" ]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  shop-kafka:
+    image: confluentinc/cp-kafka:7.7.8
+
+    # basics environments
+    environment:
+
+      # unique broker id of kafka cluster
+      KAFKA_BROKER_ID: 1
+
+      # zookeeper cluster coordinator connection
+      KAFKA_ZOOKEEPER_CONNECT: shop-zookeeper:2181
+
+      # address for connect clients
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://shop-kafka:9092
+
+      # address for get connections (all interfaces)
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+
+      # no auth protocol for listeners
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+
+      # between brokers in cluster - no auth
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      # basic replication factor of topic - 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+    # external connection: localhost:9092
+    ports:
+      - "9092:9092"
+
+    healthcheck:
+      test: [ "CMD-SHELL", "bash -c '</dev/tcp/localhost/9092'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    # start after zookeeper is healthy
+    depends_on:
+      shop-zookeeper:
+        condition: service_healthy
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+
+    # basics environments of kafka UI
+    environment:
+
+      # broker's cluster name
+      KAFKA_CLUSTERS_0_NAME: shop
+
+      # brokers for kafka UI connect
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: loyalty-kafka:9092
+
+      # zookeeper of cluster connect
+      KAFKA_CLUSTERS_0_ZOOKEEPER: loyalty-zookeeper:2181
+
+      # external connection: http://localhost:4200
+    ports:
+      - "4200:8080"
+
+    # start after zookeeper and broker healthy
+    depends_on:
+      shop-zookeeper:
+        condition: service_healthy
+      shop-kafka:
+        condition: service_healthy
+
+volumes:
+  auth_postgres_data:
+  profile_postgres_data:
+  catalog_postgres_data:
