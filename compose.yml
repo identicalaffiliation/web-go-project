@@ -138,10 +138,10 @@ services:
       KAFKA_CLUSTERS_0_NAME: shop
 
       # brokers for kafka UI connect
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: loyalty-kafka:9092
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: shop-kafka:9092
 
       # zookeeper of cluster connect
-      KAFKA_CLUSTERS_0_ZOOKEEPER: loyalty-zookeeper:2181
+      KAFKA_CLUSTERS_0_ZOOKEEPER: shop-zookeeper:2181
 
       # external connection: http://localhost:4200
     ports:
@@ -160,7 +160,7 @@ services:
       context: ./migrator
     environment:
       MIGRATIONS_PATH: ./migrations/auth
-      DB_URL: postgresql://postgres:postgres@auth-postgres:5432/auth-db?sslmode=disable
+      DB_URL: postgres://postgres:postgres@auth-postgres:5432/auth-db?sslmode=disable
     depends_on:
       auth-postgres:
         condition: service_healthy
@@ -170,7 +170,7 @@ services:
       context: ./migrator
     environment:
       MIGRATIONS_PATH: ./migrations/profile
-      DB_URL: postgresql://postgres:postgres@profile-postgres:5432/profile-db?sslmode=disable
+      DB_URL: postgres://postgres:postgres@profile-postgres:5432/profile-db?sslmode=disable
     depends_on:
       profile-postgres:
         condition: service_healthy
@@ -180,7 +180,7 @@ services:
       context: ./migrator
     environment:
       MIGRATIONS_PATH: ./migrations/catalog
-      DB_URL: postgresql://postgres:postgres@catalog-postgres:5432/catalog-db?sslmode=disable
+      DB_URL: postgres://postgres:postgres@catalog-postgres:5432/catalog-db?sslmode=disable
     depends_on:
       catalog-postgres:
         condition: service_healthy
