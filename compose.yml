@@ -185,6 +185,25 @@ services:
       catalog-postgres:
         condition: service_healthy
 
+  init-kafka:
+    image: confluentinc/cp-kafka:7.7.8
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      "
+      # blocks until kafka is reachable
+      kafka-topics --bootstrap-server shop-kafka:9092 --list
+
+      echo -e 'Creating kafka topics'
+      kafka-topics --bootstrap-server shop-kafka:9092 --create --if-not-exists --topic users.created --replication-factor 1
+      kafka-topics --bootstrap-server shop-kafka:9092 --create --if-not-exists --topic stock.created --replication-factor 1
+
+      echo -e 'Successfully created the following topics:'
+      kafka-topics --bootstrap-server shop-kafka:9092 --list
+      "
+    depends_on:
+      shop-kafka:
+        condition: service_healthy
+
 volumes:
   auth_postgres_data:
   profile_postgres_data:
