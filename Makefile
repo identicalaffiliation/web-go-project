@@ -13,6 +13,10 @@ migrate-up:
 	docker compose up --build -d profile-migrator
 	docker compose up --build -d catalog-migrator
 
+.PHONY: init_kafka_topics
+init_kafka_topics:
+	docker compose up --build -d init-kafka
+
 .PHONY: clean
 clean:
 	docker compose down -v
