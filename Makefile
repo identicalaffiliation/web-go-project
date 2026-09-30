@@ -7,6 +7,12 @@ infra_up:
 	docker compose up --build -d shop-kafka
 	docker compose up --build -d kafka-ui
 
+.PHONY: migrate-up
+migrate-up:
+	docker compose up --build -d auth-migrator
+	docker compose up --build -d profile-migrator
+	docker compose up --build -d catalog-migrator
+
 .PHONY: clean
 clean:
 	docker compose down -v
