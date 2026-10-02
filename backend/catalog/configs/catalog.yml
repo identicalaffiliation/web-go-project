@@ -1,0 +1,16 @@
+server:
+  host: 0.0.0.0
+  port: 8080
+  read_timeout: 5s
+  write_timeout: 5s
+  idle_timeout: 30s
+  shutdown_timeout: 30s
+
+s3:
+  external_host: localhost
+  internal_host: shop-minio
+  port: 9000
+  bucket: products
+  expiration: 900s
+
+operation_duration: 30s

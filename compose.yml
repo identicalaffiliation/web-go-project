@@ -1,6 +1,32 @@
 services:
 
   # INFRASTRUCTURE
+  shop-minio:
+    # minio fork
+    image: netvark/minio:latest
+    container_name: shop-minio
+
+    # web console connection: localhost:9001
+    command: server /data --console-address ":9001"
+
+    # basics environment
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+
+    volumes:
+      - minio_data:/data
+
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   auth-postgres:
     container_name: auth-postgres
     image: postgres:16-alpine
@@ -239,8 +265,40 @@ services:
       shop-kafka:
         condition: service_healthy
 
+  # APPLICATION/SERVICES
+  catalog-service:
+    container_name: catalog-service
+
+    build:
+      context: ./backend/catalog
+      dockerfile: Dockerfile
+
+    environment:
+      MASTER_DSN: ${MASTER_CATALOG_POSTGRES_DSN}
+      REPLICA_DSN: ${REPLICA_CATALOG_POSTGRES_DSN}
+      MINIO_USER: ${MINIO_USER}
+      MINIO_PASSWORD: ${MINIO_PASSWORD}
+
+    volumes:
+      - ./backend/catalog/configs/catalog.yml:/app/config.yml:ro
+
+    # external connection: localhost:8080
+    ports:
+      - "8080:8080"
+
+    depends_on:
+      catalog-master-postgres:
+        condition: service_healthy
+      shop-zookeeper:
+        condition: service_healthy
+      shop-kafka:
+        condition: service_healthy
+      shop-minio:
+        condition: service_healthy
+
 volumes:
   auth_postgres_data:
   profile_postgres_data:
   catalog_master_postgres_data:
   catalog_replica_postgres_data:
+  minio_data:
