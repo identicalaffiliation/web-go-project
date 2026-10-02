@@ -19,9 +19,6 @@ CREATE TABLE IF NOT EXISTS profiles (
     UNIQUE(user_id, profile_type)
 );
 
-CREATE INDEX idx_profiles_user_id ON profiles(user_id);
-
 -- +goose Down
-DROP INDEX IF EXISTS idx_profiles_user_id;
 DROP TABLE IF EXISTS profiles;
 DROP TYPE IF EXISTS profile_type;
