@@ -63,7 +63,7 @@ func (s *Service) issueAccessAndRefresh(claims domain.Claims, now time.Time) (
 
 	plainRefresh, refreshHash, err = s.tokens.Generate()
 	if err != nil {
-		return "", time.Time{}, "", "", time.Time{}, fmt.Errorf("iss")
+		return "", time.Time{}, "", "", time.Time{}, fmt.Errorf("generate refresh token: %w", err)
 	}
 
 	refreshExp = now.Add(RefreshTokenTTL)
