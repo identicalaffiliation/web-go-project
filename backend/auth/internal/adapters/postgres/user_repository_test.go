@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -61,21 +62,24 @@ func applyMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 
 	matches, err := filepath.Glob("../../../../../migrator/migrations/auth/*.sql")
 	if err != nil || len(matches) == 0 {
-		t.Fatalf("find migration file: %v (matches=%v)", err, matches)
+		t.Fatalf("find migration files: %v (matches=%v)", err, matches)
 	}
+	sort.Strings(matches) // имена начинаются с timestamp — сортировка строк = хронологический порядок
 
-	raw, err := os.ReadFile(matches[0])
-	if err != nil {
-		t.Fatalf("read migration file: %v", err)
-	}
+	for _, path := range matches {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read migration file %s: %v", path, err)
+		}
 
-	up, _, found := strings.Cut(string(raw), "-- +goose Down")
-	if !found {
-		t.Fatalf("migration file has no '-- +goose Down' marker")
-	}
+		up, _, found := strings.Cut(string(raw), "-- +goose Down")
+		if !found {
+			t.Fatalf("migration file %s has no '-- +goose Down' marker", path)
+		}
 
-	if _, err := pool.Exec(ctx, up); err != nil {
-		t.Fatalf("apply migration: %v", err)
+		if _, err := pool.Exec(ctx, up); err != nil {
+			t.Fatalf("apply migration %s: %v", path, err)
+		}
 	}
 }
 

@@ -8,7 +8,6 @@ import (
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/clock"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/idgen"
-	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/memory"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/postgres"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/refreshtoken"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/app"
@@ -63,7 +62,7 @@ func run(logger *slog.Logger) error {
 
 	service := app.NewService(
 		postgres.NewUserRepository(pool),
-		memory.NewRefreshTokenRepository(), // TODO(WKI-?): заменить на postgres после миграции refresh_tokens — согласовать с командой
+		postgres.NewRefreshTokenRepository(pool),
 		hasher.New(hasher.DefaultCost),
 		issuer,
 		verifier,
