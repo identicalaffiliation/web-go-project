@@ -15,12 +15,12 @@ type Role string
 type Email string
 
 const (
-	RoleUser     Role = "user"
+	RoleCustomer Role = "customer"
 	RoleBusiness Role = "business"
 )
 
 func (r Role) Valid() bool {
-	return r == RoleUser || r == RoleBusiness
+	return r == RoleCustomer || r == RoleBusiness
 }
 
 func NewEmail(raw string) (Email, error) {
