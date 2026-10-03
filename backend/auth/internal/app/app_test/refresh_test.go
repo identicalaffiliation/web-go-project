@@ -13,7 +13,7 @@ import (
 func TestRefresh_Success_Rotates(t *testing.T) {
 	fixedNow := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	stored := domain.RefreshToken{ID: "old-id", UserID: "user-1", ExpiresAt: fixedNow.Add(time.Hour)}
-	user := domain.User{ID: "user-1", Email: "alice@example.com", Role: domain.RoleUser}
+	user := domain.User{ID: "user-1", Email: "alice@example.com", Role: domain.RoleCustomer}
 
 	refreshes := &refreshRepoMock{
 		getByHashFn: func(context.Context, string) (domain.RefreshToken, error) { return stored, nil },

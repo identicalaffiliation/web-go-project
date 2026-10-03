@@ -26,7 +26,7 @@ func (s *Service) Register(ctx context.Context, in ports.RegisterInput) (domain.
 		ID:           domain.UserID(s.ids.NewID()),
 		Email:        email,
 		PasswordHash: hash,
-		Role:         domain.RoleUser,
+		Role:         domain.RoleCustomer,
 		CreatedAt:    s.clock.Now(),
 	}
 

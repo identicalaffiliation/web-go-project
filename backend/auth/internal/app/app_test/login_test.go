@@ -13,7 +13,7 @@ import (
 
 func TestLogin_Success(t *testing.T) {
 	fixedNow := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	user := domain.User{ID: "user-1", Email: "alice@example.com", PasswordHash: "hashed", Role: domain.RoleUser}
+	user := domain.User{ID: "user-1", Email: "alice@example.com", PasswordHash: "hashed", Role: domain.RoleCustomer}
 
 	users := &userRepoMock{
 		getByEmailFn: func(_ context.Context, email domain.Email) (domain.User, error) {

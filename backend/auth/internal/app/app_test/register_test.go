@@ -40,8 +40,8 @@ func TestRegister_Success(t *testing.T) {
 	if got.PasswordHash != "hashed:password1" {
 		t.Errorf("unexpected password hash: got %q", got.PasswordHash)
 	}
-	if got.Role != domain.RoleUser {
-		t.Errorf("want default role %q, got %q", domain.RoleUser, got.Role)
+	if got.Role != domain.RoleCustomer {
+		t.Errorf("want default role %q, got %q", domain.RoleCustomer, got.Role)
 	}
 	if createdUser.ID != "user-1" {
 		t.Errorf("repository got unexpected user: %+v", createdUser)

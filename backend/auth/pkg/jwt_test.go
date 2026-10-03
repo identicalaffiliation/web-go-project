@@ -25,7 +25,7 @@ func TestIssueAndVerify_Success(t *testing.T) {
 	issuer := authjwt.NewIssuer(priv, "test-kid", "auth-service", 15*time.Minute)
 	verifier := authjwt.NewVerifier(pub, "auth-service")
 
-	claims := domain.Claims{UserID: "user-1", Email: "alice@example.com", Role: domain.RoleUser}
+	claims := domain.Claims{UserID: "user-1", Email: "alice@example.com", Role: domain.RoleCustomer}
 
 	token, exp, err := issuer.Issue(claims)
 	if err != nil {
