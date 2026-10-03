@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,6 +13,7 @@ import (
 
 	trm "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
+	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/cache/redis"
 	catalogRepository "github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/catalog"
 	outboxRepository "github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/outbox"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/rest"
@@ -43,6 +45,13 @@ func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logge
 		return err
 	}
 
+	redisClient := redis.NewClient(&cfg.Cache)
+	defer func() {
+		if err := redisClient.Close(ctx); err != nil {
+			slog.Error("failed to close redis client", "error", err)
+		}
+	}()
+
 	catalogRepo := catalogRepository.NewRepository(masterPool, replicaPool)
 	outboxRepo := outboxRepository.NewRepository(masterPool, replicaPool)
 
@@ -52,6 +61,7 @@ func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logge
 		logger,
 		manager.Must(trm.NewDefaultFactory(masterPool)),
 		minioClient,
+		redisClient,
 	)
 
 	server := rest.SetupServer(&cfg.HTTPConfig, service)

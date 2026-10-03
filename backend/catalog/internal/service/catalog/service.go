@@ -8,6 +8,7 @@ type Service struct {
 	logger      ports.Logger
 	manager     ports.TxManager
 	minioClient ports.S3Client
+	cache       ports.Cache
 }
 
 func NewService(
@@ -16,6 +17,7 @@ func NewService(
 	logger ports.Logger,
 	manager ports.TxManager,
 	client ports.S3Client,
+	cache ports.Cache,
 ) *Service {
 	return &Service{
 		outbox:      outboxRepository,
@@ -23,5 +25,6 @@ func NewService(
 		logger:      logger,
 		manager:     manager,
 		minioClient: client,
+		cache:       cache,
 	}
 }

@@ -21,6 +21,7 @@ type Config struct {
 	HTTPConfig        HTTPConfig    `yaml:"server"`
 	MinioConfig       MinioConfig   `yaml:"s3"`
 	OperationDuration time.Duration `yaml:"operation_duration"`
+	Cache             RedisConfig   `yaml:"cache"`
 }
 
 type DBConfig struct {
@@ -45,4 +46,11 @@ type MinioConfig struct {
 	Expiration   time.Duration `yaml:"expiration"`
 	User         string        `env:"MINIO_USER"`
 	Password     string        `env:"MINIO_PASSWORD"`
+}
+
+type RedisConfig struct {
+	Host     string        `yaml:"host"`
+	Port     int           `yaml:"port"`
+	Password string        `env:"REDIS_PASSWORD"`
+	TTL      time.Duration `yaml:"ttl"`
 }

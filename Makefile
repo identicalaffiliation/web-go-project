@@ -8,6 +8,7 @@ up:
 	docker compose up --build -d shop-kafka
 	docker compose up --build -d kafka-ui
 	docker compose up --build -d shop-minio
+	docker compose up --build -d shop-redis
 
 .PHONY: migration-up
 migrations-up:

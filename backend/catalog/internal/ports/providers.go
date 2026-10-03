@@ -21,3 +21,8 @@ type TxManager interface {
 type S3Client interface {
 	GetPresignedURL(ctx context.Context, p *domain.Product) (string, error)
 }
+
+type Cache interface {
+	Set(ctx context.Context, key string, value any) error
+	Get(ctx context.Context, key string) (*domain.Product, error)
+}

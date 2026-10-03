@@ -13,4 +13,9 @@ s3:
   bucket: products
   expiration: 900s
 
+cache:
+  host: shop-redis
+  port: 6379
+  ttl: 600s
+
 operation_duration: 30s

@@ -62,6 +62,19 @@ func (s *Suite) SetupSuite() {
 	require.NoError(s.T(), runMigrations(s.ctx, pool))
 }
 
+func (s *Suite) TearDownTest() {
+	ctx := context.Background()
+	_, err := s.pool.Exec(ctx, `TRUNCATE TABLE catalog RESTART IDENTITY CASCADE`)
+	s.Require().NoError(err, "failed to truncate catalog after test")
+}
+
+func (s *Suite) TearDownSuite() {
+	_, err := s.pool.Exec(context.Background(), `TRUNCATE catalog RESTART IDENTITY CASCADE`)
+	s.Require().NoError(err, "failed to truncate catalog after all tests")
+
+	s.pool.Close()
+}
+
 func runMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 	std := stdlib.OpenDBFromPool(pool)
 	defer func() {

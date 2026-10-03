@@ -1,6 +1,25 @@
 services:
 
   # INFRASTRUCTURE
+  shop-redis:
+    image: redis:8-alpine
+
+    # secure redis server
+    command: [ "redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}" ]
+
+    volumes:
+      - redis_data:/data
+
+    # external connect: localhost:6379, internal connect: shop-redis:6379
+    ports:
+      - "6379:6379"
+
+    healthcheck:
+      test: [ "CMD-SHELL", "redis-cli", "ping" ]
+      interval: 5s
+      retries: 5
+      timeout: 10s
+
   shop-minio:
     # minio fork
     image: netvark/minio:latest
@@ -278,6 +297,7 @@ services:
       REPLICA_DSN: ${REPLICA_CATALOG_POSTGRES_DSN}
       MINIO_USER: ${MINIO_USER}
       MINIO_PASSWORD: ${MINIO_PASSWORD}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
 
     volumes:
       - ./backend/catalog/configs/catalog.yml:/app/config.yml:ro
@@ -295,6 +315,8 @@ services:
         condition: service_healthy
       shop-minio:
         condition: service_healthy
+      shop-redis:
+        condition: service_healthy
 
 volumes:
   auth_postgres_data:
@@ -302,3 +324,4 @@ volumes:
   catalog_master_postgres_data:
   catalog_replica_postgres_data:
   minio_data:
+  redis_data:

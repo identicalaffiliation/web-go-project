@@ -10,3 +10,11 @@ import (
 type AddToCatalogCase interface {
 	AddProductToCatalog(ctx context.Context, req *dto.CreateProductRequest) (*dto.ProductResponse, error)
 }
+
+type GetItemCase interface {
+	GetItem(ctx context.Context, id string) (*dto.ProductResponse, error)
+}
+
+type GetPageCase interface {
+	GetItemsPage(ctx context.Context, cursor *string, limit int64) (*dto.Page, error)
+}

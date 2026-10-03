@@ -46,7 +46,7 @@ func (req *CreateProductRequest) ToDomain() *domain.Product {
 	key := req.buildImageKeyFromImageName()
 	if key == "" {
 		model := &domain.Product{
-			ID:    uuid.New(),
+			ID:    uuid.NewV7(),
 			Title: req.Title,
 			Price: req.Price,
 		}
@@ -97,6 +97,11 @@ func (req *CreateProductRequest) buildImageKeyFromImageName() string {
 type File struct {
 	file   multipart.File
 	header *multipart.FileHeader
+}
+
+type Page struct {
+	Products   []Product `json:"products"`
+	NextCursor *string   `json:"nextCursor,omitempty"`
 }
 
 type ProductResponse struct {

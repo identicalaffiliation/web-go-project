@@ -10,7 +10,7 @@ import (
 )
 
 func getFileOrNil(ctx echo.Context) (*dto.File, error) {
-	header, err := ctx.FormFile("file")
+	header, err := ctx.FormFile(fileMux)
 	if err != nil && !errors.Is(err, http.ErrMissingFile) {
 		return nil, echo.ErrBadRequest
 	}

@@ -24,6 +24,8 @@ func SetupServer(cfg *config.HTTPConfig, c *catalog.Service) *echo.Echo {
 
 	internal := baseAPI.Group("/catalog")
 	internal.POST("", handlers.AddItemToCatalog(c))
+	internal.GET("/:productId", handlers.GetItem(c))
+	internal.GET("", handlers.GetItemsPage(c))
 
 	return e
 }

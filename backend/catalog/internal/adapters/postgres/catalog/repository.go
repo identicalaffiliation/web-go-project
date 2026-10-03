@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"uuid"
 
 	trm "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/utils"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/domain"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -28,6 +30,73 @@ func NewRepository(master, replica *pgxpool.Pool) *Repository {
 		poolRO: replica,
 		getter: trm.DefaultCtxGetter,
 	}
+}
+
+func (r *Repository) GetItemsByCursorPagination(ctx context.Context, cursor *string, limit int64) ([]*domain.Product, error) {
+	const query = `
+		SELECT product_id, title, description, price, image_key, created_at, updated_at
+		FROM catalog
+		WHERE product_id < COALESCE($1::uuid, 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid) -- uuid max filter
+		ORDER BY product_id DESC
+		LIMIT $2::bigint
+	`
+
+	var c any
+	if cursor != nil && *cursor != "" {
+		id, err := uuid.Parse(*cursor)
+		if err != nil {
+			return nil, ErrInvalidData
+		}
+
+		c = id
+	}
+
+	conn := r.getter.DefaultTrOrDB(ctx, r.poolRO)
+	rows, err := conn.Query(ctx, query, c, limit)
+	if err != nil {
+		return nil, fmt.Errorf("error GetItemsByCursorPagination: %w", err)
+	}
+
+	t, err := pgx.CollectRows(rows, pgx.RowToStructByName[productModel])
+	if err != nil {
+		return nil, fmt.Errorf("error GetItemsByCursorPagination: %w", err)
+	}
+
+	models := make([]*domain.Product, 0, len(t))
+	for _, v := range t {
+		models = append(models, v.toDomain())
+	}
+
+	return models, nil
+}
+
+func (r *Repository) GetItemByID(ctx context.Context, id uuid.UUID) (*domain.Product, error) {
+	const query = `
+		SELECT 
+    	product_id, title, description, price, image_key, created_at, updated_at 
+		FROM catalog WHERE product_id::uuid = $1
+	`
+
+	var m productModel
+	conn := r.getter.DefaultTrOrDB(ctx, r.poolRO)
+	err := conn.QueryRow(ctx, query, id).Scan(
+		&m.ID,
+		&m.Title,
+		&m.Description,
+		&m.Price,
+		&m.ImageKey,
+		&m.CreatedAt,
+		&m.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+
+		return nil, fmt.Errorf("error GetItemByID: %w", err)
+	}
+
+	return m.toDomain(), nil
 }
 
 func (r *Repository) Insert(ctx context.Context, product *domain.Product) (*domain.Product, error) {
