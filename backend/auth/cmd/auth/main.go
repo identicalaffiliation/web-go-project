@@ -2,14 +2,22 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/labstack/echo/v4"
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/clock"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/idgen"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/postgres"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/refreshtoken"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/rest"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/app"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/config"
 	"github.com/identicalaffiliation/web-go-project/auth/pkg/hasher"
@@ -18,7 +26,6 @@ import (
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-
 	if err := run(logger); err != nil {
 		logger.Error("auth service stopped", "error", err)
 		os.Exit(1)
@@ -31,7 +38,8 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	pool, err := postgres.NewPool(ctx, cfg.Postgres.DSN)
 	if err != nil {
@@ -70,8 +78,38 @@ func run(logger *slog.Logger) error {
 		clock.New(),
 		idgen.New(),
 	)
-	_ = service // REST/gRPC слой подключим следующим шагом
 
-	logger.Info("auth service initialized", "http_addr", cfg.HTTPAddr)
-	return nil
+	e := echo.New()
+	e.HideBanner = true
+	rest.NewHandler(service, logger).Register(e.Group("/api/v1/auth"))
+
+	srv := &http.Server{
+		Addr:         cfg.HTTPAddr,
+		Handler:      e,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		logger.Info("auth service listening", "addr", cfg.HTTPAddr)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- fmt.Errorf("listen: %w", err)
+			return
+		}
+		errCh <- nil
+	}()
+
+	select {
+	case <-ctx.Done():
+		logger.Info("shutting down auth service")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("shutdown: %w", err)
+		}
+		return nil
+	case err := <-errCh:
+		return err
+	}
 }
