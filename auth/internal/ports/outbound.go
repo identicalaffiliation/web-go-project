@@ -20,7 +20,7 @@ type RefreshTokenRepository interface {
 	Revoke(ctx context.Context, id string, now time.Time) error
 }
 
-type PassswordHasher interface {
+type PasswordHasher interface {
 	Hash(plain string) (string, error)
 	Compare(hash, plain string) error
 }

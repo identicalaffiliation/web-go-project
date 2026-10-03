@@ -16,7 +16,7 @@ const (
 type Service struct {
 	users     ports.UserRepository
 	refreshes ports.RefreshTokenRepository
-	hasher    ports.PassswordHasher
+	hasher    ports.PasswordHasher
 	issuer    ports.AccessTokenIssuer
 	verifier  ports.AccessTokenVerifier
 	tokens    ports.RefreshTokenGenerator
@@ -27,7 +27,7 @@ type Service struct {
 func NewService(
 	users ports.UserRepository,
 	refreshes ports.RefreshTokenRepository,
-	hasher ports.PassswordHasher,
+	hasher ports.PasswordHasher,
 	issuer ports.AccessTokenIssuer,
 	verifier ports.AccessTokenVerifier,
 	tokens ports.RefreshTokenGenerator,
