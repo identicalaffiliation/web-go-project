@@ -58,6 +58,6 @@ func (c *Client) Get(ctx context.Context, key string) (*domain.Product, error) {
 	return &p, nil
 }
 
-func (c *Client) Close(ctx context.Context) error {
+func (c *Client) Close(_ context.Context) error {
 	return c.client.Close()
 }

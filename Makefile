@@ -42,3 +42,7 @@ integrations:
 .PHONY: unit
 unit:
 	cd backend/catalog && go test -v -race -tags=unit ./...
+
+.PHONY: gen
+gen:
+	cd backend/catalog && go generate ./...

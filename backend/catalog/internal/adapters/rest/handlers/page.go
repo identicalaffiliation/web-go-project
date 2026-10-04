@@ -10,9 +10,14 @@ import (
 
 func GetItemsPage(app ports.GetPageCase) echo.HandlerFunc {
 	return func(ctx echo.Context) error {
-		limit, err := strconv.ParseInt(ctx.QueryParam(limitQuery), 10, 64)
-		if err != nil {
-			return echo.ErrBadRequest
+		limit := int64(50)
+		if v := ctx.QueryParam(limitQuery); v != "" {
+			n, err := strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				return echo.ErrBadRequest
+			}
+
+			limit = n
 		}
 
 		var cursorStr *string

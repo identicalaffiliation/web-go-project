@@ -55,3 +55,81 @@ func (mr *MockAddToCatalogCaseMockRecorder) AddProductToCatalog(ctx, req any) *g
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddProductToCatalog", reflect.TypeOf((*MockAddToCatalogCase)(nil).AddProductToCatalog), ctx, req)
 }
+
+// MockGetItemCase is a mock of GetItemCase interface.
+type MockGetItemCase struct {
+	ctrl     *gomock.Controller
+	recorder *MockGetItemCaseMockRecorder
+	isgomock struct{}
+}
+
+// MockGetItemCaseMockRecorder is the mock recorder for MockGetItemCase.
+type MockGetItemCaseMockRecorder struct {
+	mock *MockGetItemCase
+}
+
+// NewMockGetItemCase creates a new mock instance.
+func NewMockGetItemCase(ctrl *gomock.Controller) *MockGetItemCase {
+	mock := &MockGetItemCase{ctrl: ctrl}
+	mock.recorder = &MockGetItemCaseMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockGetItemCase) EXPECT() *MockGetItemCaseMockRecorder {
+	return m.recorder
+}
+
+// GetItem mocks base method.
+func (m *MockGetItemCase) GetItem(ctx context.Context, id string) (*dto.ProductResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetItem", ctx, id)
+	ret0, _ := ret[0].(*dto.ProductResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetItem indicates an expected call of GetItem.
+func (mr *MockGetItemCaseMockRecorder) GetItem(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetItem", reflect.TypeOf((*MockGetItemCase)(nil).GetItem), ctx, id)
+}
+
+// MockGetPageCase is a mock of GetPageCase interface.
+type MockGetPageCase struct {
+	ctrl     *gomock.Controller
+	recorder *MockGetPageCaseMockRecorder
+	isgomock struct{}
+}
+
+// MockGetPageCaseMockRecorder is the mock recorder for MockGetPageCase.
+type MockGetPageCaseMockRecorder struct {
+	mock *MockGetPageCase
+}
+
+// NewMockGetPageCase creates a new mock instance.
+func NewMockGetPageCase(ctrl *gomock.Controller) *MockGetPageCase {
+	mock := &MockGetPageCase{ctrl: ctrl}
+	mock.recorder = &MockGetPageCaseMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockGetPageCase) EXPECT() *MockGetPageCaseMockRecorder {
+	return m.recorder
+}
+
+// GetItemsPage mocks base method.
+func (m *MockGetPageCase) GetItemsPage(ctx context.Context, cursor *string, limit int64) (*dto.Page, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetItemsPage", ctx, cursor, limit)
+	ret0, _ := ret[0].(*dto.Page)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetItemsPage indicates an expected call of GetItemsPage.
+func (mr *MockGetPageCaseMockRecorder) GetItemsPage(ctx, cursor, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetItemsPage", reflect.TypeOf((*MockGetPageCase)(nil).GetItemsPage), ctx, cursor, limit)
+}
