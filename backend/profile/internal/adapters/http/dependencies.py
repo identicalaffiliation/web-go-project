@@ -19,7 +19,7 @@ def get_current_user_id(authorization: str = Header(...)) -> uuid.UUID:
     token = authorization.split(" ")[1]
 
     try:
-        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=["HS256"])
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=["RS256"])
 
         user_id_str = payload.get("user_id")
 
@@ -28,7 +28,6 @@ def get_current_user_id(authorization: str = Header(...)) -> uuid.UUID:
                 status_code=401, detail="Token payload missing 'user_id'"
             )
 
-        # 5. Преобразуем строку в UUID и возвращаем
         return uuid.UUID(user_id_str)
 
     except jwt.ExpiredSignatureError:
