@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/rest/handlers"
+	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/rest/middlewares"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/config"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/service/catalog"
 	"github.com/labstack/echo"
@@ -19,13 +20,24 @@ func SetupServer(cfg *config.HTTPConfig, c *catalog.Service) *echo.Echo {
 
 	e.Use(middleware.Recover())
 	e.Use(middleware.Logger())
-
 	baseAPI := e.Group("/api/v1")
 
 	internal := baseAPI.Group("/catalog")
-	internal.POST("", handlers.AddItemToCatalog(c))
-	internal.GET("/:productId", handlers.GetItem(c))
-	internal.GET("", handlers.GetItemsPage(c))
+	internal.POST("", handlers.AddItemToCatalog(c),
+		middlewares.RoleMiddleware(middlewares.Business),
+	)
+	internal.GET("/:productId", handlers.GetItem(c),
+		middlewares.RoleMiddleware(
+			middlewares.Client,
+			middlewares.Business,
+		),
+	)
+	internal.GET("", handlers.GetItemsPage(c),
+		middlewares.RoleMiddleware(
+			middlewares.Client,
+			middlewares.Business,
+		),
+	)
 
 	return e
 }
