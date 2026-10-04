@@ -26,7 +26,7 @@ class ProfileService:
         Обрабатывает событие из Kafka (например, auth.user.registered).
         """
         user_id_str = event_data.get("user_id")
-        event_id_str = event_data.get("event_id")  # Это наш idempotency_key
+        event_id_str = event_data.get("event_id")
 
         if not user_id_str or not event_id_str:
             logger.error(f"Invalid event data received from Kafka: {event_data}")
