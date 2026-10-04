@@ -28,3 +28,19 @@ class ProfileUpdateRequest(BaseModel):
     last_name: str | None = Field(default=None, min_length=3, max_length=100)
     phone: str | None = Field(default=None, pattern=r"^(\+7|8|7)\d{10}$")
     company_name: str | None = None
+
+
+class OrderResponse(BaseModel):
+    id: str
+    product_id: str
+    price: float
+    status: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BalanceResponse(BaseModel):
+    amount: float
+
+    model_config = ConfigDict(from_attributes=True)

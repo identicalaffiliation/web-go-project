@@ -9,6 +9,7 @@ from internal.adapters.kafka.consumer import KafkaUserRegisteredConsumer
 from internal.adapters.postgres.database import async_session_maker, engine
 from internal.adapters.postgres.repository import SqlAlchemyProfileRepository
 from internal.adapters.postgres.uow import SqlAlchemyUnitOfWork
+from internal.adapters.rpc.mock_clients import MockOrdersClient, MockPaymentsClient
 from internal.app.service import ProfileService
 from internal.config.config import settings
 
@@ -19,27 +20,34 @@ kafka_consumer: KafkaUserRegisteredConsumer | None = None
 
 
 async def build_profile_service() -> AsyncGenerator[ProfileService, None]:
-    """
-    Фабрика сервиса для HTTP-эндпоинтов.
-    FastAPI будет вызывать её на каждый входящий запрос.
-    """
     async with async_session_maker() as session:
         repo = SqlAlchemyProfileRepository(session)
         uow = SqlAlchemyUnitOfWork(session)
-        service = ProfileService(repo=repo, uow=uow)
+        orders_client = MockOrdersClient()
+        payments_client = MockPaymentsClient()
+
+        service = ProfileService(
+            repo=repo,
+            uow=uow,
+            orders_client=orders_client,
+            payments_client=payments_client,
+        )
         yield service
 
 
 async def process_kafka_message(msg_data: dict) -> None:
-    """
-    Коллбэк, который вызывается консьюмером на каждое сообщение.
-    Создает изолированную сессию БД специально для обработки этого события.
-    """
     async with async_session_maker() as session:
         repo = SqlAlchemyProfileRepository(session)
         uow = SqlAlchemyUnitOfWork(session)
-        service = ProfileService(repo=repo, uow=uow)
+        orders_client = MockOrdersClient()
+        payments_client = MockPaymentsClient()
 
+        service = ProfileService(
+            repo=repo,
+            uow=uow,
+            orders_client=orders_client,
+            payments_client=payments_client,
+        )
         await service.process_registration_event(msg_data)
 
 
@@ -52,7 +60,7 @@ async def lifespan(app: FastAPI):
     kafka_consumer = KafkaUserRegisteredConsumer(
         bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
         group_id=settings.KAFKA_CONSUMER_GROUP,
-        topic="auth.user.registered",  # Название топика, в который пишет Auth Service
+        topic="auth.user.registered",
         process_callback=process_kafka_message,
     )
 
@@ -65,7 +73,6 @@ async def lifespan(app: FastAPI):
     if kafka_consumer:
         await kafka_consumer.stop()
 
-    # Закрываем пулы соединений с БД
     await engine.dispose()
 
 

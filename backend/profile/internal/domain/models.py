@@ -25,14 +25,18 @@ class Profile:
 
 
 @dataclass
-class Address:
-    id: uuid.UUID
-    profile_id: uuid.UUID
-    city: str
-    street: str
-    house: str
-    apartment: str | None = None
-    is_default: bool = False
+class OrderDTO:
+    id: str
+    product_id: str
+    price: float
+    status: str
+    created_at: datetime
 
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
+@dataclass
+class BalanceDTO:
+    amount: float
+
+@dataclass
+class WishlistItemDTO:
+    product_id: str
+    added_at: datetime

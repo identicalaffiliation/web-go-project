@@ -3,16 +3,19 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from internal.adapters.http.dependencies import get_current_user_id, get_profile_service
-from internal.adapters.http.schemas import ProfileResponse, ProfileUpdateRequest
+from internal.adapters.http.schemas import (
+    BalanceResponse,
+    OrderResponse,
+    ProfileResponse,
+    ProfileUpdateRequest,
+)
+from internal.app.service import ProfileService
 from internal.domain.exceptions import ProfileNotFoundError
 
 router = APIRouter(prefix="/profiles", tags=["Profiles"])
 
-# Выносим зависимости в алиасы для переиспользования (очень частая практика)
 UserIdDep = Annotated[uuid.UUID, Depends(get_current_user_id)]
-# ProfileServiceDep = Annotated[ProfileService, Depends(get_profile_service)]
-# Временно оставим как Any, пока не напишем сам сервис
-ProfileServiceDep = Annotated[any, Depends(get_profile_service)]
+ProfileServiceDep = Annotated[ProfileService, Depends(get_profile_service)]
 
 
 @router.get("/me", response_model=list[ProfileResponse])
@@ -53,3 +56,17 @@ async def update_my_profile(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
         )
+
+
+@router.get("/orders", response_model=list[OrderResponse])
+async def get_my_orders(user_id: UserIdDep, profile_service: ProfileServiceDep):
+    """Получить историю заказов текущего пользователя."""
+    orders = await profile_service.get_orders(user_id)
+    return orders
+
+
+@router.get("/balance", response_model=BalanceResponse)
+async def get_my_balance(user_id: UserIdDep, profile_service: ProfileServiceDep):
+    """Получить баланс текущего пользователя."""
+    balance = await profile_service.get_balance(user_id)
+    return balance

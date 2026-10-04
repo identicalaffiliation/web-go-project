@@ -3,8 +3,9 @@ import uuid
 from typing import Any
 
 from internal.domain.exceptions import ProfileNotFoundError
-from internal.domain.models import Profile, ProfileType
+from internal.domain.models import BalanceDTO, OrderDTO, Profile, ProfileType
 from internal.ports.repository import IProfileRepository
+from internal.ports.rpc_clients import IOrdersClient, IPaymentsClient
 from internal.ports.uow import IUnitOfWork
 
 logger = logging.getLogger(__name__)
@@ -16,10 +17,17 @@ class ProfileService:
     Оркестрирует доменные модели, репозиторий и управление транзакциями.
     """
 
-    def __init__(self, repo: IProfileRepository, uow: IUnitOfWork):
-
+    def __init__(
+        self,
+        repo: IProfileRepository,
+        uow: IUnitOfWork,
+        orders_client: IOrdersClient,
+        payments_client: IPaymentsClient,
+    ):
         self.repo = repo
         self.uow = uow
+        self.orders_client = orders_client
+        self.payments_client = payments_client
 
     async def process_registration_event(self, event_data: dict[str, Any]) -> None:
         """
@@ -96,3 +104,11 @@ class ProfileService:
         except Exception:
             await self.uow.rollback()
             raise
+
+    async def get_orders(self, user_id: uuid.UUID) -> list[OrderDTO]:
+        """Получить историю заказов пользователя из внешнего сервиса."""
+        return await self.orders_client.get_user_orders(user_id)
+
+    async def get_balance(self, user_id: uuid.UUID) -> BalanceDTO:
+        """Получить баланс пользователя из внешнего сервиса."""
+        return await self.payments_client.get_user_balance(user_id)
