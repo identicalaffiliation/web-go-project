@@ -26,7 +26,7 @@ const (
 	migrations       = "../../../../migrator/migrations/catalog"
 )
 
-type Suite struct {
+type DatabaseSuite struct {
 	suite.Suite
 	container *postgres.PostgresContainer
 	catalog   *catalog.Repository
@@ -35,7 +35,7 @@ type Suite struct {
 	ctx       context.Context
 }
 
-func (s *Suite) SetupSuite() {
+func (s *DatabaseSuite) SetupSuite() {
 	s.ctx = context.Background()
 	container, err := postgres.Run(
 		s.ctx,
@@ -62,15 +62,15 @@ func (s *Suite) SetupSuite() {
 	require.NoError(s.T(), runMigrations(s.ctx, pool))
 }
 
-func (s *Suite) TearDownTest() {
+func (s *DatabaseSuite) TearDownTest() {
 	ctx := context.Background()
-	_, err := s.pool.Exec(ctx, `TRUNCATE TABLE catalog RESTART IDENTITY CASCADE`)
-	s.Require().NoError(err, "failed to truncate catalog after test")
+	_, err := s.pool.Exec(ctx, `TRUNCATE TABLE catalog, outbox RESTART IDENTITY CASCADE`)
+	s.Require().NoError(err, "failed to truncate tables after test")
 }
 
-func (s *Suite) TearDownSuite() {
-	_, err := s.pool.Exec(context.Background(), `TRUNCATE catalog RESTART IDENTITY CASCADE`)
-	s.Require().NoError(err, "failed to truncate catalog after all tests")
+func (s *DatabaseSuite) TearDownSuite() {
+	_, err := s.pool.Exec(context.Background(), `TRUNCATE catalog, outbox RESTART IDENTITY CASCADE`)
+	s.Require().NoError(err, "failed to truncate tables after all tests")
 
 	s.pool.Close()
 }
@@ -84,7 +84,7 @@ func runMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 	return goose.UpContext(ctx, std, migrations)
 }
 
-func (s *Suite) loadFixtures(path string) error {
+func (s *DatabaseSuite) loadFixtures(path string) error {
 	raw, err := os.ReadFile("fixtures/" + path)
 	if err != nil {
 		return fmt.Errorf("error while loading fixtures: %w", err)

@@ -20,3 +20,8 @@ type GetItemCase interface {
 type GetPageCase interface {
 	GetItemsPage(ctx context.Context, cursor *string, limit int64) (*dto.Page, error)
 }
+
+//go:generate mockgen -source=$GOFILE -destination=../../gen/mocks/mock_$GOFILE -package=mocks
+type UploadImageCase interface {
+	UploadImage(ctx context.Context, id string, format dto.ImageFormat) (*dto.ProductResponse, error)
+}

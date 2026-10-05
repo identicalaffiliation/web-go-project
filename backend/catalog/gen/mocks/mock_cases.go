@@ -133,3 +133,42 @@ func (mr *MockGetPageCaseMockRecorder) GetItemsPage(ctx, cursor, limit any) *gom
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetItemsPage", reflect.TypeOf((*MockGetPageCase)(nil).GetItemsPage), ctx, cursor, limit)
 }
+
+// MockUploadImageCase is a mock of UploadImageCase interface.
+type MockUploadImageCase struct {
+	ctrl     *gomock.Controller
+	recorder *MockUploadImageCaseMockRecorder
+	isgomock struct{}
+}
+
+// MockUploadImageCaseMockRecorder is the mock recorder for MockUploadImageCase.
+type MockUploadImageCaseMockRecorder struct {
+	mock *MockUploadImageCase
+}
+
+// NewMockUploadImageCase creates a new mock instance.
+func NewMockUploadImageCase(ctrl *gomock.Controller) *MockUploadImageCase {
+	mock := &MockUploadImageCase{ctrl: ctrl}
+	mock.recorder = &MockUploadImageCaseMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockUploadImageCase) EXPECT() *MockUploadImageCaseMockRecorder {
+	return m.recorder
+}
+
+// UploadImage mocks base method.
+func (m *MockUploadImageCase) UploadImage(ctx context.Context, id string, format dto.ImageFormat) (*dto.ProductResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UploadImage", ctx, id, format)
+	ret0, _ := ret[0].(*dto.ProductResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UploadImage indicates an expected call of UploadImage.
+func (mr *MockUploadImageCaseMockRecorder) UploadImage(ctx, id, format any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadImage", reflect.TypeOf((*MockUploadImageCase)(nil).UploadImage), ctx, id, format)
+}

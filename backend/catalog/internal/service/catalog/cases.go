@@ -47,13 +47,7 @@ func (s *Service) AddProductToCatalog(ctx context.Context, req *dto.CreateProduc
 		return nil, ErrInternal
 	}
 
-	url, err := s.minioClient.GetPresignedURL(ctx, created)
-	if err != nil {
-		s.logger.WithError(err).Error("failed to get presigned link from s3")
-		return nil, ErrInternal
-	}
-
-	return s.toResponseOne(created, url), nil
+	return s.toResponseOne(created, ""), nil
 }
 
 func (s *Service) GetItemsPage(ctx context.Context, cursor *string, limit int64) (*dto.Page, error) {
@@ -61,7 +55,7 @@ func (s *Service) GetItemsPage(ctx context.Context, cursor *string, limit int64)
 		limit = 50
 	}
 
-	items, err := s.catalog.GetItemsByCursorPagination(ctx, cursor, limit)
+	items, err := s.catalog.GetItemsByCursorPagination(ctx, cursor, limit+1)
 	if err != nil {
 		s.logger.WithError(err).Error("failed to get items with cursor pagination")
 		return nil, ErrInternal
@@ -122,4 +116,42 @@ func (s *Service) GetItem(ctx context.Context, id string) (*dto.ProductResponse,
 	}
 
 	return s.toResponseOne(item, ""), nil
+}
+
+func (s *Service) UploadImage(ctx context.Context, id string, format dto.ImageFormat) (*dto.ProductResponse, error) {
+	productID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, dto.ErrInvalidData
+	}
+
+	ext, ok := format.Ext()
+	if !ok {
+		return nil, dto.ErrInvalidData
+	}
+
+	imageKey := buildImageKey(ext)
+
+	product, err := s.catalog.UpdateImageKey(ctx, imageKey, productID)
+	if err != nil {
+		if errors.Is(err, catalog.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+
+		s.logger.WithError(err).Error(
+			"failed to update image key",
+			zap.String("product id", productID.String()),
+		)
+		return nil, ErrInternal
+	}
+
+	url, err := s.minioClient.GetPresignedURL(ctx, product)
+	if err != nil {
+		s.logger.WithError(err).Error(
+			"failed to get presigned url",
+			zap.String("product id", productID.String()),
+		)
+		return nil, ErrInternal
+	}
+
+	return s.toResponseOne(product, url), nil
 }

@@ -101,18 +101,14 @@ func (r *Repository) GetItemByID(ctx context.Context, id uuid.UUID) (*domain.Pro
 
 func (r *Repository) Insert(ctx context.Context, product *domain.Product) (*domain.Product, error) {
 	const query = `
-		INSERT INTO catalog (product_id, title, description, price, image_key)
-		VALUES ($1, $2, $3, $4, $5) RETURNING
+		INSERT INTO catalog (product_id, title, description, price)
+		VALUES ($1, $2, $3, $4) RETURNING
 		product_id, title, description, price, image_key, created_at, updated_at
 	`
 
 	var (
-		key  *string
 		desc *string
 	)
-	if product.ImageKey != "" {
-		key = &product.ImageKey
-	}
 
 	if product.Description != "" {
 		desc = &product.Description
@@ -127,7 +123,6 @@ func (r *Repository) Insert(ctx context.Context, product *domain.Product) (*doma
 		product.Title,
 		desc,
 		product.Price,
-		key,
 	).Scan(
 		&m.ID,
 		&m.Title,
@@ -143,6 +138,33 @@ func (r *Repository) Insert(ctx context.Context, product *domain.Product) (*doma
 		}
 
 		return nil, fmt.Errorf("error CatalogInsert: %w", err)
+	}
+
+	return m.toDomain(), nil
+}
+
+func (r *Repository) UpdateImageKey(ctx context.Context, key string, productID uuid.UUID) (*domain.Product, error) {
+	const query = `UPDATE catalog SET image_key = $1, updated_at = now() WHERE product_id = $2
+		RETURNING *`
+
+	conn := r.getter.DefaultTrOrDB(ctx, r.pool)
+
+	var m productModel
+	err := conn.QueryRow(ctx, query, key, productID).Scan(
+		&m.ID,
+		&m.Title,
+		&m.Description,
+		&m.Price,
+		&m.ImageKey,
+		&m.CreatedAt,
+		&m.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+
+		return nil, fmt.Errorf("error UpdateImageKey: %w", err)
 	}
 
 	return m.toDomain(), nil

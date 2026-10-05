@@ -13,17 +13,16 @@ import (
 )
 
 func TestCatalogSuite(t *testing.T) {
-	suite.Run(t, new(Suite))
+	suite.Run(t, new(DatabaseSuite))
 }
 
-func (s *Suite) Test_CatalogRepository_Insert() {
+func (s *DatabaseSuite) Test_CatalogRepository_Insert() {
 	t := s.T()
 	expected := &domain.Product{
 		ID:          uuid.New(),
 		Title:       "some title",
 		Description: "some description",
 		Price:       120000,
-		ImageKey:    "some key1",
 	}
 
 	actual, err := s.catalog.Insert(s.ctx, expected)
@@ -33,12 +32,12 @@ func (s *Suite) Test_CatalogRepository_Insert() {
 	require.Equal(t, expected.Title, actual.Title)
 	require.Equal(t, expected.Description, actual.Description)
 	require.Equal(t, expected.Price, actual.Price)
-	require.Equal(t, expected.ImageKey, actual.ImageKey)
+	require.Empty(t, actual.ImageKey)
 	require.NotEmpty(t, actual.CreatedAt)
 	require.NotEmpty(t, actual.UpdatedAt)
 }
 
-func (s *Suite) Test_CatalogRepository_Insert_CheckConstraintsFail() {
+func (s *DatabaseSuite) Test_CatalogRepository_Insert_CheckConstraintsFail() {
 
 	s.T().Run("invalid - negative price field", func(t *testing.T) {
 		expected := &domain.Product{
@@ -71,20 +70,20 @@ func (s *Suite) Test_CatalogRepository_Insert_CheckConstraintsFail() {
 	})
 }
 
-func (s *Suite) Test_CatalogRepository_Insert_EmptyFields() {
+func (s *DatabaseSuite) Test_CatalogRepository_Insert_EmptyFields() {
 
 	s.T().Run("empty field - description", func(t *testing.T) {
 		expected := &domain.Product{
-			ID:       uuid.New(),
-			Title:    "test title",
-			Price:    123,
-			ImageKey: "some key4",
+			ID:    uuid.New(),
+			Title: "test title",
+			Price: 123,
 		}
 
 		actual, err := s.catalog.Insert(s.ctx, expected)
 		s.Require().NoError(err)
 		s.Require().NotNil(actual)
 		s.Require().Empty(actual.Description)
+		s.Require().Empty(actual.ImageKey)
 	})
 
 	s.T().Run("empty field - image key", func(t *testing.T) {
@@ -102,7 +101,7 @@ func (s *Suite) Test_CatalogRepository_Insert_EmptyFields() {
 	})
 }
 
-func (s *Suite) Test_CatalogRepository_GetItemByID() {
+func (s *DatabaseSuite) Test_CatalogRepository_GetItemByID() {
 	s.Require().NoError(s.loadFixtures("items_list.sql"))
 
 	s.T().Run("valid case", func(t *testing.T) {
@@ -125,7 +124,7 @@ func (s *Suite) Test_CatalogRepository_GetItemByID() {
 	})
 }
 
-func (s *Suite) Test_CatalogRepository_GetItemsByCursorPagination() {
+func (s *DatabaseSuite) Test_CatalogRepository_GetItemsByCursorPagination() {
 	s.Require().NoError(s.loadFixtures("items_list.sql"))
 
 	s.T().Run("no cursor case", func(t *testing.T) {

@@ -4,13 +4,24 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path"
+	"strconv"
+	"time"
 	"uuid"
 
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/domain"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/dto"
 )
 
-var ErrInternal = errors.New("internal error")
+var (
+	ErrInternal  = errors.New("internal error")
+	ErrNotFound  = errors.New("not found")
+)
+
+func buildImageKey(ext string) string {
+	now := time.Now().UTC()
+	return path.Join("image", strconv.Itoa(now.Year()), now.Month().String(), uuid.New().String()+ext)
+}
 
 func (s *Service) toEvent(product *domain.Product) (*domain.Event, error) {
 	payload, err := json.Marshal(product)

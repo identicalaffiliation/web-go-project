@@ -10,27 +10,24 @@ import (
 	"github.com/labstack/echo"
 )
 
-func AddItemToCatalog(app ports.AddToCatalogCase) echo.HandlerFunc {
+func UploadImage(app ports.UploadImageCase) echo.HandlerFunc {
 	return func(ctx echo.Context) error {
-		var req dto.CreateProductRequest
-		if err := ctx.Bind(&req); err != nil {
-			return echo.ErrBadRequest
-		}
+		id := ctx.Param(idMux)
+		format := dto.ImageFormat(ctx.QueryParam(formatQuery))
 
-		if err := req.ValidateJSON(); err != nil {
-			return echo.ErrBadRequest
-		}
-
-		reqCtx := ctx.Request().Context()
-		response, err := app.AddProductToCatalog(reqCtx, &req)
+		response, err := app.UploadImage(ctx.Request().Context(), id, format)
 		if err != nil {
-			if !errors.Is(err, catalog.ErrInternal) {
+			if errors.Is(err, dto.ErrInvalidData) {
 				return echo.ErrBadRequest
+			}
+
+			if errors.Is(err, catalog.ErrNotFound) {
+				return echo.ErrNotFound
 			}
 
 			return echo.ErrInternalServerError
 		}
 
-		return ctx.JSON(http.StatusCreated, response)
+		return ctx.JSON(http.StatusOK, response)
 	}
 }

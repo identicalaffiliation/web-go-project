@@ -4,6 +4,7 @@ package outbox
 
 import (
 	"database/sql"
+	"encoding/json"
 	"testing"
 	"time"
 	"uuid"
@@ -18,8 +19,7 @@ func Test_EventModel_ToDomain(t *testing.T) {
 	model := &eventModel{
 		EventID:   id,
 		Key:       key,
-		Payload:   sql.RawBytes("some payload"),
-		Status:    Processing,
+		Payload:   json.RawMessage("some payload"),
 		CreatedAt: time.Now().UTC(),
 		SentAt:    sql.Null[time.Time]{V: time.Now().Add(time.Second).UTC(), Valid: true},
 	}
