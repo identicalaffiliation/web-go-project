@@ -285,6 +285,16 @@ services:
         condition: service_healthy
 
   # APPLICATION/SERVICES
+  auth-service:
+    container_name: auth-service
+
+    # STUB — replace with real auth-service that validates JWT
+    # Expected: GET /validate with Authorization header
+    # Returns: 200 + X-User-Role header (business|client), or 401/403
+    build:
+      context: ./scripts/auth-stub
+      dockerfile: Dockerfile
+
   catalog-service:
     container_name: catalog-service
 
@@ -302,9 +312,7 @@ services:
     volumes:
       - ./backend/catalog/configs/catalog.yml:/app/config.yml:ro
 
-    # external connection: localhost:8080
-    ports:
-      - "8080:8080"
+    # internal only — nginx proxies to catalog-service:8080
 
     depends_on:
       catalog-master-postgres:
@@ -317,6 +325,23 @@ services:
         condition: service_healthy
       shop-redis:
         condition: service_healthy
+
+  shop-nginx:
+    container_name: shop-nginx
+
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+
+    # external connection: localhost:8080
+    ports:
+      - "8080:80"
+
+    depends_on:
+      auth-service:
+        condition: service_started
+      catalog-service:
+        condition: service_started
 
 volumes:
   auth_postgres_data:
