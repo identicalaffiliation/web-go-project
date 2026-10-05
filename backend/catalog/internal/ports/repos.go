@@ -15,4 +15,6 @@ type CatalogRepository interface {
 
 type OutboxRepository interface {
 	Insert(ctx context.Context, event *domain.Event) error
+	SentEvent(ctx context.Context, ids []uuid.UUID) error
+	GetEvents(ctx context.Context, limit int64) ([]*domain.Event, error)
 }

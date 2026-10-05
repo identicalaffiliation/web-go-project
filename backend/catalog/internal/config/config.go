@@ -22,6 +22,8 @@ type Config struct {
 	MinioConfig       MinioConfig   `yaml:"s3"`
 	OperationDuration time.Duration `yaml:"operation_duration"`
 	Cache             RedisConfig   `yaml:"cache"`
+	Broker            KafkaConfig   `yaml:"kafka"`
+	Outbox            OutboxConfig  `yaml:"outbox"`
 }
 
 type DBConfig struct {
@@ -53,4 +55,17 @@ type RedisConfig struct {
 	Port     int           `yaml:"port"`
 	Password string        `env:"REDIS_PASSWORD"`
 	TTL      time.Duration `yaml:"ttl"`
+}
+
+type OutboxConfig struct {
+	TickTime time.Duration `yaml:"tick"`
+	Limit    int64         `yaml:"limit"`
+}
+
+type KafkaConfig struct {
+	Brokers      []string      `yaml:"brokers"`
+	ProduceTopic string        `yaml:"produce_topic"`
+	BatchSize    int           `yaml:"batch_size"`
+	BatchTimeout time.Duration `yaml:"batch_timeout"`
+	WriteTimeout time.Duration `yaml:"write_timeout"`
 }

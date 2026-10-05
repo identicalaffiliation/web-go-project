@@ -12,6 +12,7 @@ type Logger interface {
 	Debug(msg string, fields ...zap.Field)
 	Error(msg string, fields ...zap.Field)
 	WithError(err error) Logger
+	Sync() error
 }
 
 type TxManager interface {
@@ -25,4 +26,8 @@ type S3Client interface {
 type Cache interface {
 	Set(ctx context.Context, key string, value any) error
 	Get(ctx context.Context, key string) (*domain.Product, error)
+}
+
+type Producer interface {
+	SendMessages(ctx context.Context, events []*domain.Event) error
 }

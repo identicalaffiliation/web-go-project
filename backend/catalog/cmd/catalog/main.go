@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/box"
@@ -18,6 +19,12 @@ func main() {
 
 	zapLogger, err := logger.ProvideLogger()
 	shortcut.ErrNotNilFatal(err)
+
+	defer func() {
+		if err := zapLogger.Sync(); err != nil {
+			fmt.Println(err)
+		}
+	}()
 
 	cfg, err := config.ProvideConfig(configPath)
 	if err != nil {

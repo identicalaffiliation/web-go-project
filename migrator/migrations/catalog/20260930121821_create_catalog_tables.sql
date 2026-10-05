@@ -21,12 +21,11 @@ CREATE TABLE IF NOT EXISTS outbox (
     id UUID PRIMARY KEY, -- event_id to kafka header
     key UUID NOT NULL, -- kafka key
     payload JSONB NOT NULL, -- kafka body,
-    status event_status NOT NULL DEFAULT 'pending',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     sent_at TIMESTAMPTZ
 );
 
-CREATE INDEX IF NOT EXISTS not_sent_events ON outbox(created_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS not_sent_events ON outbox(created_at) WHERE sent_at IS NULL;
 
 -- +goose Down
 DROP TABLE IF EXISTS outbox;

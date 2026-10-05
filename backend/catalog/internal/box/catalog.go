@@ -8,11 +8,13 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	trm "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
+	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/brokers/kafka"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/cache/redis"
 	catalogRepository "github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/catalog"
 	outboxRepository "github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/outbox"
@@ -21,6 +23,7 @@ import (
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/config"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/ports"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/service/catalog"
+	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/service/outbox"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 )
@@ -52,6 +55,13 @@ func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logge
 		}
 	}()
 
+	kafkaproducer := kafka.NewProducer(&cfg.Broker)
+	defer func() {
+		if err := kafkaproducer.Close(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+
 	catalogRepo := catalogRepository.NewRepository(masterPool, replicaPool)
 	outboxRepo := outboxRepository.NewRepository(masterPool, replicaPool)
 
@@ -63,6 +73,17 @@ func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logge
 		minioClient,
 		redisClient,
 	)
+
+	var wg sync.WaitGroup
+	notifyCtx, stop := signal.NotifyContext(ctx, syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+
+	wg.Add(1)
+	go func() {
+		if err := outbox.Run(notifyCtx, outboxRepo, kafkaproducer, logger, &cfg.Outbox, &wg); err != nil {
+			logger.Debug("ctx signal")
+		}
+	}()
 
 	server := rest.SetupServer(&cfg.HTTPConfig, service)
 
@@ -91,6 +112,8 @@ func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logge
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("error ShutdownServer: %w", err)
 	}
+
+	wg.Wait()
 
 	return nil
 }

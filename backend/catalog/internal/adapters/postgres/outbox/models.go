@@ -2,6 +2,7 @@ package outbox
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 	"uuid"
 
@@ -29,8 +30,7 @@ func (em *eventModels) toDomainList() []*domain.Event { //nolint: unused
 type eventModel struct { //nolint: unused
 	EventID   uuid.UUID           `db:"id"`
 	Key       uuid.UUID           `db:"key"`
-	Payload   sql.RawBytes        `db:"payload"`
-	Status    EventStatus         `db:"status"`
+	Payload   json.RawMessage     `db:"payload"`
 	CreatedAt time.Time           `db:"created_at"`
 	SentAt    sql.Null[time.Time] `db:"sent_at"`
 }
@@ -40,7 +40,6 @@ func (m *eventModel) toDomain() *domain.Event { //nolint: unused
 		EventID:   m.EventID,
 		Key:       m.Key,
 		Payload:   m.Payload,
-		Status:    string(m.Status),
 		CreatedAt: m.CreatedAt,
 		SentAt:    m.SentAt.V,
 	}
