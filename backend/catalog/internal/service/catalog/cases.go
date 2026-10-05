@@ -92,7 +92,7 @@ func (s *Service) GetItem(ctx context.Context, id string) (*dto.ProductResponse,
 	}
 
 	if cached != nil {
-		return s.toResponseOne(cached, ""), nil
+		return s.toResponseOne(cached, cached.ImageKey), nil
 	}
 
 	item, err := s.catalog.GetItemByID(ctx, productID)
@@ -115,7 +115,7 @@ func (s *Service) GetItem(ctx context.Context, id string) (*dto.ProductResponse,
 		)
 	}
 
-	return s.toResponseOne(item, ""), nil
+	return s.toResponseOne(item, item.ImageKey), nil
 }
 
 func (s *Service) UploadImage(ctx context.Context, id string, format dto.ImageFormat) (*dto.ProductResponse, error) {
