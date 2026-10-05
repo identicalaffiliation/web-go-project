@@ -144,6 +144,10 @@ func (s *Service) UploadImage(ctx context.Context, id string, format dto.ImageFo
 		return nil, ErrInternal
 	}
 
+	if err := s.cache.Set(ctx, product.ID.String(), product); err != nil {
+		s.logger.WithError(err).Error("failed to set product to cache")
+	}
+
 	url, err := s.minioClient.GetPresignedURL(ctx, product)
 	if err != nil {
 		s.logger.WithError(err).Error(

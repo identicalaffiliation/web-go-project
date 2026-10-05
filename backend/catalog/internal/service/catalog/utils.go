@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	ErrInternal  = errors.New("internal error")
-	ErrNotFound  = errors.New("not found")
+	ErrInternal = errors.New("internal error")
+	ErrNotFound = errors.New("not found")
 )
 
 func buildImageKey(ext string) string {
@@ -70,19 +70,25 @@ func (s *Service) getPage(products []*domain.Product, nextCursor *string) *dto.P
 	for _, v := range products {
 		var (
 			d *string
+			u *string
 		)
 
 		if v.Description != "" {
 			d = &v.Description
 		}
 
+		if v.ImageKey != "" {
+			u = &v.ImageKey
+		}
+
 		m = append(m, dto.Product{
-			ProductID:   v.ID,
-			Title:       v.Title,
-			Description: d,
-			Price:       v.Price,
-			CreatedAt:   v.CreatedAt,
-			UpdatedAt:   v.UpdatedAt,
+			ProductID:    v.ID,
+			Title:        v.Title,
+			Description:  d,
+			PresignedURL: u,
+			Price:        v.Price,
+			CreatedAt:    v.CreatedAt,
+			UpdatedAt:    v.UpdatedAt,
 		})
 	}
 
