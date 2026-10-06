@@ -1,6 +1,51 @@
 services:
 
   # INFRASTRUCTURE
+  shop-redis:
+    image: redis:8-alpine
+
+    # secure redis server
+    command: [ "redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}" ]
+
+    volumes:
+      - redis_data:/data
+
+    # external connect: localhost:6379, internal connect: shop-redis:6379
+    ports:
+      - "6379:6379"
+
+    healthcheck:
+      test: [ "CMD-SHELL", "redis-cli", "ping" ]
+      interval: 5s
+      retries: 5
+      timeout: 10s
+
+  shop-minio:
+    # minio fork
+    image: netvark/minio:latest
+    container_name: shop-minio
+
+    # web console connection: localhost:9001
+    command: server /data --console-address ":9001"
+
+    # basics environment
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+
+    volumes:
+      - minio_data:/data
+
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   auth-postgres:
     container_name: auth-postgres
     image: postgres:16-alpine
@@ -47,9 +92,13 @@ services:
       timeout: 10s
       interval: 10s
 
-  catalog-postgres:
-    container_name: catalog-postgres
-    image: postgres:16-alpine
+  catalog-master-postgres:
+    build:
+      context: ./scripts/postgres/catalog/master
+      dockerfile: Dockerfile
+
+    container_name: catalog-master-postgres
+    image: catalog-master-postgres:1
 
     # basics environments
     environment:
@@ -62,7 +111,38 @@ services:
       - "5432:5432"
 
     volumes:
-      - catalog_postgres_data:/var/lib/postgresql
+      - catalog_master_postgres_data:/var/lib/postgresql
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d catalog-db" ]
+      retries: 5
+      timeout: 10s
+      interval: 10s
+
+  catalog-replica-postgres:
+    build:
+      context: ./scripts/postgres/catalog/replica
+      dockerfile: Dockerfile
+
+    container_name: catalog-replica-postgres
+    image: catalog-replica-postgres:1
+
+    # basics environments
+    environment:
+      POSTGRES_DB: catalog-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    # external connection: localhost:5433
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - catalog_replica_postgres_data:/var/lib/postgresql
+
+    depends_on:
+      catalog-master-postgres:
+        condition: service_healthy
 
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -d catalog-db" ]
@@ -180,9 +260,9 @@ services:
       context: ./migrator
     environment:
       MIGRATIONS_PATH: ./migrations/catalog
-      DB_URL: postgres://postgres:postgres@catalog-postgres:5432/catalog-db?sslmode=disable
+      DB_URL: postgres://postgres:postgres@catalog-master-postgres:5432/catalog-db?sslmode=disable
     depends_on:
-      catalog-postgres:
+      catalog-master-postgres:
         condition: service_healthy
 
   init-kafka:
@@ -204,7 +284,69 @@ services:
       shop-kafka:
         condition: service_healthy
 
+  # APPLICATION/SERVICES
+  auth-service:
+    container_name: auth-service
+
+    # STUB — replace with real auth-service that validates JWT
+    # Expected: GET /validate with Authorization header
+    # Returns: 200 + X-User-Role header (business|client), or 401/403
+    build:
+      context: ./scripts/auth-stub
+      dockerfile: Dockerfile
+
+  catalog-service:
+    container_name: catalog-service
+
+    build:
+      context: ./backend/catalog
+      dockerfile: Dockerfile
+
+    environment:
+      MASTER_DSN: ${MASTER_CATALOG_POSTGRES_DSN}
+      REPLICA_DSN: ${REPLICA_CATALOG_POSTGRES_DSN}
+      MINIO_USER: ${MINIO_USER}
+      MINIO_PASSWORD: ${MINIO_PASSWORD}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+    volumes:
+      - ./backend/catalog/configs/catalog.yml:/app/config.yml:ro
+
+    # internal only — nginx proxies to catalog-service:8080
+
+    depends_on:
+      catalog-master-postgres:
+        condition: service_healthy
+      shop-zookeeper:
+        condition: service_healthy
+      shop-kafka:
+        condition: service_healthy
+      shop-minio:
+        condition: service_healthy
+      shop-redis:
+        condition: service_healthy
+
+  shop-nginx:
+    container_name: shop-nginx
+
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+
+    # external connection: localhost:8080
+    ports:
+      - "8080:80"
+
+    depends_on:
+      auth-service:
+        condition: service_started
+      catalog-service:
+        condition: service_started
+
 volumes:
   auth_postgres_data:
   profile_postgres_data:
-  catalog_postgres_data:
+  catalog_master_postgres_data:
+  catalog_replica_postgres_data:
+  minio_data:
+  redis_data:

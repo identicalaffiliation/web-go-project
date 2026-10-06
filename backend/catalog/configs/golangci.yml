@@ -1,0 +1,109 @@
+version: "2"
+
+run:
+  timeout: 5m
+  relative-path-mode: gomod
+  issues-exit-code: 1
+  tests: true
+  modules-download-mode: readonly
+
+output:
+  formats:
+    text:
+      print-linter-name: true
+      print-issued-lines: true
+      colors: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  uniq-by-line: true
+
+linters:
+  default: standard
+  enable:
+    - errcheck
+    - staticcheck
+    - govet
+    - gocritic
+    - revive
+    - unused
+    - gosec
+    - depguard
+    - bodyclose
+    - asciicheck
+    - cyclop
+    - dupl
+    - ineffassign
+    - unparam
+    - errorlint
+    - errname
+    - forbidigo
+    - contextcheck
+    - containedctx
+  disable:
+    - gocyclo
+    - lll
+
+  exclusions:
+    generated: strict
+    rules:
+      - path: _test\.go
+        linters:
+          - cyclop
+          - dupl
+          - gosec
+          - forbidigo
+
+  settings:
+
+    gosec:
+      excludes:
+        - G104
+      config:
+        global:
+          audit: true
+          show-ignored: true
+        severity: "medium"
+        confidence: "medium"
+
+    cyclop:
+      max-complexity: 20
+
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: io/ioutil
+              desc: "Использование устаревшего пакета io/ioutil запрещено (замените вызовы на аналоги из пакетов os/io)"
+
+    revive:
+      severity: warning
+      rules:
+        - name: package-comments
+          disabled: true
+
+    forbidigo:
+      exclude-godoc-examples: true
+      analyze-types: true
+      forbid:
+        - pattern: '^fmt\.Print.*$'
+          msg: "Запрещено напрямую использовать fmt.Print* для логирования (вместо этого используйте структурированный логгер)"
+        - pattern: '^time\.Sleep$'
+          msg: "Запрещено использовать time.Sleep в продакшен-коде (используй таймеры/контекст)"
+        - pattern: '^http\.DefaultClient$'
+          msg: "Не используй http.DefaultClient (нет таймаутов); создай *http.Client с таймаутами"
+
+formatters:
+  enable:
+    - gofumpt
+    - gci
+  settings:
+    gofumpt:
+      extra-rules: true
+    gci:
+      sections:
+        - Standard
+        - Default
+        - LocalModule
+      no-inline-comments: false
