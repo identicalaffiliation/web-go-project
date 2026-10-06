@@ -31,14 +31,18 @@ def get_current_user_id(authorization: str = Header(...)) -> uuid.UUID:
         return uuid.UUID(user_id_str)
 
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token has expired")
+        raise HTTPException(status_code=401, detail="Token has expired") from None
 
     except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token signature or format")
+        raise HTTPException(
+            status_code=401, detail="Invalid token signature or format"
+        ) from None
 
     except ValueError:
         # Сработает, если UUID(user_id_str) не сможет распарсить строку
-        raise HTTPException(status_code=401, detail="Invalid user_id format in token")
+        raise HTTPException(
+            status_code=401, detail="Invalid user_id format in token"
+        ) from None
 
 
 # Заглушка для получения бизнес-логики (переопределяется в main.py)
