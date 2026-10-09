@@ -26,8 +26,8 @@ jobs:
       fail-fast: false
       matrix:
         service:
-          - catalog
-          - migrator
+          - backend/catalog
+          - backend/migrator
 
     steps:
       - name: Checkout
