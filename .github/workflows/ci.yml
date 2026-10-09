@@ -27,7 +27,7 @@ jobs:
       matrix:
         service:
           - backend/catalog
-          - backend/migrator
+          - migrator
 
     steps:
       - name: Checkout
