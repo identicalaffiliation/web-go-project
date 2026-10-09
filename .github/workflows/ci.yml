@@ -44,7 +44,7 @@ jobs:
       - name: Lint ${{ matrix.service }}
         uses: golangci/golangci-lint-action@v7
         with:
-          version: v2.13.1
+          version: v2.13.2
           working-directory: ${{ matrix.service }}
 
       - name: Build ${{ matrix.service }}
