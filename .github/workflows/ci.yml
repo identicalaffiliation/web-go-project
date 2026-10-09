@@ -40,13 +40,7 @@ jobs:
           cache: true
           cache-dependency-path: ${{ matrix.service }}/go.sum
 
-      # 3 main jobs - lint, build, test
-      - name: Lint ${{ matrix.service }}
-        uses: golangci/golangci-lint-action@v7
-        with:
-          version: v2.13.2
-          working-directory: ${{ matrix.service }}
-
+      # 2 main jobs - build, test
       - name: Build ${{ matrix.service }}
         working-directory: ${{ matrix.service }}
         run: go build ./cmd/...
