@@ -1,0 +1,56 @@
+name: ci.yml
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: $${ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - catalog
+          - migrator
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+          cache: true
+          cache-dependency-path: ${{ matrix.service }}/go.sum
+
+      # 3 main jobs - lint, build, test
+      - name: Lint ${{ matrix.service }}
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v1.61
+          working-directory: ${{ matrix.service }}
+
+      - name: Build ${{ matrix.service }}
+        working-directory: ${{ matrix.service }}
+        run: go build ./cmd/...
+
+      - name: Test ${{ matrix.service }}
+        working-directory: ${{ matrix.service }}
+        run: go test -race -timeout=5m ./...
