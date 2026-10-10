@@ -16,6 +16,12 @@ func (s *Service) Register(ctx context.Context, in ports.RegisterInput) (domain.
 	if err := domain.ValidatePassword(in.Password); err != nil {
 		return domain.User{}, err
 	}
+	// Дефолта нет: пустая или неизвестная роль (в т.ч. admin) отвергается,
+	// чтобы клиент не мог выдать себе привилегии при регистрации.
+	role := domain.Role(in.Role)
+	if !role.Valid() {
+		return domain.User{}, domain.ErrInvalidRole
+	}
 
 	hash, err := s.hasher.Hash(in.Password)
 	if err != nil {
@@ -26,7 +32,7 @@ func (s *Service) Register(ctx context.Context, in ports.RegisterInput) (domain.
 		ID:           domain.UserID(s.ids.NewID()),
 		Email:        email,
 		PasswordHash: hash,
-		Role:         domain.RoleCustomer,
+		Role:         role,
 		CreatedAt:    s.clock.Now(),
 	}
 

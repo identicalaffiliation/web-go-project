@@ -9,7 +9,8 @@ import (
 
 func mapError(err error) (int, string) {
 	switch {
-	case errors.Is(err, domain.ErrInvalidEmail), errors.Is(err, domain.ErrInvalidPassword):
+	case errors.Is(err, domain.ErrInvalidEmail), errors.Is(err, domain.ErrInvalidPassword),
+		errors.Is(err, domain.ErrInvalidRole):
 		return http.StatusBadRequest, err.Error()
 
 	case errors.Is(err, domain.ErrEmailTaken):

@@ -62,10 +62,32 @@ func TestHandler_Register_Success(t *testing.T) {
 		},
 	}
 	rec := doJSON(newTestEcho(svc), http.MethodPost, "/api/v1/auth/register",
-		map[string]string{"email": "a@example.com", "password": "secret123"})
+		map[string]string{"email": "a@example.com", "password": "secret123", "role": "business"})
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+}
+
+func TestHandler_Register_InvalidRole(t *testing.T) {
+	svc := &mockAuthService{
+		registerFunc: func(context.Context, ports.RegisterInput) (domain.User, error) {
+			return domain.User{}, domain.ErrInvalidRole
+		},
+	}
+	// Поле role отсутствует, пустое или admin: во всех случаях 400.
+	bodies := map[string]map[string]string{
+		"missing": {"email": "a@example.com", "password": "secret123"},
+		"empty":   {"email": "a@example.com", "password": "secret123", "role": ""},
+		"admin":   {"email": "a@example.com", "password": "secret123", "role": "admin"},
+	}
+	for name, body := range bodies {
+		t.Run(name, func(t *testing.T) {
+			rec := doJSON(newTestEcho(svc), http.MethodPost, "/api/v1/auth/register", body)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+			}
+		})
 	}
 }
 

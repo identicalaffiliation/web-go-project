@@ -35,7 +35,7 @@ func (h *Handler) register(c echo.Context) error {
 	}
 
 	user, err := h.service.Register(c.Request().Context(), ports.RegisterInput{
-		Email: req.Email, Password: req.Password,
+		Email: req.Email, Password: req.Password, Role: req.Role,
 	})
 	if err != nil {
 		return h.fail(c, err)

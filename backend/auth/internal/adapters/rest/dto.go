@@ -5,6 +5,7 @@ import "time"
 type registerRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	Role     string `json:"role"`
 }
 
 type registerResponse struct {
