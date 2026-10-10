@@ -17,6 +17,14 @@ migrate-up:
 init_kafka_topics:
 	docker compose up --build -d init-kafka
 
+.PHONY: keys
+keys:
+	go -C backend/auth run ./cmd/keygen -out ../../secrets/jwt
+
+.PHONY: keys-force
+keys-force:
+	go -C backend/auth run ./cmd/keygen -out ../../secrets/jwt -force
+
 .PHONY: clean
 clean:
 	docker compose down -v
