@@ -2,14 +2,16 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+import grpc
 from fastapi import FastAPI
+
 from internal.adapters.http.dependencies import get_profile_service
 from internal.adapters.http.profiles import router as profiles_router
 from internal.adapters.kafka.consumer import KafkaUserRegisteredConsumer
 from internal.adapters.postgres.database import async_session_maker, engine
 from internal.adapters.postgres.repository import SqlAlchemyProfileRepository
 from internal.adapters.postgres.uow import SqlAlchemyUnitOfWork
-from internal.adapters.rpc.mock_clients import MockOrdersClient, MockPaymentsClient
+from internal.adapters.rpc.grpc_clients import GrpcOrdersClient, GrpcPaymentsClient
 from internal.app.service import ProfileService
 from internal.config.config import settings
 
@@ -18,19 +20,23 @@ logger = logging.getLogger(__name__)
 
 kafka_consumer: KafkaUserRegisteredConsumer | None = None
 
+orders_channel = grpc.aio.insecure_channel("localhost:50051")
+payments_channel = grpc.aio.insecure_channel("localhost:50052")
+
+grpc_orders_client = GrpcOrdersClient(orders_channel)
+grpc_payments_client = GrpcPaymentsClient(payments_channel)
+
 
 async def build_profile_service() -> AsyncGenerator[ProfileService, None]:
     async with async_session_maker() as session:
         repo = SqlAlchemyProfileRepository(session)
         uow = SqlAlchemyUnitOfWork(session)
-        orders_client = MockOrdersClient()
-        payments_client = MockPaymentsClient()
 
         service = ProfileService(
             repo=repo,
             uow=uow,
-            orders_client=orders_client,
-            payments_client=payments_client,
+            orders_client=grpc_orders_client,
+            payments_client=grpc_payments_client,
         )
         yield service
 
@@ -39,14 +45,12 @@ async def process_kafka_message(msg_data: dict) -> None:
     async with async_session_maker() as session:
         repo = SqlAlchemyProfileRepository(session)
         uow = SqlAlchemyUnitOfWork(session)
-        orders_client = MockOrdersClient()
-        payments_client = MockPaymentsClient()
 
         service = ProfileService(
             repo=repo,
             uow=uow,
-            orders_client=orders_client,
-            payments_client=payments_client,
+            orders_client=grpc_orders_client,
+            payments_client=grpc_payments_client,
         )
         await service.process_registration_event(msg_data)
 
@@ -74,6 +78,9 @@ async def lifespan(app: FastAPI):
         await kafka_consumer.stop()
 
     await engine.dispose()
+
+    await orders_channel.close()
+    await payments_channel.close()
 
 
 app = FastAPI(
