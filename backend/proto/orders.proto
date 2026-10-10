@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package orders;
+
+import "google/protobuf/timestamp.proto";
+
+service OrdersService {
+  rpc GetOrdersByUser (GetOrdersRequest) returns (GetOrdersResponse);
+}
+
+message GetOrdersRequest {
+  string user_id = 1;
+}
+
+message OrderItem {
+  string id = 1;
+  string product_id = 2;
+  string user_id = 3;
+  float price = 4; 
+  string status = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+message GetOrdersResponse {
+  repeated OrderItem orders = 1;
+}

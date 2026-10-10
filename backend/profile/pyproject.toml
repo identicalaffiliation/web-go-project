@@ -1,0 +1,18 @@
+[tool.ruff]
+line-length = 88
+target-version = "py314"
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "alembic",
+    "internal/adapters/grpc/generated" 
+]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"

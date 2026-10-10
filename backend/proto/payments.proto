@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package payments;
+
+service PaymentsService {
+  rpc GetBalanceByUser (GetBalanceRequest) returns (GetBalanceResponse);
+}
+
+message GetBalanceRequest {
+  string user_id = 1;
+}
+
+message GetBalanceResponse {
+  string user_id = 1;
+  float amount = 2; 
+}
