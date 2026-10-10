@@ -3,6 +3,12 @@ package config
 import (
 	"fmt"
 	"os"
+	"time"
+)
+
+const (
+	defaultAccessTokenTTL  = 15 * time.Minute
+	defaultRefreshTokenTTL = 7 * 24 * time.Hour
 )
 
 type Config struct {
@@ -20,6 +26,8 @@ type JWTConfig struct {
 	PublicKeyPath  string
 	KeyID          string
 	Issuer         string
+	AccessTTL      time.Duration
+	RefreshTTL     time.Duration
 }
 
 func Load() (Config, error) {
@@ -44,6 +52,15 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	accessTTL, err := durationEnv("AUTH_ACCESS_TOKEN_TTL", defaultAccessTokenTTL)
+	if err != nil {
+		return Config{}, err
+	}
+	refreshTTL, err := durationEnv("AUTH_REFRESH_TOKEN_TTL", defaultRefreshTokenTTL)
+	if err != nil {
+		return Config{}, err
+	}
+
 	httpAddr := os.Getenv("AUTH_HTTP_ADDR")
 	if httpAddr == "" {
 		httpAddr = ":8080"
@@ -56,9 +73,26 @@ func Load() (Config, error) {
 			PublicKeyPath:  pubPath,
 			KeyID:          keyID,
 			Issuer:         issuer,
+			AccessTTL:      accessTTL,
+			RefreshTTL:     refreshTTL,
 		},
 		HTTPAddr: httpAddr,
 	}, nil
+}
+
+func durationEnv(key string, def time.Duration) (time.Duration, error) {
+	v := os.Getenv(key)
+	if v == "" {
+		return def, nil
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		return 0, fmt.Errorf("parse %s: %w", key, err)
+	}
+	if d <= 0 {
+		return 0, fmt.Errorf("%s must be positive, got %s", key, v)
+	}
+	return d, nil
 }
 
 func requireEnv(key string) (string, error) {

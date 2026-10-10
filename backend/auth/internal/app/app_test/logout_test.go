@@ -23,7 +23,7 @@ func TestLogout_RevokesExistingToken(t *testing.T) {
 	tokens := tokenGenMock{hashFn: func(plain string) string { return "hash-of-" + plain }}
 	clock := clockMock{nowFn: time.Now}
 
-	svc := app.NewService(nil, refreshes, nil, nil, nil, tokens, clock, nil)
+	svc := app.NewService(nil, refreshes, nil, nil, nil, tokens, clock, nil, refreshTTL)
 
 	if err := svc.Logout(context.Background(), "plain-token"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -41,7 +41,7 @@ func TestLogout_UnknownToken_IsNotAnError(t *testing.T) {
 	}
 	tokens := tokenGenMock{hashFn: func(plain string) string { return "hash-of-" + plain }}
 
-	svc := app.NewService(nil, refreshes, nil, nil, nil, tokens, nil, nil)
+	svc := app.NewService(nil, refreshes, nil, nil, nil, tokens, nil, nil, refreshTTL)
 
 	if err := svc.Logout(context.Background(), "unknown-token"); err != nil {
 		t.Fatalf("Logout of an unknown token must not error, got %v", err)

@@ -65,18 +65,19 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("parse public key: %w", err)
 	}
 
-	issuer := jwt.NewIssuer(privateKey, cfg.JWT.KeyID, cfg.JWT.Issuer, app.AccessTokenTTL)
+	issuer := jwt.NewIssuer(privateKey, cfg.JWT.KeyID, cfg.JWT.Issuer, cfg.JWT.AccessTTL)
 	verifier := jwt.NewVerifier(publicKey, cfg.JWT.Issuer)
 
 	service := app.NewService(
 		postgres.NewUserRepository(pool),
 		postgres.NewRefreshTokenRepository(pool),
-		hasher.New(hasher.DefaultCost),
+		hasher.New(),
 		issuer,
 		verifier,
 		refreshtoken.New(),
 		clock.New(),
 		idgen.New(),
+		cfg.JWT.RefreshTTL,
 	)
 
 	e := echo.New()

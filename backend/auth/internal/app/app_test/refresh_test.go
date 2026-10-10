@@ -31,7 +31,7 @@ func TestRefresh_Success_Rotates(t *testing.T) {
 		getByIDFn: func(context.Context, domain.UserID) (domain.User, error) { return user, nil },
 	}
 	issuer := issuerMock{issueFn: func(domain.Claims) (string, time.Time, error) {
-		return "new-access", fixedNow.Add(app.AccessTokenTTL), nil
+		return "new-access", fixedNow.Add(accessTTL), nil
 	}}
 	tokens := tokenGenMock{
 		hashFn:     func(plain string) string { return "hash-of-" + plain },
@@ -40,7 +40,7 @@ func TestRefresh_Success_Rotates(t *testing.T) {
 	clock := clockMock{nowFn: func() time.Time { return fixedNow }}
 	ids := idGenMock{newIDFn: func() string { return "new-id" }}
 
-	svc := app.NewService(users, refreshes, nil, issuer, nil, tokens, clock, ids)
+	svc := app.NewService(users, refreshes, nil, issuer, nil, tokens, clock, ids, refreshTTL)
 
 	pair, err := svc.Refresh(context.Background(), "old-plain-token")
 	if err != nil {
@@ -61,7 +61,7 @@ func TestRefresh_Expired(t *testing.T) {
 	tokens := tokenGenMock{hashFn: func(plain string) string { return "hash-of-" + plain }}
 	clock := clockMock{nowFn: func() time.Time { return fixedNow }}
 
-	svc := app.NewService(nil, refreshes, nil, nil, nil, tokens, clock, nil)
+	svc := app.NewService(nil, refreshes, nil, nil, nil, tokens, clock, nil, refreshTTL)
 
 	_, err := svc.Refresh(context.Background(), "old-plain-token")
 	if !errors.Is(err, domain.ErrRefreshTokenExpired) {
@@ -77,7 +77,7 @@ func TestRefresh_NotFound_MapsToInvalidToken(t *testing.T) {
 	}
 	tokens := tokenGenMock{hashFn: func(plain string) string { return "hash-of-" + plain }}
 
-	svc := app.NewService(nil, refreshes, nil, nil, nil, tokens, nil, nil)
+	svc := app.NewService(nil, refreshes, nil, nil, nil, tokens, nil, nil, refreshTTL)
 
 	_, err := svc.Refresh(context.Background(), "unknown-token")
 	if !errors.Is(err, domain.ErrInvalidToken) {

@@ -29,7 +29,7 @@ func (s *Service) Login(ctx context.Context, in ports.LoginInput) (domain.TokenP
 
 	now := s.clock.Now()
 	claims := domain.Claims{UserID: user.ID, Email: user.Email, Role: user.Role}
-	access, accessExp, plainRefresh, hash, refreshExp, err := s.issueAccessAndRefresh(claims, now)
+	t, err := s.issueAccessAndRefresh(claims, now)
 	if err != nil {
 		return domain.TokenPair{}, err
 	}
@@ -37,8 +37,8 @@ func (s *Service) Login(ctx context.Context, in ports.LoginInput) (domain.TokenP
 	rt := domain.RefreshToken{
 		ID:        s.ids.NewID(),
 		UserID:    user.ID,
-		TokenHash: hash,
-		ExpiresAt: refreshExp,
+		TokenHash: t.refreshHash,
+		ExpiresAt: t.refreshExp,
 		CreatedAt: now,
 	}
 	if err := s.refreshes.Create(ctx, rt); err != nil {
@@ -46,9 +46,9 @@ func (s *Service) Login(ctx context.Context, in ports.LoginInput) (domain.TokenP
 	}
 
 	return domain.TokenPair{
-		AccessToken:      access,
-		AccessExpiresAt:  accessExp,
-		RefreshToken:     plainRefresh,
-		RefreshExpiresAt: refreshExp,
+		AccessToken:      t.access,
+		AccessExpiresAt:  t.accessExp,
+		RefreshToken:     t.plainRefresh,
+		RefreshExpiresAt: t.refreshExp,
 	}, nil
 }

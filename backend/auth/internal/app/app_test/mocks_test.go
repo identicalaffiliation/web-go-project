@@ -83,3 +83,8 @@ func (m clockMock) Now() time.Time { return m.nowFn() }
 type idGenMock struct{ newIDFn func() string }
 
 func (m idGenMock) NewID() string { return m.newIDFn() }
+
+const (
+	accessTTL  = 15 * time.Minute
+	refreshTTL = 7 * 24 * time.Hour
+)

@@ -38,8 +38,7 @@ func (r *UserRepository) Create(ctx context.Context, user domain.User) error {
 
 	_, err = r.pool.Exec(ctx, query, id, string(user.Email), user.PasswordHash, string(user.Role), user.CreatedAt)
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
+		if isUniqueViolation(err) {
 			return domain.ErrEmailTaken
 		}
 		return fmt.Errorf("insert user: %w", err)
@@ -95,6 +94,11 @@ func (r *UserRepository) scanUser(row pgx.Row) (domain.User, error) {
 		Role:         domain.Role(role),
 		CreatedAt:    createdAt,
 	}, nil
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == uniqueViolation
 }
 
 func encodeUUID(s string) (pgtype.UUID, error) {

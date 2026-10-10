@@ -9,7 +9,7 @@ import (
 )
 
 func TestHasher_HashAndCompare(t *testing.T) {
-	h := hasher.New(4) // низкая cost — тест быстрый, тут проверяем не стойкость, а поведение
+	h := hasher.New()
 
 	hash, err := h.Hash("password1")
 	if err != nil {
@@ -24,7 +24,7 @@ func TestHasher_HashAndCompare(t *testing.T) {
 }
 
 func TestHasher_Compare_WrongPassword(t *testing.T) {
-	h := hasher.New(4)
+	h := hasher.New()
 
 	hash, err := h.Hash("password1")
 	if err != nil {
@@ -32,6 +32,13 @@ func TestHasher_Compare_WrongPassword(t *testing.T) {
 	}
 
 	err = h.Compare(hash, "wrong-password")
+	if !errors.Is(err, domain.ErrInvalidCredentials) {
+		t.Fatalf("want ErrInvalidCredentials, got %v", err)
+	}
+}
+
+func TestHasher_Compare_MalformedHash(t *testing.T) {
+	err := hasher.New().Compare("not-a-bcrypt-hash", "password1")
 	if !errors.Is(err, domain.ErrInvalidCredentials) {
 		t.Fatalf("want ErrInvalidCredentials, got %v", err)
 	}

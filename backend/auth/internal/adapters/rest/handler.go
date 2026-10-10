@@ -95,7 +95,7 @@ func (h *Handler) validate(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, errorResponse{Error: "invalid request body"})
 	}
 
-	claims, err := h.service.ValidateToken(c.Request().Context(), req.AccessToken)
+	claims, err := h.service.ValidateToken(req.AccessToken)
 	if err != nil {
 		return h.fail(c, err)
 	}

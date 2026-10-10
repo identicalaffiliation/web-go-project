@@ -30,7 +30,7 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (domain.Toke
 	}
 
 	claims := domain.Claims{UserID: user.ID, Email: user.Email, Role: user.Role}
-	access, accessExp, plainRefresh, newHash, refreshExp, err := s.issueAccessAndRefresh(claims, now)
+	t, err := s.issueAccessAndRefresh(claims, now)
 	if err != nil {
 		return domain.TokenPair{}, err
 	}
@@ -38,8 +38,8 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (domain.Toke
 	next := domain.RefreshToken{
 		ID:        s.ids.NewID(),
 		UserID:    user.ID,
-		TokenHash: newHash,
-		ExpiresAt: refreshExp,
+		TokenHash: t.refreshHash,
+		ExpiresAt: t.refreshExp,
 		CreatedAt: now,
 	}
 	if err := s.refreshes.Rotate(ctx, stored.ID, next, now); err != nil {
@@ -47,9 +47,9 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (domain.Toke
 	}
 
 	return domain.TokenPair{
-		AccessToken:      access,
-		AccessExpiresAt:  accessExp,
-		RefreshToken:     plainRefresh,
-		RefreshExpiresAt: refreshExp,
+		AccessToken:      t.access,
+		AccessExpiresAt:  t.accessExp,
+		RefreshToken:     t.plainRefresh,
+		RefreshExpiresAt: t.refreshExp,
 	}, nil
 }

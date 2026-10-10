@@ -21,5 +21,5 @@ type AuthService interface {
 	Login(ctx context.Context, in LoginInput) (domain.TokenPair, error)
 	Refresh(ctx context.Context, refreshToken string) (domain.TokenPair, error)
 	Logout(ctx context.Context, refreshToken string) error
-	ValidateToken(ctx context.Context, accessToken string) (domain.Claims, error)
+	ValidateToken(accessToken string) (domain.Claims, error)
 }

@@ -35,7 +35,7 @@ func (m *mockAuthService) Refresh(context.Context, string) (domain.TokenPair, er
 	return domain.TokenPair{}, nil
 }
 func (m *mockAuthService) Logout(context.Context, string) error { return nil }
-func (m *mockAuthService) ValidateToken(context.Context, string) (domain.Claims, error) {
+func (m *mockAuthService) ValidateToken(string) (domain.Claims, error) {
 	return domain.Claims{}, nil
 }
 
