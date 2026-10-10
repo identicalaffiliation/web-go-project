@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,6 +11,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/logging"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/rest"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
@@ -41,8 +40,7 @@ func (m *mockAuthService) ValidateToken(string) (domain.Claims, error) {
 
 func newTestEcho(svc ports.AuthService) *echo.Echo {
 	e := echo.New()
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	rest.NewHandler(svc, logger).Register(e.Group("/api/v1/auth"))
+	rest.NewHandler(svc, logging.NewNop()).Register(e.Group("/api/v1/auth"))
 	return e
 }
 

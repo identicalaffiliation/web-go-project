@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/ilyakaznacheev/cleanenv"
@@ -11,6 +12,8 @@ type Config struct {
 	Postgres PostgresConfig
 	JWT      JWTConfig
 	HTTPAddr string `env:"AUTH_HTTP_ADDR" env-default:":8080"`
+	
+	LogLevel slog.Level `env:"AUTH_LOG_LEVEL" env-default:"info"`
 }
 
 type PostgresConfig struct {

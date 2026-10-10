@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"log/slog"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -12,10 +11,10 @@ import (
 
 type Handler struct {
 	service ports.AuthService
-	logger  *slog.Logger
+	logger  ports.Logger
 }
 
-func NewHandler(service ports.AuthService, logger *slog.Logger) *Handler {
+func NewHandler(service ports.AuthService, logger ports.Logger) *Handler {
 	return &Handler{service: service, logger: logger}
 }
 
@@ -108,7 +107,7 @@ func (h *Handler) validate(c echo.Context) error {
 func (h *Handler) fail(c echo.Context, err error) error {
 	status, msg := mapError(err)
 	if status == http.StatusInternalServerError {
-		h.logger.Error("auth request failed", "error", err, "path", c.Path())
+		h.logger.WithError(err).Error("auth request failed", "path", c.Path())
 	}
 	return c.JSON(status, errorResponse{Error: msg})
 }

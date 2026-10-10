@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log/slog"
 	"os"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ var allEnvKeys = []string{
 	"AUTH_HTTP_ADDR",
 	"AUTH_ACCESS_TOKEN_TTL",
 	"AUTH_REFRESH_TOKEN_TTL",
+	"AUTH_LOG_LEVEL",
 }
 
 // setEnv сначала полностью очищает окружение конфига, потом выставляет vars.
@@ -80,6 +82,43 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.JWT.RefreshTTL != 7*24*time.Hour {
 		t.Errorf("RefreshTTL = %s, want 168h", cfg.JWT.RefreshTTL)
 	}
+	if cfg.LogLevel != slog.LevelInfo {
+		t.Errorf("LogLevel = %s, want INFO", cfg.LogLevel)
+	}
+}
+
+func TestLoad_LogLevel(t *testing.T) {
+	tests := map[string]slog.Level{
+		"debug": slog.LevelDebug,
+		"info":  slog.LevelInfo,
+		"warn":  slog.LevelWarn,
+		"error": slog.LevelError,
+	}
+	for value, want := range tests {
+		t.Run(value, func(t *testing.T) {
+			vars := requiredVars()
+			vars["AUTH_LOG_LEVEL"] = value
+			setEnv(t, vars)
+
+			cfg, err := Load()
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if cfg.LogLevel != want {
+				t.Errorf("LogLevel = %s, want %s", cfg.LogLevel, want)
+			}
+		})
+	}
+}
+
+func TestLoad_InvalidLogLevel(t *testing.T) {
+	vars := requiredVars()
+	vars["AUTH_LOG_LEVEL"] = "verbose"
+	setEnv(t, vars)
+
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error for AUTH_LOG_LEVEL=verbose")
+	}
 }
 
 func TestLoad_AllSet(t *testing.T) {
@@ -105,6 +144,7 @@ func TestLoad_AllSet(t *testing.T) {
 			RefreshTTL:     24 * time.Hour,
 		},
 		HTTPAddr: ":9090",
+		LogLevel: slog.LevelInfo,
 	}
 	if cfg != want {
 		t.Errorf("cfg = %+v, want %+v", cfg, want)

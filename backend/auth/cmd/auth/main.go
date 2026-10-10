@@ -15,6 +15,7 @@ import (
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/clock"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/idgen"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/logging"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/postgres"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/refreshtoken"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/rest"
@@ -22,21 +23,25 @@ import (
 	"github.com/identicalaffiliation/web-go-project/auth/internal/config"
 	"github.com/identicalaffiliation/web-go-project/auth/pkg/hasher"
 	"github.com/identicalaffiliation/web-go-project/auth/pkg/jwt"
+	"github.com/identicalaffiliation/web-go-project/auth/pkg/logger"
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	if err := run(logger); err != nil {
-		logger.Error("auth service stopped", "error", err)
+	if err := run(); err != nil {
+		// Конфиг мог не загрузиться, поэтому логгера по уровню из него ещё нет:
+		// сообщение о причине остановки пишем временным логгером с уровнем по умолчанию.
+		logging.New(logger.New(slog.LevelInfo)).WithError(err).Error("auth service stopped")
 		os.Exit(1)
 	}
 }
 
-func run(logger *slog.Logger) error {
+func run() error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
+
+	log := logging.New(logger.New(cfg.LogLevel))
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -82,7 +87,7 @@ func run(logger *slog.Logger) error {
 
 	e := echo.New()
 	e.HideBanner = true
-	rest.NewHandler(service, logger).Register(e.Group("/api/v1/auth"))
+	rest.NewHandler(service, log).Register(e.Group("/api/v1/auth"))
 
 	srv := &http.Server{
 		Addr:         cfg.HTTPAddr,
@@ -93,7 +98,7 @@ func run(logger *slog.Logger) error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		logger.Info("auth service listening", "addr", cfg.HTTPAddr)
+		log.Info("auth service listening", "addr", cfg.HTTPAddr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- fmt.Errorf("listen: %w", err)
 			return
@@ -103,7 +108,7 @@ func run(logger *slog.Logger) error {
 
 	select {
 	case <-ctx.Done():
-		logger.Info("shutting down auth service")
+		log.Info("shutting down auth service")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := srv.Shutdown(shutdownCtx); err != nil {
