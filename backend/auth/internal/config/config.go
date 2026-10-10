@@ -2,103 +2,49 @@ package config
 
 import (
 	"fmt"
-	"os"
 	"time"
-)
 
-const (
-	defaultAccessTokenTTL  = 15 * time.Minute
-	defaultRefreshTokenTTL = 7 * 24 * time.Hour
+	"github.com/ilyakaznacheev/cleanenv"
 )
 
 type Config struct {
 	Postgres PostgresConfig
 	JWT      JWTConfig
-	HTTPAddr string
+	HTTPAddr string `env:"AUTH_HTTP_ADDR" env-default:":8080"`
 }
 
 type PostgresConfig struct {
-	DSN string
+	DSN string `env:"AUTH_DB_DSN" env-required:"true"`
 }
 
 type JWTConfig struct {
-	PrivateKeyPath string
-	PublicKeyPath  string
-	KeyID          string
-	Issuer         string
-	AccessTTL      time.Duration
-	RefreshTTL     time.Duration
+	PrivateKeyPath string        `env:"AUTH_JWT_PRIVATE_KEY_PATH" env-required:"true"`
+	PublicKeyPath  string        `env:"AUTH_JWT_PUBLIC_KEY_PATH" env-required:"true"`
+	KeyID          string        `env:"AUTH_JWT_KEY_ID" env-required:"true"`
+	Issuer         string        `env:"AUTH_JWT_ISSUER" env-required:"true"`
+	AccessTTL      time.Duration `env:"AUTH_ACCESS_TOKEN_TTL" env-default:"15m"`
+	RefreshTTL     time.Duration `env:"AUTH_REFRESH_TOKEN_TTL" env-default:"168h"`
 }
 
 func Load() (Config, error) {
-	dsn, err := requireEnv("AUTH_DB_DSN")
-	if err != nil {
+	var cfg Config
+	if err := cleanenv.ReadEnv(&cfg); err != nil {
+		return Config{}, fmt.Errorf("read config from env: %w", err)
+	}
+	if err := cfg.validate(); err != nil {
 		return Config{}, err
 	}
-	privPath, err := requireEnv("AUTH_JWT_PRIVATE_KEY_PATH")
-	if err != nil {
-		return Config{}, err
-	}
-	pubPath, err := requireEnv("AUTH_JWT_PUBLIC_KEY_PATH")
-	if err != nil {
-		return Config{}, err
-	}
-	keyID, err := requireEnv("AUTH_JWT_KEY_ID")
-	if err != nil {
-		return Config{}, err
-	}
-	issuer, err := requireEnv("AUTH_JWT_ISSUER")
-	if err != nil {
-		return Config{}, err
-	}
-
-	accessTTL, err := durationEnv("AUTH_ACCESS_TOKEN_TTL", defaultAccessTokenTTL)
-	if err != nil {
-		return Config{}, err
-	}
-	refreshTTL, err := durationEnv("AUTH_REFRESH_TOKEN_TTL", defaultRefreshTokenTTL)
-	if err != nil {
-		return Config{}, err
-	}
-
-	httpAddr := os.Getenv("AUTH_HTTP_ADDR")
-	if httpAddr == "" {
-		httpAddr = ":8080"
-	}
-
-	return Config{
-		Postgres: PostgresConfig{DSN: dsn},
-		JWT: JWTConfig{
-			PrivateKeyPath: privPath,
-			PublicKeyPath:  pubPath,
-			KeyID:          keyID,
-			Issuer:         issuer,
-			AccessTTL:      accessTTL,
-			RefreshTTL:     refreshTTL,
-		},
-		HTTPAddr: httpAddr,
-	}, nil
+	return cfg, nil
 }
 
-func durationEnv(key string, def time.Duration) (time.Duration, error) {
-	v := os.Getenv(key)
-	if v == "" {
-		return def, nil
+// validate проверяет то, что теги cleanenv выразить не могут: нулевой или
+// отрицательный TTL превратил бы выданные токены в мгновенно протухшие.
+func (c Config) validate() error {
+	if c.JWT.AccessTTL <= 0 {
+		return fmt.Errorf("AUTH_ACCESS_TOKEN_TTL must be positive, got %s", c.JWT.AccessTTL)
 	}
-	d, err := time.ParseDuration(v)
-	if err != nil {
-		return 0, fmt.Errorf("parse %s: %w", key, err)
+	if c.JWT.RefreshTTL <= 0 {
+		return fmt.Errorf("AUTH_REFRESH_TOKEN_TTL must be positive, got %s", c.JWT.RefreshTTL)
 	}
-	if d <= 0 {
-		return 0, fmt.Errorf("%s must be positive, got %s", key, v)
-	}
-	return d, nil
-}
-
-func requireEnv(key string) (string, error) {
-	v := os.Getenv(key)
-	if v == "" {
-		return "", fmt.Errorf("missing required environment variable %s", key)
-	}
-	return v, nil
+	return nil
 }
