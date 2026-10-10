@@ -8,7 +8,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
-	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
 type Issuer struct {
@@ -42,5 +41,3 @@ func (i *Issuer) Issue(c domain.Claims) (string, time.Time, error) {
 	}
 	return signed, cl.ExpiresAt.Time, nil
 }
-
-var _ ports.AccessTokenIssuer = (*Issuer)(nil)

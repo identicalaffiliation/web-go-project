@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
-	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -40,5 +39,3 @@ func (h *Hasher) Compare(hash, plain string) error {
 	}
 	return nil
 }
-
-var _ ports.PasswordHasher = (*Hasher)(nil)

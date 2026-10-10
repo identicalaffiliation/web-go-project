@@ -39,8 +39,6 @@ func (m *mockAuthService) ValidateToken(context.Context, string) (domain.Claims,
 	return domain.Claims{}, nil
 }
 
-var _ ports.AuthService = (*mockAuthService)(nil)
-
 func newTestEcho(svc ports.AuthService) *echo.Echo {
 	e := echo.New()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))

@@ -13,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
-	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
 const uniqueViolation = "23505"
@@ -109,5 +108,3 @@ func encodeUUID(s string) (pgtype.UUID, error) {
 func decodeUUID(v pgtype.UUID) string {
 	return uuid.UUID(v.Bytes).String()
 }
-
-var _ ports.UserRepository = (*UserRepository)(nil)

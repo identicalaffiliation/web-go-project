@@ -6,8 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-
-	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
 const TokenBytes = 32
@@ -31,5 +29,3 @@ func (g *Generator) Hash(plain string) string {
 	sum := sha256.Sum256([]byte(plain))
 	return hex.EncodeToString(sum[:])
 }
-
-var _ ports.RefreshTokenGenerator = (*Generator)(nil)

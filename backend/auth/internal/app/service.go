@@ -46,8 +46,6 @@ func NewService(
 	}
 }
 
-var _ ports.AuthService = (*Service)(nil)
-
 func (s *Service) issueAccessAndRefresh(claims domain.Claims, now time.Time) (
 	access string,
 	accessExp time.Time,

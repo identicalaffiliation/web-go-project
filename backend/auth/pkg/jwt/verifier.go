@@ -8,7 +8,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
-	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
 type Verifier struct {
@@ -43,5 +42,3 @@ func (v *Verifier) Verify(tokenString string) (domain.Claims, error) {
 
 	return fromClaims(cl), nil
 }
-
-var _ ports.AccessTokenVerifier = (*Verifier)(nil)

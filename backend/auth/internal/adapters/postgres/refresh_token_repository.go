@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
-	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
 type execer interface {
@@ -127,5 +126,3 @@ func (r *RefreshTokenRepository) Revoke(ctx context.Context, id string, now time
 	}
 	return nil
 }
-
-var _ ports.RefreshTokenRepository = (*RefreshTokenRepository)(nil)
