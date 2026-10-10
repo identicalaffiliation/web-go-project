@@ -47,7 +47,7 @@ func setupPool(t *testing.T) *pgxpool.Pool {
 		t.Fatalf("connection string: %v", err)
 	}
 
-	pool, err := postgres.NewPool(ctx, dsn)
+	pool, err := postgres.NewPool(ctx, testPoolConfig(dsn))
 	if err != nil {
 		t.Fatalf("new pool: %v", err)
 	}

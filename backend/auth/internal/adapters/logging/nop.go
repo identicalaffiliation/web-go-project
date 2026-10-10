@@ -6,8 +6,6 @@ type nop struct{}
 
 var _ ports.Logger = nop{}
 
-// NewNop возвращает логгер, который ничего не пишет. Нужен тестам, чтобы
-// не расписывать мок логгера руками.
 func NewNop() ports.Logger { return nop{} }
 
 func (nop) Debug(string, ...any)           {}

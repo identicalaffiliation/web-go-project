@@ -46,7 +46,15 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	pool, err := postgres.NewPool(ctx, cfg.Postgres.DSN)
+	pool, err := postgres.NewPool(ctx, postgres.PoolConfig{
+		DSN:               cfg.Postgres.DSN,
+		MaxConns:          cfg.Postgres.MaxConns,
+		MinConns:          cfg.Postgres.MinConns,
+		MaxConnLifetime:   cfg.Postgres.MaxConnLifetime,
+		MaxConnIdleTime:   cfg.Postgres.MaxConnIdleTime,
+		HealthCheckPeriod: cfg.Postgres.HealthCheckPeriod,
+		ConnectTimeout:    cfg.Postgres.ConnectTimeout,
+	})
 	if err != nil {
 		return fmt.Errorf("connect to postgres: %w", err)
 	}

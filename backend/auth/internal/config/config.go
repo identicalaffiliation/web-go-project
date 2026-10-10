@@ -12,12 +12,19 @@ type Config struct {
 	Postgres PostgresConfig
 	JWT      JWTConfig
 	HTTPAddr string `env:"AUTH_HTTP_ADDR" env-default:":8080"`
-	
+
 	LogLevel slog.Level `env:"AUTH_LOG_LEVEL" env-default:"info"`
 }
 
 type PostgresConfig struct {
 	DSN string `env:"AUTH_DB_DSN" env-required:"true"`
+
+	MaxConns          int32         `env:"AUTH_DB_MAX_CONNS" env-default:"20"`
+	MinConns          int32         `env:"AUTH_DB_MIN_CONNS" env-default:"2"`
+	MaxConnLifetime   time.Duration `env:"AUTH_DB_MAX_CONN_LIFETIME" env-default:"30m"`
+	MaxConnIdleTime   time.Duration `env:"AUTH_DB_MAX_CONN_IDLE_TIME" env-default:"5m"`
+	HealthCheckPeriod time.Duration `env:"AUTH_DB_HEALTH_CHECK_PERIOD" env-default:"30s"`
+	ConnectTimeout    time.Duration `env:"AUTH_DB_CONNECT_TIMEOUT" env-default:"5s"`
 }
 
 type JWTConfig struct {
@@ -40,8 +47,6 @@ func Load() (Config, error) {
 	return cfg, nil
 }
 
-// validate проверяет то, что теги cleanenv выразить не могут: нулевой или
-// отрицательный TTL превратил бы выданные токены в мгновенно протухшие.
 func (c Config) validate() error {
 	if c.JWT.AccessTTL <= 0 {
 		return fmt.Errorf("AUTH_ACCESS_TOKEN_TTL must be positive, got %s", c.JWT.AccessTTL)
@@ -49,5 +54,35 @@ func (c Config) validate() error {
 	if c.JWT.RefreshTTL <= 0 {
 		return fmt.Errorf("AUTH_REFRESH_TOKEN_TTL must be positive, got %s", c.JWT.RefreshTTL)
 	}
+	return c.Postgres.validate()
+}
+
+func (c PostgresConfig) validate() error {
+	if c.MaxConns < 1 {
+		return fmt.Errorf("AUTH_DB_MAX_CONNS must be >= 1, got %d", c.MaxConns)
+	}
+	if c.MinConns < 0 {
+		return fmt.Errorf("AUTH_DB_MIN_CONNS must be >= 0, got %d", c.MinConns)
+	}
+	if c.MinConns > c.MaxConns {
+		return fmt.Errorf("AUTH_DB_MIN_CONNS (%d) must not exceed AUTH_DB_MAX_CONNS (%d)",
+			c.MinConns, c.MaxConns)
+	}
+
+	durations := []struct {
+		name  string
+		value time.Duration
+	}{
+		{"AUTH_DB_MAX_CONN_LIFETIME", c.MaxConnLifetime},
+		{"AUTH_DB_MAX_CONN_IDLE_TIME", c.MaxConnIdleTime},
+		{"AUTH_DB_HEALTH_CHECK_PERIOD", c.HealthCheckPeriod},
+		{"AUTH_DB_CONNECT_TIMEOUT", c.ConnectTimeout},
+	}
+	for _, d := range durations {
+		if d.value <= 0 {
+			return fmt.Errorf("%s must be > 0, got %v", d.name, d.value)
+		}
+	}
+
 	return nil
 }

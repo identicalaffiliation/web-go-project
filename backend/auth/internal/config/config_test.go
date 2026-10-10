@@ -17,6 +17,12 @@ var allEnvKeys = []string{
 	"AUTH_ACCESS_TOKEN_TTL",
 	"AUTH_REFRESH_TOKEN_TTL",
 	"AUTH_LOG_LEVEL",
+	"AUTH_DB_MAX_CONNS",
+	"AUTH_DB_MIN_CONNS",
+	"AUTH_DB_MAX_CONN_LIFETIME",
+	"AUTH_DB_MAX_CONN_IDLE_TIME",
+	"AUTH_DB_HEALTH_CHECK_PERIOD",
+	"AUTH_DB_CONNECT_TIMEOUT",
 }
 
 // setEnv сначала полностью очищает окружение конфига, потом выставляет vars.
@@ -85,6 +91,19 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.LogLevel != slog.LevelInfo {
 		t.Errorf("LogLevel = %s, want INFO", cfg.LogLevel)
 	}
+
+	wantPostgres := PostgresConfig{
+		DSN:               requiredVars()["AUTH_DB_DSN"],
+		MaxConns:          20,
+		MinConns:          2,
+		MaxConnLifetime:   30 * time.Minute,
+		MaxConnIdleTime:   5 * time.Minute,
+		HealthCheckPeriod: 30 * time.Second,
+		ConnectTimeout:    5 * time.Second,
+	}
+	if cfg.Postgres != wantPostgres {
+		t.Errorf("Postgres = %+v, want %+v", cfg.Postgres, wantPostgres)
+	}
 }
 
 func TestLoad_LogLevel(t *testing.T) {
@@ -126,6 +145,12 @@ func TestLoad_AllSet(t *testing.T) {
 	vars["AUTH_HTTP_ADDR"] = ":9090"
 	vars["AUTH_ACCESS_TOKEN_TTL"] = "5m"
 	vars["AUTH_REFRESH_TOKEN_TTL"] = "24h"
+	vars["AUTH_DB_MAX_CONNS"] = "10"
+	vars["AUTH_DB_MIN_CONNS"] = "10"
+	vars["AUTH_DB_MAX_CONN_LIFETIME"] = "1h"
+	vars["AUTH_DB_MAX_CONN_IDLE_TIME"] = "10m"
+	vars["AUTH_DB_HEALTH_CHECK_PERIOD"] = "1m"
+	vars["AUTH_DB_CONNECT_TIMEOUT"] = "3s"
 	setEnv(t, vars)
 
 	cfg, err := Load()
@@ -134,7 +159,15 @@ func TestLoad_AllSet(t *testing.T) {
 	}
 
 	want := Config{
-		Postgres: PostgresConfig{DSN: vars["AUTH_DB_DSN"]},
+		Postgres: PostgresConfig{
+			DSN:               vars["AUTH_DB_DSN"],
+			MaxConns:          10,
+			MinConns:          10,
+			MaxConnLifetime:   time.Hour,
+			MaxConnIdleTime:   10 * time.Minute,
+			HealthCheckPeriod: time.Minute,
+			ConnectTimeout:    3 * time.Second,
+		},
 		JWT: JWTConfig{
 			PrivateKeyPath: "/keys/private.pem",
 			PublicKeyPath:  "/keys/public.pem",
@@ -165,6 +198,35 @@ func TestLoad_InvalidTTL(t *testing.T) {
 
 			if _, err := Load(); err == nil {
 				t.Fatalf("expected error for AUTH_ACCESS_TOKEN_TTL=%q", value)
+			}
+		})
+	}
+}
+
+func TestLoad_InvalidPool(t *testing.T) {
+	tests := map[string]map[string]string{
+		"max conns is zero":          {"AUTH_DB_MAX_CONNS": "0"},
+		"max conns is negative":      {"AUTH_DB_MAX_CONNS": "-1"},
+		"max conns is not a number":  {"AUTH_DB_MAX_CONNS": "many"},
+		"min conns is negative":      {"AUTH_DB_MIN_CONNS": "-1"},
+		"min conns above max conns":  {"AUTH_DB_MAX_CONNS": "5", "AUTH_DB_MIN_CONNS": "6"},
+		"min conns above default":    {"AUTH_DB_MIN_CONNS": "21"},
+		"zero conn lifetime":         {"AUTH_DB_MAX_CONN_LIFETIME": "0s"},
+		"negative conn idle time":    {"AUTH_DB_MAX_CONN_IDLE_TIME": "-1m"},
+		"zero health check period":   {"AUTH_DB_HEALTH_CHECK_PERIOD": "0s"},
+		"zero connect timeout":       {"AUTH_DB_CONNECT_TIMEOUT": "0s"},
+		"connect timeout not parsed": {"AUTH_DB_CONNECT_TIMEOUT": "soon"},
+	}
+	for name, overrides := range tests {
+		t.Run(name, func(t *testing.T) {
+			vars := requiredVars()
+			for k, v := range overrides {
+				vars[k] = v
+			}
+			setEnv(t, vars)
+
+			if _, err := Load(); err == nil {
+				t.Fatalf("expected error for %v", overrides)
 			}
 		})
 	}

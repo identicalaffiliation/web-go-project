@@ -5,8 +5,6 @@ import (
 	"github.com/identicalaffiliation/web-go-project/auth/pkg/logger"
 )
 
-// adapter приводит *logger.Logger к ports.Logger: у pkg-типа With возвращает
-// *logger.Logger, а порт требует ports.Logger, и Go не позволяет их подменять.
 type adapter struct {
 	l *logger.Logger
 }
