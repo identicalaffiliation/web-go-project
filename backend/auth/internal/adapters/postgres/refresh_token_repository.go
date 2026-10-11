@@ -69,7 +69,8 @@ func (r *RefreshTokenRepository) Rotate(ctx context.Context, oldID uuid.UUID, ne
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback(ctx) // если Commit уже прошёл — это no-op
+	
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	if _, err := tx.Exec(ctx, `UPDATE refresh_tokens SET revoked_at = $1 WHERE id = $2`, now, oldID); err != nil {
 		return fmt.Errorf("revoke old refresh token: %w", err)
