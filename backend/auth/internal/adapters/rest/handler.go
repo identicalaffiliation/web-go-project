@@ -86,24 +86,6 @@ func LogoutHandler(svc ports.AuthService, log ports.Logger) echo.HandlerFunc {
 	}
 }
 
-func ValidateHandler(svc ports.AuthService, log ports.Logger) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		var req validateRequest
-		if err := c.Bind(&req); err != nil {
-			return c.JSON(http.StatusBadRequest, errorResponse{Error: "invalid request body"})
-		}
-
-		claims, err := svc.ValidateToken(req.AccessToken)
-		if err != nil {
-			return fail(c, log, err)
-		}
-
-		return c.JSON(http.StatusOK, claimsResponse{
-			UserID: claims.UserID.String(), Email: string(claims.Email), Role: string(claims.Role),
-		})
-	}
-}
-
 func fail(c echo.Context, log ports.Logger, err error) error {
 	status, msg := mapError(err)
 	if status == http.StatusInternalServerError {

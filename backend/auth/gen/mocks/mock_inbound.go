@@ -100,18 +100,3 @@ func (mr *MockAuthServiceMockRecorder) Register(ctx, in any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockAuthService)(nil).Register), ctx, in)
 }
-
-// ValidateToken mocks base method.
-func (m *MockAuthService) ValidateToken(accessToken string) (domain.Claims, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ValidateToken", accessToken)
-	ret0, _ := ret[0].(domain.Claims)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ValidateToken indicates an expected call of ValidateToken.
-func (mr *MockAuthServiceMockRecorder) ValidateToken(accessToken any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateToken", reflect.TypeOf((*MockAuthService)(nil).ValidateToken), accessToken)
-}

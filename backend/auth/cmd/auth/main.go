@@ -150,7 +150,6 @@ func serverSetup(cfg config.Config, svc ports.AuthService, log ports.Logger) *ec
 	g.POST("/login", rest.LoginHandler(svc, log))
 	g.POST("/refresh", rest.RefreshHandler(svc, log))
 	g.POST("/logout", rest.LogoutHandler(svc, log))
-	g.POST("/validate", rest.ValidateHandler(svc, log))
 
 	return e
 }

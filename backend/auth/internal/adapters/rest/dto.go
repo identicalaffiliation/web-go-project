@@ -39,16 +39,6 @@ type logoutRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-type validateRequest struct {
-	AccessToken string `json:"access_token"`
-}
-
-type claimsResponse struct {
-	UserID string `json:"user_id"`
-	Email  string `json:"email"`
-	Role   string `json:"role"`
-}
-
 type errorResponse struct {
 	Error string `json:"error"`
 }
