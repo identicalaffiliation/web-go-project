@@ -26,10 +26,9 @@ func TestRegister_Success(t *testing.T) {
 				},
 			}
 			hasher := hasherMock{hashFn: func(plain string) (string, error) { return "hashed:" + plain, nil }}
-			ids := idGenMock{newIDFn: func() string { return "user-1" }}
-			clock := clockMock{nowFn: func() time.Time { return fixedNow }}
 
-			svc := app.NewService(users, nil, hasher, nil, nil, nil, clock, ids, refreshTTL)
+			svc := app.NewService(users, nil, hasher, nil, nil, nil, refreshTTL,
+				app.WithNow(func() time.Time { return fixedNow }))
 
 			got, err := svc.Register(context.Background(), ports.RegisterInput{
 				Email:    "Alice@Example.com",
@@ -48,7 +47,14 @@ func TestRegister_Success(t *testing.T) {
 			if got.Role != role {
 				t.Errorf("want role %q, got %q", role, got.Role)
 			}
-			if createdUser.ID != "user-1" || createdUser.Role != role {
+			if !got.CreatedAt.Equal(fixedNow) {
+				t.Errorf("want created at %v, got %v", fixedNow, got.CreatedAt)
+			}
+			
+			if got.ID.Version() != 7 {
+				t.Errorf("user ID must be UUIDv7, got %s", got.ID)
+			}
+			if createdUser.ID != got.ID || createdUser.Role != role {
 				t.Errorf("repository got unexpected user: %+v", createdUser)
 			}
 		})
@@ -65,7 +71,7 @@ func TestRegister_InvalidRole_DoesNotTouchRepository(t *testing.T) {
 					return nil
 				},
 			}
-			svc := app.NewService(users, nil, hasherMock{}, nil, nil, nil, nil, nil, refreshTTL)
+			svc := app.NewService(users, nil, hasherMock{}, nil, nil, nil, refreshTTL)
 
 			_, err := svc.Register(context.Background(), ports.RegisterInput{
 				Email:    "alice@example.com",
@@ -86,7 +92,7 @@ func TestRegister_InvalidPassword_DoesNotTouchRepository(t *testing.T) {
 			return nil
 		},
 	}
-	svc := app.NewService(users, nil, hasherMock{}, nil, nil, nil, nil, nil, refreshTTL)
+	svc := app.NewService(users, nil, hasherMock{}, nil, nil, nil, refreshTTL)
 
 	_, err := svc.Register(context.Background(), ports.RegisterInput{
 		Email:    "alice@example.com",
@@ -102,10 +108,8 @@ func TestRegister_EmailTaken_PropagatesFromRepository(t *testing.T) {
 		createFn: func(context.Context, domain.User) error { return domain.ErrEmailTaken },
 	}
 	hasher := hasherMock{hashFn: func(plain string) (string, error) { return "hashed", nil }}
-	ids := idGenMock{newIDFn: func() string { return "user-1" }}
-	clock := clockMock{nowFn: time.Now}
 
-	svc := app.NewService(users, nil, hasher, nil, nil, nil, clock, ids, refreshTTL)
+	svc := app.NewService(users, nil, hasher, nil, nil, nil, refreshTTL)
 
 	_, err := svc.Register(context.Background(), ports.RegisterInput{
 		Email:    "alice@example.com",

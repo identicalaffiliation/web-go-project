@@ -4,13 +4,15 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
 )
 
 type userRepoMock struct {
 	createFn     func(ctx context.Context, u domain.User) error
 	getByEmailFn func(ctx context.Context, email domain.Email) (domain.User, error)
-	getByIDFn    func(ctx context.Context, id domain.UserID) (domain.User, error)
+	getByIDFn    func(ctx context.Context, id uuid.UUID) (domain.User, error)
 }
 
 func (m *userRepoMock) Create(ctx context.Context, u domain.User) error {
@@ -21,15 +23,15 @@ func (m *userRepoMock) GetByEmail(ctx context.Context, email domain.Email) (doma
 	return m.getByEmailFn(ctx, email)
 }
 
-func (m *userRepoMock) GetByID(ctx context.Context, id domain.UserID) (domain.User, error) {
+func (m *userRepoMock) GetByID(ctx context.Context, id uuid.UUID) (domain.User, error) {
 	return m.getByIDFn(ctx, id)
 }
 
 type refreshRepoMock struct {
 	createFn    func(ctx context.Context, t domain.RefreshToken) error
 	getByHashFn func(ctx context.Context, hash string) (domain.RefreshToken, error)
-	rotateFn    func(ctx context.Context, oldID string, next domain.RefreshToken, now time.Time) error
-	revokeFn    func(ctx context.Context, id string, now time.Time) error
+	rotateFn    func(ctx context.Context, oldID uuid.UUID, next domain.RefreshToken, now time.Time) error
+	revokeFn    func(ctx context.Context, id uuid.UUID, now time.Time) error
 }
 
 func (m *refreshRepoMock) Create(ctx context.Context, t domain.RefreshToken) error {
@@ -40,11 +42,11 @@ func (m *refreshRepoMock) GetByHash(ctx context.Context, hash string) (domain.Re
 	return m.getByHashFn(ctx, hash)
 }
 
-func (m *refreshRepoMock) Rotate(ctx context.Context, oldID string, next domain.RefreshToken, now time.Time) error {
+func (m *refreshRepoMock) Rotate(ctx context.Context, oldID uuid.UUID, next domain.RefreshToken, now time.Time) error {
 	return m.rotateFn(ctx, oldID, next, now)
 }
 
-func (m *refreshRepoMock) Revoke(ctx context.Context, id string, now time.Time) error {
+func (m *refreshRepoMock) Revoke(ctx context.Context, id uuid.UUID, now time.Time) error {
 	return m.revokeFn(ctx, id, now)
 }
 
@@ -76,15 +78,12 @@ type tokenGenMock struct {
 func (m tokenGenMock) Generate() (string, string, error) { return m.generateFn() }
 func (m tokenGenMock) Hash(plain string) string          { return m.hashFn(plain) }
 
-type clockMock struct{ nowFn func() time.Time }
-
-func (m clockMock) Now() time.Time { return m.nowFn() }
-
-type idGenMock struct{ newIDFn func() string }
-
-func (m idGenMock) NewID() string { return m.newIDFn() }
-
 const (
 	accessTTL  = 15 * time.Minute
 	refreshTTL = 7 * 24 * time.Hour
+)
+
+var (
+	testUserID  = uuid.MustParse("019a0000-0000-7000-8000-000000000001")
+	testTokenID = uuid.MustParse("019a0000-0000-7000-8000-000000000002")
 )

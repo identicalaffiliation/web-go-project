@@ -13,7 +13,7 @@ import (
 
 func TestLogin_Success(t *testing.T) {
 	fixedNow := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	user := domain.User{ID: "user-1", Email: "alice@example.com", PasswordHash: "hashed", Role: domain.RoleCustomer}
+	user := domain.User{ID: testUserID, Email: "alice@example.com", PasswordHash: "hashed", Role: domain.RoleCustomer}
 
 	users := &userRepoMock{
 		getByEmailFn: func(_ context.Context, email domain.Email) (domain.User, error) {
@@ -40,10 +40,9 @@ func TestLogin_Success(t *testing.T) {
 			return nil
 		},
 	}
-	clock := clockMock{nowFn: func() time.Time { return fixedNow }}
-	ids := idGenMock{newIDFn: func() string { return "refresh-1" }}
 
-	svc := app.NewService(users, refreshes, hasher, issuer, nil, tokens, clock, ids, refreshTTL)
+	svc := app.NewService(users, refreshes, hasher, issuer, nil, tokens, refreshTTL,
+		app.WithNow(func() time.Time { return fixedNow }))
 
 	pair, err := svc.Login(context.Background(), ports.LoginInput{Email: "alice@example.com", Password: "password1"})
 	if err != nil {
@@ -52,8 +51,11 @@ func TestLogin_Success(t *testing.T) {
 	if pair.AccessToken != "access-token" || pair.RefreshToken != "plain-refresh" {
 		t.Errorf("unexpected token pair: %+v", pair)
 	}
-	if storedToken.TokenHash != "hash-refresh" || storedToken.UserID != "user-1" {
+	if storedToken.TokenHash != "hash-refresh" || storedToken.UserID != testUserID {
 		t.Errorf("unexpected stored refresh token: %+v", storedToken)
+	}
+	if storedToken.ID.Version() != 7 {
+		t.Errorf("refresh token ID must be UUIDv7, got %s", storedToken.ID)
 	}
 	if want := fixedNow.Add(refreshTTL); !pair.RefreshExpiresAt.Equal(want) || !storedToken.ExpiresAt.Equal(want) {
 		t.Errorf("refresh expiry: pair=%v stored=%v, want %v", pair.RefreshExpiresAt, storedToken.ExpiresAt, want)
@@ -68,7 +70,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 	}
 	hasher := hasherMock{compareFn: func(string, string) error { return domain.ErrInvalidCredentials }}
 
-	svc := app.NewService(users, nil, hasher, nil, nil, nil, nil, nil, refreshTTL)
+	svc := app.NewService(users, nil, hasher, nil, nil, nil, refreshTTL)
 
 	_, err := svc.Login(context.Background(), ports.LoginInput{Email: "alice@example.com", Password: "wrong"})
 	if !errors.Is(err, domain.ErrInvalidCredentials) {
@@ -83,7 +85,7 @@ func TestLogin_UnknownEmail_DoesNotLeakUserNotFound(t *testing.T) {
 		},
 	}
 
-	svc := app.NewService(users, nil, hasherMock{}, nil, nil, nil, nil, nil, refreshTTL)
+	svc := app.NewService(users, nil, hasherMock{}, nil, nil, nil, refreshTTL)
 
 	_, err := svc.Login(context.Background(), ports.LoginInput{Email: "nobody@example.com", Password: "whatever1"})
 	if !errors.Is(err, domain.ErrInvalidCredentials) {

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
@@ -31,20 +31,11 @@ func (r *RefreshTokenRepository) Create(ctx context.Context, token domain.Refres
 }
 
 func (r *RefreshTokenRepository) insert(ctx context.Context, q execer, token domain.RefreshToken) error {
-	id, err := encodeUUID(token.ID)
-	if err != nil {
-		return err
-	}
-	userID, err := encodeUUID(string(token.UserID))
-	if err != nil {
-		return err
-	}
-
 	const query = `
 		INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, revoked_at, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6)
 	`
-	_, err = q.Exec(ctx, query, id, userID, token.TokenHash, token.ExpiresAt, token.RevokedAt, token.CreatedAt)
+	_, err := q.Exec(ctx, query, token.ID, token.UserID, token.TokenHash, token.ExpiresAt, token.RevokedAt, token.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("insert refresh token: %w", err)
 	}
@@ -58,16 +49,11 @@ func (r *RefreshTokenRepository) GetByHash(ctx context.Context, hash string) (do
 		WHERE token_hash = $1
 	`
 
-	var (
-		id        pgtype.UUID
-		userID    pgtype.UUID
-		tokenHash string
-		expiresAt time.Time
-		revokedAt *time.Time
-		createdAt time.Time
-	)
+	var token domain.RefreshToken
 
-	err := r.pool.QueryRow(ctx, query, hash).Scan(&id, &userID, &tokenHash, &expiresAt, &revokedAt, &createdAt)
+	err := r.pool.QueryRow(ctx, query, hash).Scan(
+		&token.ID, &token.UserID, &token.TokenHash, &token.ExpiresAt, &token.RevokedAt, &token.CreatedAt,
+	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.RefreshToken{}, domain.ErrRefreshTokenNotFound
@@ -75,29 +61,17 @@ func (r *RefreshTokenRepository) GetByHash(ctx context.Context, hash string) (do
 		return domain.RefreshToken{}, fmt.Errorf("scan refresh token: %w", err)
 	}
 
-	return domain.RefreshToken{
-		ID:        decodeUUID(id),
-		UserID:    domain.UserID(decodeUUID(userID)),
-		TokenHash: tokenHash,
-		ExpiresAt: expiresAt,
-		RevokedAt: revokedAt,
-		CreatedAt: createdAt,
-	}, nil
+	return token, nil
 }
 
-func (r *RefreshTokenRepository) Rotate(ctx context.Context, oldID string, next domain.RefreshToken, now time.Time) error {
+func (r *RefreshTokenRepository) Rotate(ctx context.Context, oldID uuid.UUID, next domain.RefreshToken, now time.Time) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback(ctx) // если Commit уже прошёл — это no-op
 
-	oldPgID, err := encodeUUID(oldID)
-	if err != nil {
-		return err
-	}
-
-	if _, err := tx.Exec(ctx, `UPDATE refresh_tokens SET revoked_at = $1 WHERE id = $2`, now, oldPgID); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE refresh_tokens SET revoked_at = $1 WHERE id = $2`, now, oldID); err != nil {
 		return fmt.Errorf("revoke old refresh token: %w", err)
 	}
 
@@ -111,13 +85,8 @@ func (r *RefreshTokenRepository) Rotate(ctx context.Context, oldID string, next 
 	return nil
 }
 
-func (r *RefreshTokenRepository) Revoke(ctx context.Context, id string, now time.Time) error {
-	pgID, err := encodeUUID(id)
-	if err != nil {
-		return err
-	}
-
-	cmd, err := r.pool.Exec(ctx, `UPDATE refresh_tokens SET revoked_at = $1 WHERE id = $2`, now, pgID)
+func (r *RefreshTokenRepository) Revoke(ctx context.Context, id uuid.UUID, now time.Time) error {
+	cmd, err := r.pool.Exec(ctx, `UPDATE refresh_tokens SET revoked_at = $1 WHERE id = $2`, now, id)
 	if err != nil {
 		return fmt.Errorf("revoke refresh token: %w", err)
 	}

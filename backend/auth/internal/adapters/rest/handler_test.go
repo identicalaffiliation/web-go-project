@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/logging"
@@ -62,7 +63,7 @@ func doJSON(e *echo.Echo, method, path string, body any) *httptest.ResponseRecor
 func TestHandler_Register_Success(t *testing.T) {
 	svc := &mockAuthService{
 		registerFunc: func(_ context.Context, in ports.RegisterInput) (domain.User, error) {
-			return domain.User{ID: "user-1", Email: domain.Email(in.Email), Role: domain.RoleCustomer, CreatedAt: time.Now()}, nil
+			return domain.User{ID: uuid.MustParse("019a0000-0000-7000-8000-000000000001"), Email: domain.Email(in.Email), Role: domain.RoleCustomer, CreatedAt: time.Now()}, nil
 		},
 	}
 	rec := doJSON(newTestEcho(svc), http.MethodPost, "/api/v1/auth/register",

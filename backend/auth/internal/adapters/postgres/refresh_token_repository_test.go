@@ -19,7 +19,7 @@ func TestRefreshTokenRepository_CreateAndGetByHash(t *testing.T) {
 	ctx := context.Background()
 
 	user := domain.User{
-		ID:           domain.UserID(uuid.NewString()),
+		ID:           uuid.New(),
 		Email:        "carol@example.com",
 		PasswordHash: "hash",
 		Role:         domain.RoleCustomer,
@@ -30,7 +30,7 @@ func TestRefreshTokenRepository_CreateAndGetByHash(t *testing.T) {
 	}
 
 	token := domain.RefreshToken{
-		ID:        uuid.NewString(),
+		ID:        uuid.New(),
 		UserID:    user.ID,
 		TokenHash: "hash-1",
 		ExpiresAt: time.Now().Add(7 * 24 * time.Hour).UTC(),
@@ -67,7 +67,7 @@ func TestRefreshTokenRepository_Rotate(t *testing.T) {
 	ctx := context.Background()
 
 	user := domain.User{
-		ID:           domain.UserID(uuid.NewString()),
+		ID:           uuid.New(),
 		Email:        "dave@example.com",
 		PasswordHash: "hash",
 		Role:         domain.RoleCustomer,
@@ -78,7 +78,7 @@ func TestRefreshTokenRepository_Rotate(t *testing.T) {
 	}
 
 	old := domain.RefreshToken{
-		ID:        uuid.NewString(),
+		ID:        uuid.New(),
 		UserID:    user.ID,
 		TokenHash: "old-hash",
 		ExpiresAt: time.Now().Add(time.Hour).UTC(),
@@ -89,7 +89,7 @@ func TestRefreshTokenRepository_Rotate(t *testing.T) {
 	}
 
 	next := domain.RefreshToken{
-		ID:        uuid.NewString(),
+		ID:        uuid.New(),
 		UserID:    user.ID,
 		TokenHash: "new-hash",
 		ExpiresAt: time.Now().Add(7 * 24 * time.Hour).UTC(),

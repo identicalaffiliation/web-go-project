@@ -6,29 +6,31 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/identicalaffiliation/web-go-project/auth/internal/app"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
 )
 
 func TestRefresh_Success_Rotates(t *testing.T) {
 	fixedNow := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	stored := domain.RefreshToken{ID: "old-id", UserID: "user-1", ExpiresAt: fixedNow.Add(time.Hour)}
-	user := domain.User{ID: "user-1", Email: "alice@example.com", Role: domain.RoleCustomer}
+	stored := domain.RefreshToken{ID: testTokenID, UserID: testUserID, ExpiresAt: fixedNow.Add(time.Hour)}
+	user := domain.User{ID: testUserID, Email: "alice@example.com", Role: domain.RoleCustomer}
 
 	refreshes := &refreshRepoMock{
 		getByHashFn: func(context.Context, string) (domain.RefreshToken, error) { return stored, nil },
-		rotateFn: func(_ context.Context, oldID string, next domain.RefreshToken, _ time.Time) error {
-			if oldID != "old-id" {
-				t.Fatalf("want to rotate old-id, got %s", oldID)
+		rotateFn: func(_ context.Context, oldID uuid.UUID, next domain.RefreshToken, _ time.Time) error {
+			if oldID != testTokenID {
+				t.Fatalf("want to rotate %s, got %s", testTokenID, oldID)
 			}
-			if next.TokenHash != "new-hash" {
+			if next.TokenHash != "new-hash" || next.UserID != testUserID || next.ID == testTokenID {
 				t.Fatalf("unexpected next token: %+v", next)
 			}
 			return nil
 		},
 	}
 	users := &userRepoMock{
-		getByIDFn: func(context.Context, domain.UserID) (domain.User, error) { return user, nil },
+		getByIDFn: func(context.Context, uuid.UUID) (domain.User, error) { return user, nil },
 	}
 	issuer := issuerMock{issueFn: func(domain.Claims) (string, time.Time, error) {
 		return "new-access", fixedNow.Add(accessTTL), nil
@@ -37,10 +39,9 @@ func TestRefresh_Success_Rotates(t *testing.T) {
 		hashFn:     func(plain string) string { return "hash-of-" + plain },
 		generateFn: func() (string, string, error) { return "new-plain", "new-hash", nil },
 	}
-	clock := clockMock{nowFn: func() time.Time { return fixedNow }}
-	ids := idGenMock{newIDFn: func() string { return "new-id" }}
 
-	svc := app.NewService(users, refreshes, nil, issuer, nil, tokens, clock, ids, refreshTTL)
+	svc := app.NewService(users, refreshes, nil, issuer, nil, tokens, refreshTTL,
+		app.WithNow(func() time.Time { return fixedNow }))
 
 	pair, err := svc.Refresh(context.Background(), "old-plain-token")
 	if err != nil {
@@ -53,15 +54,15 @@ func TestRefresh_Success_Rotates(t *testing.T) {
 
 func TestRefresh_Expired(t *testing.T) {
 	fixedNow := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	stored := domain.RefreshToken{ID: "old-id", ExpiresAt: fixedNow.Add(-time.Minute)}
+	stored := domain.RefreshToken{ID: testTokenID, ExpiresAt: fixedNow.Add(-time.Minute)}
 
 	refreshes := &refreshRepoMock{
 		getByHashFn: func(context.Context, string) (domain.RefreshToken, error) { return stored, nil },
 	}
 	tokens := tokenGenMock{hashFn: func(plain string) string { return "hash-of-" + plain }}
-	clock := clockMock{nowFn: func() time.Time { return fixedNow }}
 
-	svc := app.NewService(nil, refreshes, nil, nil, nil, tokens, clock, nil, refreshTTL)
+	svc := app.NewService(nil, refreshes, nil, nil, nil, tokens, refreshTTL,
+		app.WithNow(func() time.Time { return fixedNow }))
 
 	_, err := svc.Refresh(context.Background(), "old-plain-token")
 	if !errors.Is(err, domain.ErrRefreshTokenExpired) {
@@ -77,7 +78,7 @@ func TestRefresh_NotFound_MapsToInvalidToken(t *testing.T) {
 	}
 	tokens := tokenGenMock{hashFn: func(plain string) string { return "hash-of-" + plain }}
 
-	svc := app.NewService(nil, refreshes, nil, nil, nil, tokens, nil, nil, refreshTTL)
+	svc := app.NewService(nil, refreshes, nil, nil, nil, tokens, refreshTTL)
 
 	_, err := svc.Refresh(context.Background(), "unknown-token")
 	if !errors.Is(err, domain.ErrInvalidToken) {

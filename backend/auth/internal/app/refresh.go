@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
+
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
 )
 
@@ -19,7 +21,7 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (domain.Toke
 		return domain.TokenPair{}, fmt.Errorf("get refresh token: %w", err)
 	}
 
-	now := s.clock.Now()
+	now := s.now()
 	if err := stored.CheckActive(now); err != nil {
 		return domain.TokenPair{}, err
 	}
@@ -35,8 +37,13 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (domain.Toke
 		return domain.TokenPair{}, err
 	}
 
+	id, err := uuid.NewV7()
+	if err != nil {
+		return domain.TokenPair{}, fmt.Errorf("generate refresh token id: %w", err)
+	}
+
 	next := domain.RefreshToken{
-		ID:        s.ids.NewID(),
+		ID:        id,
 		UserID:    user.ID,
 		TokenHash: t.refreshHash,
 		ExpiresAt: t.refreshExp,

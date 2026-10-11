@@ -4,11 +4,11 @@ import (
 	"net/mail"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const maxEmaiLen = 254
-
-type UserID string
 
 type Role string
 
@@ -38,7 +38,7 @@ func NewEmail(raw string) (Email, error) {
 }
 
 type User struct {
-	ID           UserID
+	ID           uuid.UUID
 	Email        Email
 	PasswordHash string
 	Role         Role

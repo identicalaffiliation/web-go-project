@@ -1,9 +1,11 @@
 package jwt
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
 )
@@ -17,7 +19,7 @@ type claims struct {
 func toClaims(c domain.Claims, issuer string, now time.Time, ttl time.Duration) claims {
 	return claims{
 		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   string(c.UserID),
+			Subject:   c.UserID.String(),
 			Issuer:    issuer,
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
@@ -27,10 +29,15 @@ func toClaims(c domain.Claims, issuer string, now time.Time, ttl time.Duration) 
 	}
 }
 
-func fromClaims(c claims) domain.Claims {
+func fromClaims(c claims) (domain.Claims, error) {
+	userID, err := uuid.Parse(c.Subject)
+	if err != nil {
+		return domain.Claims{}, fmt.Errorf("parse subject: %w", err)
+	}
+
 	return domain.Claims{
-		UserID: domain.UserID(c.Subject),
+		UserID: userID,
 		Email:  domain.Email(c.Email),
 		Role:   domain.Role(c.Role),
-	}
+	}, nil
 }

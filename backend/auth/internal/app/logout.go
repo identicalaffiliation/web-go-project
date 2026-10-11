@@ -19,7 +19,7 @@ func (s *Service) Logout(ctx context.Context, refreshToken string) error {
 		return fmt.Errorf("get refresh token: %w", err)
 	}
 
-	if err := s.refreshes.Revoke(ctx, stored.ID, s.clock.Now()); err != nil {
+	if err := s.refreshes.Revoke(ctx, stored.ID, s.now()); err != nil {
 		return fmt.Errorf("revoke refresh token: %w", err)
 	}
 	return nil

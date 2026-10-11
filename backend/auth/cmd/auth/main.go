@@ -14,8 +14,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/clock"
-	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/idgen"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/logging"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/postgres"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/refreshtoken"
@@ -90,8 +88,6 @@ func run() error {
 		issuer,
 		verifier,
 		refreshtoken.New(),
-		clock.New(),
-		idgen.New(),
 		cfg.JWT.RefreshTTL,
 	)
 

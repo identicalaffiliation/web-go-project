@@ -7,9 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
 	authjwt "github.com/identicalaffiliation/web-go-project/auth/pkg/jwt"
 )
+
+var testUserID = uuid.MustParse("019a0000-0000-7000-8000-000000000001")
 
 func generateKeyPair(t *testing.T) (*rsa.PrivateKey, *rsa.PublicKey) {
 	t.Helper()
@@ -25,7 +29,7 @@ func TestIssueAndVerify_Success(t *testing.T) {
 	issuer := authjwt.NewIssuer(priv, "test-kid", "auth-service", 15*time.Minute)
 	verifier := authjwt.NewVerifier(pub, "auth-service")
 
-	claims := domain.Claims{UserID: "user-1", Email: "alice@example.com", Role: domain.RoleCustomer}
+	claims := domain.Claims{UserID: testUserID, Email: "alice@example.com", Role: domain.RoleCustomer}
 
 	token, exp, err := issuer.Issue(claims)
 	if err != nil {
@@ -52,7 +56,7 @@ func TestVerify_WrongIssuer(t *testing.T) {
 	issuer := authjwt.NewIssuer(priv, "test-kid", "auth-service", 15*time.Minute)
 	verifier := authjwt.NewVerifier(pub, "some-other-service")
 
-	token, _, err := issuer.Issue(domain.Claims{UserID: "user-1"})
+	token, _, err := issuer.Issue(domain.Claims{UserID: testUserID})
 	if err != nil {
 		t.Fatalf("Issue: %v", err)
 	}
@@ -69,7 +73,7 @@ func TestVerify_Expired(t *testing.T) {
 	issuer := authjwt.NewIssuer(priv, "test-kid", "auth-service", -time.Minute)
 	verifier := authjwt.NewVerifier(pub, "auth-service")
 
-	token, _, err := issuer.Issue(domain.Claims{UserID: "user-1"})
+	token, _, err := issuer.Issue(domain.Claims{UserID: testUserID})
 	if err != nil {
 		t.Fatalf("Issue: %v", err)
 	}
@@ -87,7 +91,7 @@ func TestVerify_WrongKey(t *testing.T) {
 	issuer := authjwt.NewIssuer(priv1, "test-kid", "auth-service", 15*time.Minute)
 	verifier := authjwt.NewVerifier(pub2, "auth-service") // чужой публичный ключ
 
-	token, _, err := issuer.Issue(domain.Claims{UserID: "user-1"})
+	token, _, err := issuer.Issue(domain.Claims{UserID: testUserID})
 	if err != nil {
 		t.Fatalf("Issue: %v", err)
 	}

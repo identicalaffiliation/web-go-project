@@ -1,9 +1,13 @@
 package domain
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type Claims struct {
-	UserID UserID
+	UserID uuid.UUID
 	Email  Email
 	Role   Role
 }
@@ -16,8 +20,8 @@ type TokenPair struct {
 }
 
 type RefreshToken struct {
-	ID        string
-	UserID    UserID
+	ID        uuid.UUID
+	UserID    uuid.UUID
 	TokenHash string
 	ExpiresAt time.Time
 	RevokedAt *time.Time

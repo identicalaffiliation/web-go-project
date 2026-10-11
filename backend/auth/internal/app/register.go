@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
+
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
@@ -28,12 +30,17 @@ func (s *Service) Register(ctx context.Context, in ports.RegisterInput) (domain.
 		return domain.User{}, fmt.Errorf("hash password: %w", err)
 	}
 
+	id, err := uuid.NewV7()
+	if err != nil {
+		return domain.User{}, fmt.Errorf("generate user id: %w", err)
+	}
+
 	user := domain.User{
-		ID:           domain.UserID(s.ids.NewID()),
+		ID:           id,
 		Email:        email,
 		PasswordHash: hash,
 		Role:         role,
-		CreatedAt:    s.clock.Now(),
+		CreatedAt:    s.now(),
 	}
 
 	if err := s.users.Create(ctx, user); err != nil {

@@ -40,5 +40,10 @@ func (v *Verifier) Verify(tokenString string) (domain.Claims, error) {
 		return domain.Claims{}, domain.ErrInvalidToken
 	}
 
-	return fromClaims(cl), nil
+	out, err := fromClaims(cl)
+	if err != nil {
+		return domain.Claims{}, fmt.Errorf("%w: %v", domain.ErrInvalidToken, err)
+	}
+
+	return out, nil
 }

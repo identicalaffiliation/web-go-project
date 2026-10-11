@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
+
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
@@ -27,15 +29,20 @@ func (s *Service) Login(ctx context.Context, in ports.LoginInput) (domain.TokenP
 		return domain.TokenPair{}, domain.ErrInvalidCredentials
 	}
 
-	now := s.clock.Now()
+	now := s.now()
 	claims := domain.Claims{UserID: user.ID, Email: user.Email, Role: user.Role}
 	t, err := s.issueAccessAndRefresh(claims, now)
 	if err != nil {
 		return domain.TokenPair{}, err
 	}
 
+	id, err := uuid.NewV7()
+	if err != nil {
+		return domain.TokenPair{}, fmt.Errorf("generate refresh token id: %w", err)
+	}
+
 	rt := domain.RefreshToken{
-		ID:        s.ids.NewID(),
+		ID:        id,
 		UserID:    user.ID,
 		TokenHash: t.refreshHash,
 		ExpiresAt: t.refreshExp,

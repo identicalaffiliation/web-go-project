@@ -15,9 +15,17 @@ type Service struct {
 	issuer     ports.AccessTokenIssuer
 	verifier   ports.AccessTokenVerifier
 	tokens     ports.RefreshTokenGenerator
-	clock      ports.Clock
-	ids        ports.IDGenerator
 	refreshTTL time.Duration
+	now        func() time.Time // подменяется в тестах
+}
+
+type Option func(*Service)
+
+
+func WithNow(now func() time.Time) Option {
+	return func(s *Service) {
+		s.now = now
+	}
 }
 
 // TTL access-токена здесь не нужен: его знает issuer и сам считает expiresAt.
@@ -28,21 +36,23 @@ func NewService(
 	issuer ports.AccessTokenIssuer,
 	verifier ports.AccessTokenVerifier,
 	tokens ports.RefreshTokenGenerator,
-	clock ports.Clock,
-	ids ports.IDGenerator,
 	refreshTTL time.Duration,
+	opts ...Option,
 ) *Service {
-	return &Service{
+	s := &Service{
 		users:      users,
 		refreshes:  refreshes,
 		hasher:     hasher,
 		issuer:     issuer,
 		verifier:   verifier,
 		tokens:     tokens,
-		clock:      clock,
-		ids:        ids,
 		refreshTTL: refreshTTL,
+		now:        time.Now,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 type issuedTokens struct {

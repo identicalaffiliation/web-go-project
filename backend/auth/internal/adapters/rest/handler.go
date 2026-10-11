@@ -26,7 +26,7 @@ func RegisterHandler(svc ports.AuthService, log ports.Logger) echo.HandlerFunc {
 		}
 
 		return c.JSON(http.StatusCreated, registerResponse{
-			ID: string(user.ID), Email: string(user.Email), Role: string(user.Role), CreatedAt: user.CreatedAt,
+			ID: user.ID.String(), Email: string(user.Email), Role: string(user.Role), CreatedAt: user.CreatedAt,
 		})
 	}
 }
@@ -93,7 +93,7 @@ func ValidateHandler(svc ports.AuthService, log ports.Logger) echo.HandlerFunc {
 		}
 
 		return c.JSON(http.StatusOK, claimsResponse{
-			UserID: string(claims.UserID), Email: string(claims.Email), Role: string(claims.Role),
+			UserID: claims.UserID.String(), Email: string(claims.Email), Role: string(claims.Role),
 		})
 	}
 }

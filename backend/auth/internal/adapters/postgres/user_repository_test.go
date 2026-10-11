@@ -89,7 +89,7 @@ func TestUserRepository_CreateAndGet(t *testing.T) {
 	ctx := context.Background()
 
 	user := domain.User{
-		ID:           domain.UserID(uuid.NewString()),
+		ID:           uuid.New(),
 		Email:        "alice@example.com",
 		PasswordHash: "hash",
 		Role:         domain.RoleCustomer,
@@ -123,7 +123,7 @@ func TestUserRepository_Create_DuplicateEmail(t *testing.T) {
 	ctx := context.Background()
 
 	user := domain.User{
-		ID:           domain.UserID(uuid.NewString()),
+		ID:           uuid.New(),
 		Email:        "bob@example.com",
 		PasswordHash: "hash",
 		Role:         domain.RoleCustomer,
@@ -134,7 +134,7 @@ func TestUserRepository_Create_DuplicateEmail(t *testing.T) {
 	}
 
 	dup := user
-	dup.ID = domain.UserID(uuid.NewString())
+	dup.ID = uuid.New()
 
 	err := repo.Create(ctx, dup)
 	if !errors.Is(err, domain.ErrEmailTaken) {

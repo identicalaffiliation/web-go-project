@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
 	authjwt "github.com/identicalaffiliation/web-go-project/auth/pkg/jwt"
 )
@@ -42,7 +44,7 @@ func TestRun_GeneratesKeysUsableByJWTPackage(t *testing.T) {
 	// Токен, подписанный сгенерированным приватным ключом, должен проверяться
 	// сгенерированным публичным: так мы убеждаемся, что это именно пара.
 	issuer := authjwt.NewIssuer(priv, "kid", suggestedIssuer, time.Minute)
-	token, _, err := issuer.Issue(domain.Claims{UserID: "user-1"})
+	token, _, err := issuer.Issue(domain.Claims{UserID: uuid.MustParse("019a0000-0000-7000-8000-000000000001")})
 	if err != nil {
 		t.Fatalf("Issue: %v", err)
 	}
