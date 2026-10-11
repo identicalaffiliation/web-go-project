@@ -17,6 +17,9 @@ var allEnvKeys = []string{
 	"AUTH_ACCESS_TOKEN_TTL",
 	"AUTH_REFRESH_TOKEN_TTL",
 	"AUTH_LOG_LEVEL",
+	"AUTH_HTTP_READ_TIMEOUT",
+	"AUTH_HTTP_WRITE_TIMEOUT",
+	"AUTH_HTTP_IDLE_TIMEOUT",
 	"AUTH_DB_MAX_CONNS",
 	"AUTH_DB_MIN_CONNS",
 	"AUTH_DB_MAX_CONN_LIFETIME",
@@ -91,6 +94,12 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.LogLevel != slog.LevelInfo {
 		t.Errorf("LogLevel = %s, want INFO", cfg.LogLevel)
 	}
+	if cfg.HTTPReadTimeout != 5*time.Second ||
+		cfg.HTTPWriteTimeout != 10*time.Second ||
+		cfg.HTTPIdleTimeout != 60*time.Second {
+		t.Errorf("HTTP timeouts = %s/%s/%s, want 5s/10s/60s",
+			cfg.HTTPReadTimeout, cfg.HTTPWriteTimeout, cfg.HTTPIdleTimeout)
+	}
 
 	wantPostgres := PostgresConfig{
 		DSN:               requiredVars()["AUTH_DB_DSN"],
@@ -151,6 +160,9 @@ func TestLoad_AllSet(t *testing.T) {
 	vars["AUTH_DB_MAX_CONN_IDLE_TIME"] = "10m"
 	vars["AUTH_DB_HEALTH_CHECK_PERIOD"] = "1m"
 	vars["AUTH_DB_CONNECT_TIMEOUT"] = "3s"
+	vars["AUTH_HTTP_READ_TIMEOUT"] = "2s"
+	vars["AUTH_HTTP_WRITE_TIMEOUT"] = "4s"
+	vars["AUTH_HTTP_IDLE_TIMEOUT"] = "30s"
 	setEnv(t, vars)
 
 	cfg, err := Load()
@@ -176,11 +188,36 @@ func TestLoad_AllSet(t *testing.T) {
 			AccessTTL:      5 * time.Minute,
 			RefreshTTL:     24 * time.Hour,
 		},
-		HTTPAddr: ":9090",
-		LogLevel: slog.LevelInfo,
+		HTTPAddr:         ":9090",
+		HTTPReadTimeout:  2 * time.Second,
+		HTTPWriteTimeout: 4 * time.Second,
+		HTTPIdleTimeout:  30 * time.Second,
+		LogLevel:         slog.LevelInfo,
 	}
 	if cfg != want {
 		t.Errorf("cfg = %+v, want %+v", cfg, want)
+	}
+}
+
+func TestLoad_InvalidHTTPTimeouts(t *testing.T) {
+	tests := map[string]map[string]string{
+		"zero read":      {"AUTH_HTTP_READ_TIMEOUT": "0s"},
+		"negative write": {"AUTH_HTTP_WRITE_TIMEOUT": "-1s"},
+		"zero idle":      {"AUTH_HTTP_IDLE_TIMEOUT": "0s"},
+		"not a duration": {"AUTH_HTTP_READ_TIMEOUT": "fast"},
+	}
+	for name, overrides := range tests {
+		t.Run(name, func(t *testing.T) {
+			vars := requiredVars()
+			for k, v := range overrides {
+				vars[k] = v
+			}
+			setEnv(t, vars)
+
+			if _, err := Load(); err == nil {
+				t.Fatalf("expected error for %v", overrides)
+			}
+		})
 	}
 }
 

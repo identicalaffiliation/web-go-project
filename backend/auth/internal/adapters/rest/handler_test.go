@@ -40,7 +40,13 @@ func (m *mockAuthService) ValidateToken(string) (domain.Claims, error) {
 
 func newTestEcho(svc ports.AuthService) *echo.Echo {
 	e := echo.New()
-	rest.NewHandler(svc, logging.NewNop()).Register(e.Group("/api/v1/auth"))
+	log := logging.NewNop()
+	g := e.Group("/api/v1/auth")
+	g.POST("/register", rest.RegisterHandler(svc, log))
+	g.POST("/login", rest.LoginHandler(svc, log))
+	g.POST("/refresh", rest.RefreshHandler(svc, log))
+	g.POST("/logout", rest.LogoutHandler(svc, log))
+	g.POST("/validate", rest.ValidateHandler(svc, log))
 	return e
 }
 

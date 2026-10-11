@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/rest"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/app"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/config"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 	"github.com/identicalaffiliation/web-go-project/auth/pkg/hasher"
 	"github.com/identicalaffiliation/web-go-project/auth/pkg/jwt"
 	"github.com/identicalaffiliation/web-go-project/auth/pkg/logger"
@@ -93,21 +95,16 @@ func run() error {
 		cfg.JWT.RefreshTTL,
 	)
 
-	e := echo.New()
-	e.HideBanner = true
-	rest.NewHandler(service, log).Register(e.Group("/api/v1/auth"))
+	e := serverSetup(cfg, service, log)
 
-	srv := &http.Server{
-		Addr:         cfg.HTTPAddr,
-		Handler:      e,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-	}
-
+	// Start блокирует до остановки сервера, поэтому запускаем его в горутине,
+	// а main-горутина тем временем ждёт сигнал или ошибку сервера.
+	// Буфер 1: горутина отправит результат и завершится, даже если читать
+	// из канала уже некому.
 	errCh := make(chan error, 1)
 	go func() {
 		log.Info("auth service listening", "addr", cfg.HTTPAddr)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := e.Start(cfg.HTTPAddr); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- fmt.Errorf("listen: %w", err)
 			return
 		}
@@ -117,13 +114,67 @@ func run() error {
 	select {
 	case <-ctx.Done():
 		log.Info("shutting down auth service")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		// Контекст ctx уже отменён сигналом, им Shutdown ограничивать нельзя:
+		// он сразу бы прервал ожидание активных запросов. Нужен новый контекст
+		// с собственным дедлайном.
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
-		if err := srv.Shutdown(shutdownCtx); err != nil {
+		if err := e.Shutdown(shutdownCtx); err != nil {
 			return fmt.Errorf("shutdown: %w", err)
 		}
 		return nil
 	case err := <-errCh:
 		return err
+	}
+}
+
+// shutdownTimeout — сколько ждём завершения активных запросов при остановке.
+const shutdownTimeout = 5 * time.Second
+
+// serverSetup собирает echo: таймауты, middleware и маршруты. Выделено из run,
+// чтобы run отвечал за жизненный цикл, а serverSetup — за то, что сервер умеет.
+func serverSetup(cfg config.Config, svc ports.AuthService, log ports.Logger) *echo.Echo {
+	e := echo.New()
+	e.HideBanner = true
+	e.HidePort = true
+
+	// Свой http.Server не создаём: echo держит его в e.Server, и Start/Shutdown
+	// работают именно с ним.
+	e.Server.ReadTimeout = cfg.HTTPReadTimeout
+	e.Server.WriteTimeout = cfg.HTTPWriteTimeout
+	e.Server.IdleTimeout = cfg.HTTPIdleTimeout
+
+	e.Use(recoverMiddleware(log))
+
+	g := e.Group("/api/v1/auth")
+	g.POST("/register", rest.RegisterHandler(svc, log))
+	g.POST("/login", rest.LoginHandler(svc, log))
+	g.POST("/refresh", rest.RefreshHandler(svc, log))
+	g.POST("/logout", rest.LogoutHandler(svc, log))
+	g.POST("/validate", rest.ValidateHandler(svc, log))
+
+	return e
+}
+
+// recoverMiddleware ловит панику в хендлере, чтобы она не роняла процесс, и
+// пишет её в наш JSON-лог. Свой, а не echo/middleware.Recover: тот пакет
+// тянет golang.org/x/time, то есть новую зависимость.
+func recoverMiddleware(log ports.Logger) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) (err error) {
+			defer func() {
+				r := recover()
+				if r == nil {
+					return
+				}
+				// ErrAbortHandler — штатный способ net/http оборвать ответ.
+				if r == http.ErrAbortHandler { //nolint:errorlint // сравнение со значением panic
+					panic(r)
+				}
+				log.Error("panic recovered", "panic", fmt.Sprint(r), "stack", string(debug.Stack()))
+				err = c.JSON(http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+			}()
+			return next(c)
+		}
 	}
 }

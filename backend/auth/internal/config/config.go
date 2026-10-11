@@ -13,6 +13,10 @@ type Config struct {
 	JWT      JWTConfig
 	HTTPAddr string `env:"AUTH_HTTP_ADDR" env-default:":8080"`
 
+	HTTPReadTimeout  time.Duration `env:"AUTH_HTTP_READ_TIMEOUT" env-default:"5s"`
+	HTTPWriteTimeout time.Duration `env:"AUTH_HTTP_WRITE_TIMEOUT" env-default:"10s"`
+	HTTPIdleTimeout  time.Duration `env:"AUTH_HTTP_IDLE_TIMEOUT" env-default:"60s"`
+
 	LogLevel slog.Level `env:"AUTH_LOG_LEVEL" env-default:"info"`
 }
 
@@ -53,6 +57,19 @@ func (c Config) validate() error {
 	}
 	if c.JWT.RefreshTTL <= 0 {
 		return fmt.Errorf("AUTH_REFRESH_TOKEN_TTL must be positive, got %s", c.JWT.RefreshTTL)
+	}
+	
+	for _, d := range []struct {
+		name  string
+		value time.Duration
+	}{
+		{"AUTH_HTTP_READ_TIMEOUT", c.HTTPReadTimeout},
+		{"AUTH_HTTP_WRITE_TIMEOUT", c.HTTPWriteTimeout},
+		{"AUTH_HTTP_IDLE_TIMEOUT", c.HTTPIdleTimeout},
+	} {
+		if d.value <= 0 {
+			return fmt.Errorf("%s must be > 0, got %v", d.name, d.value)
+		}
 	}
 	return c.Postgres.validate()
 }
