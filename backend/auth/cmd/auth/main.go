@@ -134,6 +134,9 @@ func serverSetup(cfg config.Config, svc ports.AuthService, log ports.Logger) *ec
 	e.HideBanner = true
 	e.HidePort = true
 
+	// Единственный экземпляр на процесс; хендлеры достают его через c.Validate.
+	e.Validator = rest.NewValidator()
+
 	// Свой http.Server не создаём: echo держит его в e.Server, и Start/Shutdown
 	// работают именно с ним.
 	e.Server.ReadTimeout = cfg.HTTPReadTimeout

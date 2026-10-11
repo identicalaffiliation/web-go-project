@@ -2,10 +2,12 @@ package rest
 
 import "time"
 
+// Теги проверяют только форму запроса. Сложность пароля (длина в символах и
+// байтах, пробелы) проверяет domain.ValidatePassword.
 type registerRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Role     string `json:"role"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required"`
+	Role     string `json:"role" validate:"required,oneof=customer business"`
 }
 
 type registerResponse struct {
@@ -15,9 +17,11 @@ type registerResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// При логине пароль только required: правила сложности относятся к регистрации,
+// а старый пароль может им не соответствовать.
 type loginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required"`
 }
 
 type tokenPairResponse struct {

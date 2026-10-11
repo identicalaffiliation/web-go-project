@@ -17,6 +17,9 @@ func RegisterHandler(svc ports.AuthService, log ports.Logger) echo.HandlerFunc {
 		if err := c.Bind(&req); err != nil {
 			return c.JSON(http.StatusBadRequest, errorResponse{Error: "invalid request body"})
 		}
+		if err := c.Validate(&req); err != nil {
+			return c.JSON(http.StatusBadRequest, errorResponse{Error: validationMessage(err)})
+		}
 
 		user, err := svc.Register(c.Request().Context(), ports.RegisterInput{
 			Email: req.Email, Password: req.Password, Role: req.Role,
@@ -36,6 +39,9 @@ func LoginHandler(svc ports.AuthService, log ports.Logger) echo.HandlerFunc {
 		var req loginRequest
 		if err := c.Bind(&req); err != nil {
 			return c.JSON(http.StatusBadRequest, errorResponse{Error: "invalid request body"})
+		}
+		if err := c.Validate(&req); err != nil {
+			return c.JSON(http.StatusBadRequest, errorResponse{Error: validationMessage(err)})
 		}
 
 		pair, err := svc.Login(c.Request().Context(), ports.LoginInput{

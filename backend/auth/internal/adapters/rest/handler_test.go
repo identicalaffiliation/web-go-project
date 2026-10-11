@@ -41,6 +41,7 @@ func (m *mockAuthService) ValidateToken(string) (domain.Claims, error) {
 
 func newTestEcho(svc ports.AuthService) *echo.Echo {
 	e := echo.New()
+	e.Validator = rest.NewValidator()
 	log := logging.NewNop()
 	g := e.Group("/api/v1/auth")
 	g.POST("/register", rest.RegisterHandler(svc, log))
@@ -74,25 +75,89 @@ func TestHandler_Register_Success(t *testing.T) {
 	}
 }
 
-func TestHandler_Register_InvalidRole(t *testing.T) {
-	svc := &mockAuthService{
+
+func failingService(t *testing.T) *mockAuthService {
+	t.Helper()
+	return &mockAuthService{
 		registerFunc: func(context.Context, ports.RegisterInput) (domain.User, error) {
-			return domain.User{}, domain.ErrInvalidRole
+			t.Error("service.Register must not be called on invalid request")
+			return domain.User{}, nil
+		},
+		loginFunc: func(context.Context, ports.LoginInput) (domain.TokenPair, error) {
+			t.Error("service.Login must not be called on invalid request")
+			return domain.TokenPair{}, nil
 		},
 	}
-	// Поле role отсутствует, пустое или admin: во всех случаях 400.
-	bodies := map[string]map[string]string{
-		"missing": {"email": "a@example.com", "password": "secret123"},
-		"empty":   {"email": "a@example.com", "password": "secret123", "role": ""},
-		"admin":   {"email": "a@example.com", "password": "secret123", "role": "admin"},
+}
+
+func TestHandler_Register_ValidationErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    map[string]string
+		wantMsg string
+	}{
+		{"empty email", map[string]string{"email": "", "password": "secret123", "role": "customer"}, "email is required"},
+		{"missing email", map[string]string{"password": "secret123", "role": "customer"}, "email is required"},
+		{"invalid email", map[string]string{"email": "not-an-email", "password": "secret123", "role": "customer"}, "invalid email"},
+		{"empty password", map[string]string{"email": "a@example.com", "password": "", "role": "customer"}, "password is required"},
+		{"missing role", map[string]string{"email": "a@example.com", "password": "secret123"}, "role is required"},
+		{"empty role", map[string]string{"email": "a@example.com", "password": "secret123", "role": ""}, "role is required"},
+		{"admin role", map[string]string{"email": "a@example.com", "password": "secret123", "role": "admin"}, "invalid role"},
 	}
-	for name, body := range bodies {
-		t.Run(name, func(t *testing.T) {
-			rec := doJSON(newTestEcho(svc), http.MethodPost, "/api/v1/auth/register", body)
-			if rec.Code != http.StatusBadRequest {
-				t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
-			}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := doJSON(newTestEcho(failingService(t)), http.MethodPost, "/api/v1/auth/register", tc.body)
+			assertBadRequest(t, rec, tc.wantMsg)
 		})
+	}
+}
+
+func TestHandler_Register_DomainPasswordError(t *testing.T) {
+	// Сложность пароля теги не проверяют: ошибку отдаёт сервис (domain.ValidatePassword).
+	svc := &mockAuthService{
+		registerFunc: func(context.Context, ports.RegisterInput) (domain.User, error) {
+			return domain.User{}, domain.ErrInvalidPassword
+		},
+	}
+	rec := doJSON(newTestEcho(svc), http.MethodPost, "/api/v1/auth/register",
+		map[string]string{"email": "a@example.com", "password": "short", "role": "customer"})
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+}
+
+func TestHandler_Login_ValidationErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    map[string]string
+		wantMsg string
+	}{
+		{"empty email", map[string]string{"email": "", "password": "x"}, "email is required"},
+		{"invalid email", map[string]string{"email": "nope", "password": "x"}, "invalid email"},
+		{"empty password", map[string]string{"email": "a@example.com", "password": ""}, "password is required"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := doJSON(newTestEcho(failingService(t)), http.MethodPost, "/api/v1/auth/login", tc.body)
+			assertBadRequest(t, rec, tc.wantMsg)
+		})
+	}
+}
+
+func assertBadRequest(t *testing.T, rec *httptest.ResponseRecorder, wantMsg string) {
+	t.Helper()
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+	var resp struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if resp.Error != wantMsg {
+		t.Errorf("error = %q, want %q", resp.Error, wantMsg)
 	}
 }
 
@@ -103,7 +168,7 @@ func TestHandler_Register_EmailTaken(t *testing.T) {
 		},
 	}
 	rec := doJSON(newTestEcho(svc), http.MethodPost, "/api/v1/auth/register",
-		map[string]string{"email": "a@example.com", "password": "secret123"})
+		map[string]string{"email": "a@example.com", "password": "secret123", "role": "customer"})
 
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusConflict)

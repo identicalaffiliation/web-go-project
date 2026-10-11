@@ -48,6 +48,7 @@ func TestValidatePassword(t *testing.T) {
 	}{
 		{name: "ok", in: "12345678"},
 		{name: "too short", in: "1234567", wantErr: true},
+		{name: "only spaces", in: "         ", wantErr: true},
 		{name: "too long", in: strings.Repeat("a", domain.MaxPasswordBytes+1), wantErr: true},
 	}
 
