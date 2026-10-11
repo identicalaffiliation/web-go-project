@@ -6,5 +6,4 @@ grpcio
 grpcio-tools
 aiokafka
 pydantic-settings
-pyjwt
 python-dotenv

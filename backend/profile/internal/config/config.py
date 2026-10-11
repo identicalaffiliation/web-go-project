@@ -15,8 +15,6 @@ class Settings(BaseSettings):
     ORDERS_GRPC_HOST: str = "localhost:50051"
     PAYMENTS_GRPC_HOST: str = "localhost:50052"
 
-    JWT_SECRET_KEY: str
-
     @property
     def database_url(self) -> str:
         return (
