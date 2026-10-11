@@ -11,7 +11,7 @@ import (
 	"github.com/identicalaffiliation/web-go-project/auth/gen/mocks"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/app"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
-	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/dto"
 )
 
 func TestRegister_Success(t *testing.T) {
@@ -36,7 +36,7 @@ func TestRegister_Success(t *testing.T) {
 			svc := app.NewService(users, nil, hasher, nil, nil, nil, refreshTTL,
 				app.WithNow(func() time.Time { return fixedNow }))
 
-			got, err := svc.Register(context.Background(), ports.RegisterInput{
+			got, err := svc.Register(context.Background(), dto.RegisterInput{
 				Email:    "Alice@Example.com",
 				Password: "password1",
 				Role:     string(role),
@@ -76,7 +76,7 @@ func TestRegister_InvalidRole_DoesNotTouchRepository(t *testing.T) {
 			users := mocks.NewMockUserRepository(ctrl)
 			svc := app.NewService(users, nil, mocks.NewMockPasswordHasher(ctrl), nil, nil, nil, refreshTTL)
 
-			_, err := svc.Register(context.Background(), ports.RegisterInput{
+			_, err := svc.Register(context.Background(), dto.RegisterInput{
 				Email:    "alice@example.com",
 				Password: "password1",
 				Role:     role,
@@ -93,7 +93,7 @@ func TestRegister_InvalidPassword_DoesNotTouchRepository(t *testing.T) {
 	users := mocks.NewMockUserRepository(ctrl)
 	svc := app.NewService(users, nil, mocks.NewMockPasswordHasher(ctrl), nil, nil, nil, refreshTTL)
 
-	_, err := svc.Register(context.Background(), ports.RegisterInput{
+	_, err := svc.Register(context.Background(), dto.RegisterInput{
 		Email:    "alice@example.com",
 		Password: "short",
 	})
@@ -111,7 +111,7 @@ func TestRegister_EmailTaken_PropagatesFromRepository(t *testing.T) {
 
 	svc := app.NewService(users, nil, hasher, nil, nil, nil, refreshTTL)
 
-	_, err := svc.Register(context.Background(), ports.RegisterInput{
+	_, err := svc.Register(context.Background(), dto.RegisterInput{
 		Email:    "alice@example.com",
 		Password: "password1",
 		Role:     string(domain.RoleCustomer),

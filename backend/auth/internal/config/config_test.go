@@ -28,9 +28,6 @@ var allEnvKeys = []string{
 	"AUTH_DB_CONNECT_TIMEOUT",
 }
 
-// setEnv сначала полностью очищает окружение конфига, потом выставляет vars.
-// t.Setenv запоминает прежнее значение и вернёт его после теста; Unsetenv
-// нужен, потому что cleanenv отличает «не задана» от «задана пустой».
 func setEnv(t *testing.T, vars map[string]string) {
 	t.Helper()
 	for _, k := range allEnvKeys {

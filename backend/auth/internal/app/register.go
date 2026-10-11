@@ -7,10 +7,10 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
-	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/dto"
 )
 
-func (s *Service) Register(ctx context.Context, in ports.RegisterInput) (domain.User, error) {
+func (s *Service) Register(ctx context.Context, in dto.RegisterInput) (domain.User, error) {
 	email, err := domain.NewEmail(in.Email)
 	if err != nil {
 		return domain.User{}, err

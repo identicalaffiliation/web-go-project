@@ -17,6 +17,7 @@ import (
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/logging"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/rest"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/dto"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
@@ -44,7 +45,7 @@ func doJSON(e *echo.Echo, method, path string, body any) *httptest.ResponseRecor
 func TestHandler_Register_Success(t *testing.T) {
 	svc := mocks.NewMockAuthService(gomock.NewController(t))
 	svc.EXPECT().Register(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, in ports.RegisterInput) (domain.User, error) {
+		DoAndReturn(func(_ context.Context, in dto.RegisterInput) (domain.User, error) {
 			return domain.User{ID: uuid.MustParse("019a0000-0000-7000-8000-000000000001"), Email: domain.Email(in.Email), Role: domain.RoleCustomer, CreatedAt: time.Now()}, nil
 		})
 	rec := doJSON(newTestEcho(svc), http.MethodPost, "/api/v1/auth/register",

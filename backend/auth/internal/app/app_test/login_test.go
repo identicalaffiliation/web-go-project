@@ -11,7 +11,7 @@ import (
 	"github.com/identicalaffiliation/web-go-project/auth/gen/mocks"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/app"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
-	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/dto"
 )
 
 func TestLogin_Success(t *testing.T) {
@@ -42,7 +42,7 @@ func TestLogin_Success(t *testing.T) {
 	svc := app.NewService(users, refreshes, hasher, issuer, nil, tokens, refreshTTL,
 		app.WithNow(func() time.Time { return fixedNow }))
 
-	pair, err := svc.Login(context.Background(), ports.LoginInput{Email: "alice@example.com", Password: "password1"})
+	pair, err := svc.Login(context.Background(), dto.LoginInput{Email: "alice@example.com", Password: "password1"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 
 	svc := app.NewService(users, nil, hasher, nil, nil, nil, refreshTTL)
 
-	_, err := svc.Login(context.Background(), ports.LoginInput{Email: "alice@example.com", Password: "wrong"})
+	_, err := svc.Login(context.Background(), dto.LoginInput{Email: "alice@example.com", Password: "wrong"})
 	if !errors.Is(err, domain.ErrInvalidCredentials) {
 		t.Fatalf("want ErrInvalidCredentials, got %v", err)
 	}
@@ -82,7 +82,7 @@ func TestLogin_UnknownEmail_DoesNotLeakUserNotFound(t *testing.T) {
 
 	svc := app.NewService(users, nil, mocks.NewMockPasswordHasher(ctrl), nil, nil, nil, refreshTTL)
 
-	_, err := svc.Login(context.Background(), ports.LoginInput{Email: "nobody@example.com", Password: "whatever1"})
+	_, err := svc.Login(context.Background(), dto.LoginInput{Email: "nobody@example.com", Password: "whatever1"})
 	if !errors.Is(err, domain.ErrInvalidCredentials) {
 		t.Fatalf("want ErrInvalidCredentials, got %v", err)
 	}

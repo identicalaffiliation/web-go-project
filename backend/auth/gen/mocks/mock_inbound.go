@@ -14,7 +14,7 @@ import (
 	reflect "reflect"
 
 	domain "github.com/identicalaffiliation/web-go-project/auth/internal/domain"
-	ports "github.com/identicalaffiliation/web-go-project/auth/internal/ports"
+	dto "github.com/identicalaffiliation/web-go-project/auth/internal/dto"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -43,7 +43,7 @@ func (m *MockAuthService) EXPECT() *MockAuthServiceMockRecorder {
 }
 
 // Login mocks base method.
-func (m *MockAuthService) Login(ctx context.Context, in ports.LoginInput) (domain.TokenPair, error) {
+func (m *MockAuthService) Login(ctx context.Context, in dto.LoginInput) (domain.TokenPair, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Login", ctx, in)
 	ret0, _ := ret[0].(domain.TokenPair)
@@ -87,7 +87,7 @@ func (mr *MockAuthServiceMockRecorder) Refresh(ctx, refreshToken any) *gomock.Ca
 }
 
 // Register mocks base method.
-func (m *MockAuthService) Register(ctx context.Context, in ports.RegisterInput) (domain.User, error) {
+func (m *MockAuthService) Register(ctx context.Context, in dto.RegisterInput) (domain.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Register", ctx, in)
 	ret0, _ := ret[0].(domain.User)

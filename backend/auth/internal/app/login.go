@@ -8,10 +8,10 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
-	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/dto"
 )
 
-func (s *Service) Login(ctx context.Context, in ports.LoginInput) (domain.TokenPair, error) {
+func (s *Service) Login(ctx context.Context, in dto.LoginInput) (domain.TokenPair, error) {
 	email, err := domain.NewEmail(in.Email)
 	if err != nil {
 		return domain.TokenPair{}, domain.ErrInvalidCredentials

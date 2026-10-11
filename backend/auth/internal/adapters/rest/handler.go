@@ -6,6 +6,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/dto"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
@@ -21,7 +22,7 @@ func RegisterHandler(svc ports.AuthService, log ports.Logger) echo.HandlerFunc {
 			return c.JSON(http.StatusBadRequest, errorResponse{Error: validationMessage(err)})
 		}
 
-		user, err := svc.Register(c.Request().Context(), ports.RegisterInput{
+		user, err := svc.Register(c.Request().Context(), dto.RegisterInput{
 			Email: req.Email, Password: req.Password, Role: req.Role,
 		})
 		if err != nil {
@@ -44,7 +45,7 @@ func LoginHandler(svc ports.AuthService, log ports.Logger) echo.HandlerFunc {
 			return c.JSON(http.StatusBadRequest, errorResponse{Error: validationMessage(err)})
 		}
 
-		pair, err := svc.Login(c.Request().Context(), ports.LoginInput{
+		pair, err := svc.Login(c.Request().Context(), dto.LoginInput{
 			Email: req.Email, Password: req.Password,
 		})
 		if err != nil {
