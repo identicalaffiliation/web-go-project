@@ -54,7 +54,7 @@ class ProfileService:
                 await self.uow.commit()
                 logger.info(f"Successfully created CUSTOMER profile for user {user_id}")
             else:
-                self.uow.commit()
+                await self.uow.rollback()
                 logger.info(
                     f"Event {idempotency_key} already processed (Idempotency). Skipping."
                 )
@@ -66,7 +66,7 @@ class ProfileService:
 
     async def get_profiles_by_user(self, user_id: uuid.UUID) -> list[Profile]:
         """
-        Получить все профили пользователя. Транзакция здесь не нужна (только чтение).
+        Получить все профили пользователя.
         """
         return await self.repo.get_by_user_id(user_id)
 
@@ -76,17 +76,13 @@ class ProfileService:
         """
         Обновляет данные профиля, предварительно проверяя права доступа.
         """
-        # 1. Получаем все профили текущего юзера
         user_profiles = await self.repo.get_by_user_id(user_id)
 
-        # 2. Ищем среди них тот, который запросили на обновление (Проверка принадлежности)
         target_profile = next((p for p in user_profiles if p.id == profile_id), None)
 
         if not target_profile:
-            # Если профиля нет или он чужой — выбрасываем нашу доменную ошибку
             raise ProfileNotFoundError(str(profile_id))
 
-        # 3. Применяем новые данные к бизнес-модели (PATCH-логика)
         if "first_name" in update_data:
             target_profile.first_name = update_data["first_name"]
         if "last_name" in update_data:
@@ -97,7 +93,6 @@ class ProfileService:
             target_profile.company_name = update_data["company_name"]
 
         try:
-            # 4. Передаем обновленную модель в репозиторий и коммитим
             updated_profile = await self.repo.update(target_profile)
             await self.uow.commit()
             return updated_profile
