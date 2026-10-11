@@ -12,6 +12,7 @@ import (
 	"github.com/identicalaffiliation/web-go-project/auth/internal/app"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/dto"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
 func TestLogin_Success(t *testing.T) {
@@ -65,7 +66,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 	users := mocks.NewMockUserRepository(ctrl)
 	users.EXPECT().GetByEmail(gomock.Any(), gomock.Any()).Return(domain.User{PasswordHash: "hashed"}, nil)
 	hasher := mocks.NewMockPasswordHasher(ctrl)
-	hasher.EXPECT().Compare(gomock.Any(), gomock.Any()).Return(domain.ErrInvalidCredentials)
+	hasher.EXPECT().Compare(gomock.Any(), gomock.Any()).Return(errors.New("mismatch"))
 
 	svc := app.NewService(users, nil, hasher, nil, nil, nil, refreshTTL)
 
@@ -78,7 +79,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 func TestLogin_UnknownEmail_DoesNotLeakUserNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	users := mocks.NewMockUserRepository(ctrl)
-	users.EXPECT().GetByEmail(gomock.Any(), gomock.Any()).Return(domain.User{}, domain.ErrUserNotFound)
+	users.EXPECT().GetByEmail(gomock.Any(), gomock.Any()).Return(domain.User{}, ports.ErrUserNotFound)
 
 	svc := app.NewService(users, nil, mocks.NewMockPasswordHasher(ctrl), nil, nil, nil, refreshTTL)
 
@@ -86,7 +87,7 @@ func TestLogin_UnknownEmail_DoesNotLeakUserNotFound(t *testing.T) {
 	if !errors.Is(err, domain.ErrInvalidCredentials) {
 		t.Fatalf("want ErrInvalidCredentials, got %v", err)
 	}
-	if errors.Is(err, domain.ErrUserNotFound) {
+	if errors.Is(err, ports.ErrUserNotFound) {
 		t.Fatal("ErrUserNotFound must not leak out of Login")
 	}
 }

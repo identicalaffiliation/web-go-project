@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
 type execer interface {
@@ -56,7 +57,7 @@ func (r *RefreshTokenRepository) GetByHash(ctx context.Context, hash string) (do
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.RefreshToken{}, domain.ErrRefreshTokenNotFound
+			return domain.RefreshToken{}, ports.ErrRefreshTokenNotFound
 		}
 		return domain.RefreshToken{}, fmt.Errorf("scan refresh token: %w", err)
 	}
@@ -92,7 +93,7 @@ func (r *RefreshTokenRepository) Revoke(ctx context.Context, id uuid.UUID, now t
 		return fmt.Errorf("revoke refresh token: %w", err)
 	}
 	if cmd.RowsAffected() == 0 {
-		return domain.ErrRefreshTokenNotFound
+		return ports.ErrRefreshTokenNotFound
 	}
 	return nil
 }

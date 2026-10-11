@@ -1,11 +1,14 @@
 package hasher
 
 import (
+	"errors"
 	"fmt"
 
-	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// ErrMismatch — пароль не соответствует хешу (или хеш повреждён).
+var ErrMismatch = errors.New("password does not match hash")
 
 type Hasher struct{}
 
@@ -25,7 +28,7 @@ func (h *Hasher) Hash(plain string) (string, error) {
 // вызывающему незачем различать эти случаи, а наружу такая разница не должна утекать.
 func (h *Hasher) Compare(hash, plain string) error {
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(plain)); err != nil {
-		return domain.ErrInvalidCredentials
+		return ErrMismatch
 	}
 	return nil
 }

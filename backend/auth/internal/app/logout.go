@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
 func (s *Service) Logout(ctx context.Context, refreshToken string) error {
@@ -13,7 +13,7 @@ func (s *Service) Logout(ctx context.Context, refreshToken string) error {
 
 	stored, err := s.refreshes.GetByHash(ctx, hash)
 	if err != nil {
-		if errors.Is(err, domain.ErrRefreshTokenNotFound) {
+		if errors.Is(err, ports.ErrRefreshTokenNotFound) {
 			return nil
 		}
 		return fmt.Errorf("get refresh token: %w", err)

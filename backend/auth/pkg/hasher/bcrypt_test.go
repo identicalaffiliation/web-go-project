@@ -4,7 +4,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
 	"github.com/identicalaffiliation/web-go-project/auth/pkg/hasher"
 )
 
@@ -32,14 +31,14 @@ func TestHasher_Compare_WrongPassword(t *testing.T) {
 	}
 
 	err = h.Compare(hash, "wrong-password")
-	if !errors.Is(err, domain.ErrInvalidCredentials) {
-		t.Fatalf("want ErrInvalidCredentials, got %v", err)
+	if !errors.Is(err, hasher.ErrMismatch) {
+		t.Fatalf("want ErrMismatch, got %v", err)
 	}
 }
 
 func TestHasher_Compare_MalformedHash(t *testing.T) {
 	err := hasher.New().Compare("not-a-bcrypt-hash", "password1")
-	if !errors.Is(err, domain.ErrInvalidCredentials) {
-		t.Fatalf("want ErrInvalidCredentials, got %v", err)
+	if !errors.Is(err, hasher.ErrMismatch) {
+		t.Fatalf("want ErrMismatch, got %v", err)
 	}
 }

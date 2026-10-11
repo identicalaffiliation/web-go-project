@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
 func mapError(err error) (int, string) {
@@ -19,9 +20,7 @@ func mapError(err error) (int, string) {
 	case errors.Is(err, domain.ErrInvalidCredentials):
 		return http.StatusUnauthorized, "invalid credentials"
 
-	case errors.Is(err, domain.ErrInvalidToken),
-		errors.Is(err, domain.ErrTokenExpired),
-		errors.Is(err, domain.ErrRefreshTokenNotFound),
+	case errors.Is(err, ports.ErrRefreshTokenNotFound),
 		errors.Is(err, domain.ErrRefreshTokenExpired),
 		errors.Is(err, domain.ErrRefreshTokenRevoked):
 		return http.StatusUnauthorized, "invalid or expired token"

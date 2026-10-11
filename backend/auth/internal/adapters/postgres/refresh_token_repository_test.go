@@ -10,6 +10,7 @@ import (
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/postgres"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
 func TestRefreshTokenRepository_CreateAndGetByHash(t *testing.T) {
@@ -55,7 +56,7 @@ func TestRefreshTokenRepository_GetByHash_NotFound(t *testing.T) {
 	repo := postgres.NewRefreshTokenRepository(pool)
 
 	_, err := repo.GetByHash(context.Background(), "no-such-hash")
-	if !errors.Is(err, domain.ErrRefreshTokenNotFound) {
+	if !errors.Is(err, ports.ErrRefreshTokenNotFound) {
 		t.Fatalf("want ErrRefreshTokenNotFound, got %v", err)
 	}
 }

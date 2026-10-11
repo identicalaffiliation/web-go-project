@@ -12,6 +12,7 @@ import (
 	"github.com/identicalaffiliation/web-go-project/auth/gen/mocks"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/app"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
 func TestRefresh_Success_Rotates(t *testing.T) {
@@ -71,17 +72,17 @@ func TestRefresh_Expired(t *testing.T) {
 	}
 }
 
-func TestRefresh_NotFound_MapsToInvalidToken(t *testing.T) {
+func TestRefresh_NotFound_Propagates(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	refreshes := mocks.NewMockRefreshTokenRepository(ctrl)
-	refreshes.EXPECT().GetByHash(gomock.Any(), gomock.Any()).Return(domain.RefreshToken{}, domain.ErrRefreshTokenNotFound)
+	refreshes.EXPECT().GetByHash(gomock.Any(), gomock.Any()).Return(domain.RefreshToken{}, ports.ErrRefreshTokenNotFound)
 	tokens := mocks.NewMockRefreshTokenGenerator(ctrl)
 	tokens.EXPECT().Hash(gomock.Any()).DoAndReturn(func(plain string) string { return "hash-of-" + plain })
 
 	svc := app.NewService(nil, refreshes, nil, nil, nil, tokens, refreshTTL)
 
 	_, err := svc.Refresh(context.Background(), "unknown-token")
-	if !errors.Is(err, domain.ErrInvalidToken) {
-		t.Fatalf("want ErrInvalidToken, got %v", err)
+	if !errors.Is(err, ports.ErrRefreshTokenNotFound) {
+		t.Fatalf("want ErrRefreshTokenNotFound, got %v", err)
 	}
 }

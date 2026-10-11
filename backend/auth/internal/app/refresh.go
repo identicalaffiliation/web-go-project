@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
 func (s *Service) Refresh(ctx context.Context, refreshToken string) (domain.TokenPair, error) {
@@ -15,8 +16,8 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (domain.Toke
 
 	stored, err := s.refreshes.GetByHash(ctx, hash)
 	if err != nil {
-		if errors.Is(err, domain.ErrRefreshTokenNotFound) {
-			return domain.TokenPair{}, domain.ErrInvalidToken
+		if errors.Is(err, ports.ErrRefreshTokenNotFound) {
+			return domain.TokenPair{}, fmt.Errorf("refresh token lookup: %w", err)
 		}
 		return domain.TokenPair{}, fmt.Errorf("get refresh token: %w", err)
 	}

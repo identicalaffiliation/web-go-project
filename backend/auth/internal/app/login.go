@@ -9,6 +9,7 @@ import (
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/dto"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
 func (s *Service) Login(ctx context.Context, in dto.LoginInput) (domain.TokenPair, error) {
@@ -19,7 +20,7 @@ func (s *Service) Login(ctx context.Context, in dto.LoginInput) (domain.TokenPai
 
 	user, err := s.users.GetByEmail(ctx, email)
 	if err != nil {
-		if errors.Is(err, domain.ErrUserNotFound) {
+		if errors.Is(err, ports.ErrUserNotFound) {
 			return domain.TokenPair{}, domain.ErrInvalidCredentials
 		}
 		return domain.TokenPair{}, fmt.Errorf("get user: %w", err)

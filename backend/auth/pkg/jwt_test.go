@@ -62,7 +62,7 @@ func TestVerify_WrongIssuer(t *testing.T) {
 	}
 
 	_, err = verifier.Verify(token)
-	if !errors.Is(err, domain.ErrInvalidToken) {
+	if !errors.Is(err, authjwt.ErrInvalidToken) {
 		t.Fatalf("want ErrInvalidToken, got %v", err)
 	}
 }
@@ -79,7 +79,7 @@ func TestVerify_Expired(t *testing.T) {
 	}
 
 	_, err = verifier.Verify(token)
-	if !errors.Is(err, domain.ErrTokenExpired) {
+	if !errors.Is(err, authjwt.ErrTokenExpired) {
 		t.Fatalf("want ErrTokenExpired, got %v", err)
 	}
 }
@@ -97,7 +97,7 @@ func TestVerify_WrongKey(t *testing.T) {
 	}
 
 	_, err = verifier.Verify(token)
-	if !errors.Is(err, domain.ErrInvalidToken) {
+	if !errors.Is(err, authjwt.ErrInvalidToken) {
 		t.Fatalf("want ErrInvalidToken (signature mismatch), got %v", err)
 	}
 }

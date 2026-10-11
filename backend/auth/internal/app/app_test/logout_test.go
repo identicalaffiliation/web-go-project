@@ -11,6 +11,7 @@ import (
 	"github.com/identicalaffiliation/web-go-project/auth/gen/mocks"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/app"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
 func TestLogout_RevokesExistingToken(t *testing.T) {
@@ -41,7 +42,7 @@ func TestLogout_RevokesExistingToken(t *testing.T) {
 func TestLogout_UnknownToken_IsNotAnError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	refreshes := mocks.NewMockRefreshTokenRepository(ctrl)
-	refreshes.EXPECT().GetByHash(gomock.Any(), gomock.Any()).Return(domain.RefreshToken{}, domain.ErrRefreshTokenNotFound)
+	refreshes.EXPECT().GetByHash(gomock.Any(), gomock.Any()).Return(domain.RefreshToken{}, ports.ErrRefreshTokenNotFound)
 	tokens := mocks.NewMockRefreshTokenGenerator(ctrl)
 	tokens.EXPECT().Hash(gomock.Any()).DoAndReturn(func(plain string) string { return "hash-of-" + plain })
 

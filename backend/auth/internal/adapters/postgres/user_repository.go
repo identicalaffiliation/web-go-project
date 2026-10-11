@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
 const uniqueViolation = "23505"
@@ -64,7 +65,7 @@ func (r *UserRepository) scanUser(row pgx.Row) (domain.User, error) {
 	err := row.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Role, &user.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.User{}, domain.ErrUserNotFound
+			return domain.User{}, ports.ErrUserNotFound
 		}
 		return domain.User{}, fmt.Errorf("scan user: %w", err)
 	}

@@ -18,6 +18,7 @@ import (
 
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/postgres"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
 func setupPool(t *testing.T) *pgxpool.Pool {
@@ -147,7 +148,7 @@ func TestUserRepository_GetByEmail_NotFound(t *testing.T) {
 	repo := postgres.NewUserRepository(pool)
 
 	_, err := repo.GetByEmail(context.Background(), "nobody@example.com")
-	if !errors.Is(err, domain.ErrUserNotFound) {
+	if !errors.Is(err, ports.ErrUserNotFound) {
 		t.Fatalf("want ErrUserNotFound, got %v", err)
 	}
 }

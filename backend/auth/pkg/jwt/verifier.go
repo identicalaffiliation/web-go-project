@@ -32,17 +32,17 @@ func (v *Verifier) Verify(tokenString string) (domain.Claims, error) {
 	}, jwt.WithIssuer(v.expectedIssuer), jwt.WithExpirationRequired())
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {
-			return domain.Claims{}, domain.ErrTokenExpired
+			return domain.Claims{}, ErrTokenExpired
 		}
-		return domain.Claims{}, fmt.Errorf("%w: %v", domain.ErrInvalidToken, err)
+		return domain.Claims{}, fmt.Errorf("%w: %v", ErrInvalidToken, err)
 	}
 	if !token.Valid {
-		return domain.Claims{}, domain.ErrInvalidToken
+		return domain.Claims{}, ErrInvalidToken
 	}
 
 	out, err := fromClaims(cl)
 	if err != nil {
-		return domain.Claims{}, fmt.Errorf("%w: %v", domain.ErrInvalidToken, err)
+		return domain.Claims{}, fmt.Errorf("%w: %v", ErrInvalidToken, err)
 	}
 
 	return out, nil
