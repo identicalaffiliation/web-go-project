@@ -84,6 +84,52 @@ func TestRun_DoesNotOverwriteWithoutForce(t *testing.T) {
 	}
 }
 
+func TestExistingKeyFiles(t *testing.T) {
+	dir := t.TempDir()
+	privPath := filepath.Join(dir, privateKeyFile)
+	pubPath := filepath.Join(dir, publicKeyFile)
+
+	got, err := existingKeyFiles(privPath, pubPath)
+	if err != nil {
+		t.Fatalf("existingKeyFiles on empty dir: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("empty dir: got %v, want no files", got)
+	}
+
+	if err := os.WriteFile(pubPath, []byte("pub"), 0o600); err != nil {
+		t.Fatalf("write public key: %v", err)
+	}
+	got, err = existingKeyFiles(privPath, pubPath)
+	if err != nil {
+		t.Fatalf("existingKeyFiles with public only: %v", err)
+	}
+	if len(got) != 1 || got[0] != pubPath {
+		t.Fatalf("got %v, want [%s]", got, pubPath)
+	}
+}
+
+func TestRun_RefusesWhenOnlyPublicKeyExists(t *testing.T) {
+	dir := t.TempDir()
+	pubPath := filepath.Join(dir, publicKeyFile)
+	if err := os.WriteFile(pubPath, []byte("pub"), 0o600); err != nil {
+		t.Fatalf("write public key: %v", err)
+	}
+
+	err := run(&bytes.Buffer{}, dir, 2048, false)
+	if !errors.Is(err, errKeysExist) {
+		t.Fatalf("got %v, want errKeysExist", err)
+	}
+
+	// Проверка должна сработать до генерации: приватный ключ не создаётся.
+	if _, err := os.Stat(filepath.Join(dir, privateKeyFile)); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("private key must not be created, stat err: %v", err)
+	}
+	if got := string(readFile(t, pubPath)); got != "pub" {
+		t.Errorf("public key was modified: %q", got)
+	}
+}
+
 func TestRun_ForceReplacesKeys(t *testing.T) {
 	dir := t.TempDir()
 	if err := run(&bytes.Buffer{}, dir, 2048, false); err != nil {
