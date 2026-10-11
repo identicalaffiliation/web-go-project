@@ -11,33 +11,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"go.uber.org/mock/gomock"
 
+	"github.com/identicalaffiliation/web-go-project/auth/gen/mocks"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/logging"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/rest"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
-
-type mockAuthService struct {
-	registerFunc func(ctx context.Context, in ports.RegisterInput) (domain.User, error)
-	loginFunc    func(ctx context.Context, in ports.LoginInput) (domain.TokenPair, error)
-}
-
-func (m *mockAuthService) Register(ctx context.Context, in ports.RegisterInput) (domain.User, error) {
-	return m.registerFunc(ctx, in)
-}
-
-func (m *mockAuthService) Login(ctx context.Context, in ports.LoginInput) (domain.TokenPair, error) {
-	return m.loginFunc(ctx, in)
-}
-
-func (m *mockAuthService) Refresh(context.Context, string) (domain.TokenPair, error) {
-	return domain.TokenPair{}, nil
-}
-func (m *mockAuthService) Logout(context.Context, string) error { return nil }
-func (m *mockAuthService) ValidateToken(string) (domain.Claims, error) {
-	return domain.Claims{}, nil
-}
 
 func newTestEcho(svc ports.AuthService) *echo.Echo {
 	e := echo.New()
@@ -62,11 +43,11 @@ func doJSON(e *echo.Echo, method, path string, body any) *httptest.ResponseRecor
 }
 
 func TestHandler_Register_Success(t *testing.T) {
-	svc := &mockAuthService{
-		registerFunc: func(_ context.Context, in ports.RegisterInput) (domain.User, error) {
+	svc := mocks.NewMockAuthService(gomock.NewController(t))
+	svc.EXPECT().Register(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, in ports.RegisterInput) (domain.User, error) {
 			return domain.User{ID: uuid.MustParse("019a0000-0000-7000-8000-000000000001"), Email: domain.Email(in.Email), Role: domain.RoleCustomer, CreatedAt: time.Now()}, nil
-		},
-	}
+		})
 	rec := doJSON(newTestEcho(svc), http.MethodPost, "/api/v1/auth/register",
 		map[string]string{"email": "a@example.com", "password": "secret123", "role": "business"})
 
@@ -76,18 +57,10 @@ func TestHandler_Register_Success(t *testing.T) {
 }
 
 
-func failingService(t *testing.T) *mockAuthService {
+// failingService — мок без ожиданий: любой вызов сервиса валит тест.
+func failingService(t *testing.T) *mocks.MockAuthService {
 	t.Helper()
-	return &mockAuthService{
-		registerFunc: func(context.Context, ports.RegisterInput) (domain.User, error) {
-			t.Error("service.Register must not be called on invalid request")
-			return domain.User{}, nil
-		},
-		loginFunc: func(context.Context, ports.LoginInput) (domain.TokenPair, error) {
-			t.Error("service.Login must not be called on invalid request")
-			return domain.TokenPair{}, nil
-		},
-	}
+	return mocks.NewMockAuthService(gomock.NewController(t))
 }
 
 func TestHandler_Register_ValidationErrors(t *testing.T) {
@@ -114,11 +87,8 @@ func TestHandler_Register_ValidationErrors(t *testing.T) {
 
 func TestHandler_Register_DomainPasswordError(t *testing.T) {
 	// Сложность пароля теги не проверяют: ошибку отдаёт сервис (domain.ValidatePassword).
-	svc := &mockAuthService{
-		registerFunc: func(context.Context, ports.RegisterInput) (domain.User, error) {
-			return domain.User{}, domain.ErrInvalidPassword
-		},
-	}
+	svc := mocks.NewMockAuthService(gomock.NewController(t))
+	svc.EXPECT().Register(gomock.Any(), gomock.Any()).Return(domain.User{}, domain.ErrInvalidPassword)
 	rec := doJSON(newTestEcho(svc), http.MethodPost, "/api/v1/auth/register",
 		map[string]string{"email": "a@example.com", "password": "short", "role": "customer"})
 
@@ -162,11 +132,8 @@ func assertBadRequest(t *testing.T, rec *httptest.ResponseRecorder, wantMsg stri
 }
 
 func TestHandler_Register_EmailTaken(t *testing.T) {
-	svc := &mockAuthService{
-		registerFunc: func(context.Context, ports.RegisterInput) (domain.User, error) {
-			return domain.User{}, domain.ErrEmailTaken
-		},
-	}
+	svc := mocks.NewMockAuthService(gomock.NewController(t))
+	svc.EXPECT().Register(gomock.Any(), gomock.Any()).Return(domain.User{}, domain.ErrEmailTaken)
 	rec := doJSON(newTestEcho(svc), http.MethodPost, "/api/v1/auth/register",
 		map[string]string{"email": "a@example.com", "password": "secret123", "role": "customer"})
 
@@ -176,11 +143,8 @@ func TestHandler_Register_EmailTaken(t *testing.T) {
 }
 
 func TestHandler_Login_InvalidCredentials(t *testing.T) {
-	svc := &mockAuthService{
-		loginFunc: func(context.Context, ports.LoginInput) (domain.TokenPair, error) {
-			return domain.TokenPair{}, domain.ErrInvalidCredentials
-		},
-	}
+	svc := mocks.NewMockAuthService(gomock.NewController(t))
+	svc.EXPECT().Login(gomock.Any(), gomock.Any()).Return(domain.TokenPair{}, domain.ErrInvalidCredentials)
 	rec := doJSON(newTestEcho(svc), http.MethodPost, "/api/v1/auth/login",
 		map[string]string{"email": "a@example.com", "password": "wrong"})
 

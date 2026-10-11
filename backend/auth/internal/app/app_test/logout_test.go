@@ -6,23 +6,27 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.uber.org/mock/gomock"
 
+	"github.com/identicalaffiliation/web-go-project/auth/gen/mocks"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/app"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
 )
 
 func TestLogout_RevokesExistingToken(t *testing.T) {
+	ctrl := gomock.NewController(t)
 	stored := domain.RefreshToken{ID: testTokenID}
 	var revokedID uuid.UUID
 
-	refreshes := &refreshRepoMock{
-		getByHashFn: func(context.Context, string) (domain.RefreshToken, error) { return stored, nil },
-		revokeFn: func(_ context.Context, id uuid.UUID, _ time.Time) error {
+	refreshes := mocks.NewMockRefreshTokenRepository(ctrl)
+	refreshes.EXPECT().GetByHash(gomock.Any(), gomock.Any()).Return(stored, nil)
+	refreshes.EXPECT().Revoke(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, id uuid.UUID, _ time.Time) error {
 			revokedID = id
 			return nil
-		},
-	}
-	tokens := tokenGenMock{hashFn: func(plain string) string { return "hash-of-" + plain }}
+		})
+	tokens := mocks.NewMockRefreshTokenGenerator(ctrl)
+	tokens.EXPECT().Hash(gomock.Any()).DoAndReturn(func(plain string) string { return "hash-of-" + plain })
 
 	svc := app.NewService(nil, refreshes, nil, nil, nil, tokens, refreshTTL)
 
@@ -35,12 +39,11 @@ func TestLogout_RevokesExistingToken(t *testing.T) {
 }
 
 func TestLogout_UnknownToken_IsNotAnError(t *testing.T) {
-	refreshes := &refreshRepoMock{
-		getByHashFn: func(context.Context, string) (domain.RefreshToken, error) {
-			return domain.RefreshToken{}, domain.ErrRefreshTokenNotFound
-		},
-	}
-	tokens := tokenGenMock{hashFn: func(plain string) string { return "hash-of-" + plain }}
+	ctrl := gomock.NewController(t)
+	refreshes := mocks.NewMockRefreshTokenRepository(ctrl)
+	refreshes.EXPECT().GetByHash(gomock.Any(), gomock.Any()).Return(domain.RefreshToken{}, domain.ErrRefreshTokenNotFound)
+	tokens := mocks.NewMockRefreshTokenGenerator(ctrl)
+	tokens.EXPECT().Hash(gomock.Any()).DoAndReturn(func(plain string) string { return "hash-of-" + plain })
 
 	svc := app.NewService(nil, refreshes, nil, nil, nil, tokens, refreshTTL)
 
