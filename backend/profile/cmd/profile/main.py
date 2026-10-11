@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 kafka_consumer: KafkaUserRegisteredConsumer | None = None
 
-orders_channel = grpc.aio.insecure_channel("localhost:50051")
-payments_channel = grpc.aio.insecure_channel("localhost:50052")
+orders_channel = grpc.aio.insecure_channel(settings.ORDERS_GRPC_HOST)
+payments_channel = grpc.aio.insecure_channel(settings.PAYMENTS_GRPC_HOST)
 
 grpc_orders_client = GrpcOrdersClient(orders_channel)
 grpc_payments_client = GrpcPaymentsClient(payments_channel)
@@ -29,16 +29,19 @@ grpc_payments_client = GrpcPaymentsClient(payments_channel)
 
 async def build_profile_service() -> AsyncGenerator[ProfileService, None]:
     async with async_session_maker() as session:
-        repo = SqlAlchemyProfileRepository(session)
-        uow = SqlAlchemyUnitOfWork(session)
+        try:
+            repo = SqlAlchemyProfileRepository(session)
+            uow = SqlAlchemyUnitOfWork(session)
 
-        service = ProfileService(
-            repo=repo,
-            uow=uow,
-            orders_client=grpc_orders_client,
-            payments_client=grpc_payments_client,
-        )
-        yield service
+            service = ProfileService(
+                repo=repo,
+                uow=uow,
+                orders_client=grpc_orders_client,
+                payments_client=grpc_payments_client,
+            )
+            yield service
+        finally:
+            await session.close()
 
 
 async def process_kafka_message(msg_data: dict) -> None:
@@ -64,7 +67,7 @@ async def lifespan(app: FastAPI):
     kafka_consumer = KafkaUserRegisteredConsumer(
         bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
         group_id=settings.KAFKA_CONSUMER_GROUP,
-        topic="auth.user.registered",
+        topic=settings.KAFKA_USER_REGISTERED_TOPIC,
         process_callback=process_kafka_message,
     )
 
@@ -97,4 +100,4 @@ app.include_router(profiles_router, prefix="/api/v1")
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("cmd.profile.main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run(app, host="127.0.0.1", port=8000)

@@ -54,6 +54,7 @@ class ProfileService:
                 await self.uow.commit()
                 logger.info(f"Successfully created CUSTOMER profile for user {user_id}")
             else:
+                self.uow.commit()
                 logger.info(
                     f"Event {idempotency_key} already processed (Idempotency). Skipping."
                 )

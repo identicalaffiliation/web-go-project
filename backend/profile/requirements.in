@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+sqlalchemy[asyncio]
+asyncpg
+grpcio
+grpcio-tools
+aiokafka
+pydantic-settings
+pyjwt
+python-dotenv

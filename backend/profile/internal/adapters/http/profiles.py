@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+
 from internal.adapters.http.dependencies import get_current_user_id, get_profile_service
 from internal.adapters.http.schemas import (
     BalanceResponse,
@@ -50,12 +51,12 @@ async def update_my_profile(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Profile not found or access denied",
-        )
+        ) from None
     except Exception:  # noqa: BLE001
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
-        )
+        ) from None
 
 
 @router.get("/orders", response_model=list[OrderResponse])
