@@ -160,6 +160,11 @@ func serverSetup(cfg config.Config, svc ports.AuthService, log ports.Logger) *ec
 	g.POST("/login", rest.LoginHandler(svc, log))
 	g.POST("/refresh", rest.RefreshHandler(svc, log))
 	g.POST("/logout", rest.LogoutHandler(svc, log))
+	//TODO: create the validate controller for jwt token with X-User-Role header and X-User-ID (for other services)
+	g.GET("/validate", func(ctx echo.Context) error {
+		ctx.Response().Header().Set("X-User-Role", "business")
+		return ctx.NoContent(http.StatusOK)
+	})
 
 	return e
 }

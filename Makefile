@@ -31,7 +31,6 @@ keys-force:
 run:
 	docker compose up --build -d auth-service
 	docker compose up --build -d catalog-service
-	docker compose up --build -d shop-nginx
 
 .PHONY: clean
 clean:
@@ -55,3 +54,7 @@ unit:
 .PHONY: gen
 gen:
 	cd backend/catalog && go generate ./...
+
+.PHONY: swag
+swag:
+	cd backend/catalog && swag init -g cmd/catalog/main.go -o docs/catalog --parseDependency --parseInternal

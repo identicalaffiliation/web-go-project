@@ -14,9 +14,9 @@ import (
 const realConfigPath = "../../configs/auth.yml"
 
 var allEnvKeys = []string{
-	"AUTH_DB_DSN",
-	"AUTH_JWT_PRIVATE_KEY_PATH",
-	"AUTH_JWT_PUBLIC_KEY_PATH",
+	"MASTER_DSN",
+	"PRIVATE_KEY_PATH",
+	"PUBLIC_KEY_PATH",
 	"AUTH_JWT_KEY_ID",
 	"AUTH_JWT_ISSUER",
 	"AUTH_HTTP_ADDR",
@@ -50,10 +50,10 @@ func setEnv(t *testing.T, vars map[string]string) {
 
 func requiredVars() map[string]string {
 	return map[string]string{
-		"AUTH_DB_DSN":               "postgres://u:p@localhost:5432/auth",
-		"AUTH_JWT_PRIVATE_KEY_PATH": "/keys/private.pem",
-		"AUTH_JWT_PUBLIC_KEY_PATH":  "/keys/public.pem",
-		"AUTH_JWT_KEY_ID":           "kid-1",
+		"MASTER_DSN":       "postgres://u:p@localhost:5432/auth",
+		"PRIVATE_KEY_PATH": "/keys/private.pem",
+		"PUBLIC_KEY_PATH":  "/keys/public.pem",
+		"AUTH_JWT_KEY_ID":  "kid-1",
 	}
 }
 
@@ -260,11 +260,11 @@ func TestLoad_SecretsIgnoredInFile(t *testing.T) {
 		"postgres:\n", "postgres:\n  dsn: postgres://u:p@localhost:5432/auth\n", 1))
 
 	vars := requiredVars()
-	delete(vars, "AUTH_DB_DSN")
+	delete(vars, "MASTER_DSN")
 	setEnv(t, vars)
 
 	if _, err := Load(path); err == nil {
-		t.Fatal("expected error: DSN must come from AUTH_DB_DSN only")
+		t.Fatal("expected error: DSN must come from MASTER_DSN only")
 	}
 }
 

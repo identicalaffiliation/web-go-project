@@ -35,7 +35,7 @@ type HTTPConfig struct {
 type PostgresConfig struct {
 	// yaml:"-": в DSN лежит пароль, поэтому из файла он не читается вообще.
 	// Без тега yaml декодер взял бы ключ dsn по имени поля.
-	DSN string `yaml:"-" env:"AUTH_DB_DSN" env-required:"true"`
+	DSN string `yaml:"-" env:"MASTER_DSN" env-required:"true"`
 
 	MaxConns          int32         `yaml:"max_conns" env:"AUTH_DB_MAX_CONNS"`
 	MinConns          int32         `yaml:"min_conns" env:"AUTH_DB_MIN_CONNS"`
@@ -46,8 +46,8 @@ type PostgresConfig struct {
 }
 
 type JWTConfig struct {
-	PrivateKeyPath string `yaml:"-" env:"AUTH_JWT_PRIVATE_KEY_PATH" env-required:"true"`
-	PublicKeyPath  string `yaml:"-" env:"AUTH_JWT_PUBLIC_KEY_PATH" env-required:"true"`
+	PrivateKeyPath string `yaml:"-" env:"PRIVATE_KEY_PATH" env-required:"true"`
+	PublicKeyPath  string `yaml:"-" env:"PUBLIC_KEY_PATH" env-required:"true"`
 	KeyID          string `yaml:"-" env:"AUTH_JWT_KEY_ID" env-required:"true"`
 
 	Issuer     string        `yaml:"issuer" env:"AUTH_JWT_ISSUER"`
@@ -115,10 +115,10 @@ func (c HTTPConfig) validate() error {
 }
 
 func (c PostgresConfig) validate() error {
-	// env-required ловит только отсутствующую переменную: пустая (AUTH_DB_DSN=)
+	// env-required ловит только отсутствующую переменную: пустая (MASTER_DSN=)
 	// для cleanenv считается заданной.
 	if c.DSN == "" {
-		return fmt.Errorf("%w: AUTH_DB_DSN must not be empty", ErrInvalid)
+		return fmt.Errorf("%w: MASTER_DSN must not be empty", ErrInvalid)
 	}
 	if c.MaxConns < 1 {
 		return fmt.Errorf("%w: postgres.max_conns (AUTH_DB_MAX_CONNS) must be >= 1, got %d", ErrInvalid, c.MaxConns)
@@ -140,8 +140,8 @@ func (c PostgresConfig) validate() error {
 
 func (c JWTConfig) validate() error {
 	for _, s := range []struct{ name, value string }{
-		{"AUTH_JWT_PRIVATE_KEY_PATH", c.PrivateKeyPath},
-		{"AUTH_JWT_PUBLIC_KEY_PATH", c.PublicKeyPath},
+		{"PRIVATE_KEY_PATH", c.PrivateKeyPath},
+		{"PUBLIC_KEY_PATH", c.PublicKeyPath},
 		{"AUTH_JWT_KEY_ID", c.KeyID},
 		{"jwt.issuer (AUTH_JWT_ISSUER)", c.Issuer},
 	} {

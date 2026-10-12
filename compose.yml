@@ -284,17 +284,6 @@ services:
       shop-kafka:
         condition: service_healthy
 
-  # APPLICATION/SERVICES
-  auth-service:
-    container_name: auth-service
-
-    # STUB — replace with real auth-service that validates JWT
-    # Expected: GET /validate with Authorization header
-    # Returns: 200 + X-User-Role header (business|client), or 401/403
-    build:
-      context: ./scripts/auth-stub
-      dockerfile: Dockerfile
-
   catalog-service:
     container_name: catalog-service
 
@@ -312,7 +301,8 @@ services:
     volumes:
       - ./backend/catalog/configs/catalog.yml:/app/config.yml:ro
 
-    # internal only — nginx proxies to catalog-service:8080
+    ports:
+      - "8080:8080"
 
     depends_on:
       catalog-master-postgres:
@@ -326,22 +316,33 @@ services:
       shop-redis:
         condition: service_healthy
 
-  shop-nginx:
-    container_name: shop-nginx
+  auth-service:
+    container_name: auth-service
 
     build:
-      context: ./nginx
+      context: ./backend/auth
       dockerfile: Dockerfile
 
-    # external connection: localhost:8080
+    environment:
+      MASTER_DSN: ${MASTER_AUTH_POSTGRES_DSN}
+      PRIVATE_KEY_PATH: /app/keys/private.pem
+      PUBLIC_KEY_PATH: /app/keys/public.pem
+      AUTH_JWT_KEY_ID: auth-2024-01
+      AUTH_JWT_ISSUER: auth.example.com
+
     ports:
-      - "8080:80"
+      - "8081:8080"
+
+    volumes:
+      - ./secrets/jwt:/app/keys:ro
 
     depends_on:
-      auth-service:
-        condition: service_started
-      catalog-service:
-        condition: service_started
+      auth-postgres:
+        condition: service_healthy
+      shop-zookeeper:
+        condition: service_healthy
+      shop-kafka:
+        condition: service_healthy
 
 volumes:
   auth_postgres_data:
