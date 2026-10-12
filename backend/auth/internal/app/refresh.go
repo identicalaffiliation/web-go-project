@@ -1,0 +1,63 @@
+package app
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/google/uuid"
+
+	"github.com/identicalaffiliation/web-go-project/auth/internal/domain"
+	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
+)
+
+func (s *Service) Refresh(ctx context.Context, refreshToken string) (domain.TokenPair, error) {
+	hash := s.tokens.Hash(refreshToken)
+
+	stored, err := s.refreshes.GetByHash(ctx, hash)
+	if err != nil {
+		if errors.Is(err, ports.ErrRefreshTokenNotFound) {
+			return domain.TokenPair{}, fmt.Errorf("refresh token lookup: %w", err)
+		}
+		return domain.TokenPair{}, fmt.Errorf("get refresh token: %w", err)
+	}
+
+	now := s.now()
+	if err := stored.CheckActive(now); err != nil {
+		return domain.TokenPair{}, err
+	}
+
+	user, err := s.users.GetByID(ctx, stored.UserID)
+	if err != nil {
+		return domain.TokenPair{}, fmt.Errorf("get user: %w", err)
+	}
+
+	claims := domain.Claims{UserID: user.ID, Email: user.Email, Role: user.Role}
+	t, err := s.issueAccessAndRefresh(claims, now)
+	if err != nil {
+		return domain.TokenPair{}, err
+	}
+
+	id, err := uuid.NewV7()
+	if err != nil {
+		return domain.TokenPair{}, fmt.Errorf("generate refresh token id: %w", err)
+	}
+
+	next := domain.RefreshToken{
+		ID:        id,
+		UserID:    user.ID,
+		TokenHash: t.refreshHash,
+		ExpiresAt: t.refreshExp,
+		CreatedAt: now,
+	}
+	if err := s.refreshes.Rotate(ctx, stored.ID, next, now); err != nil {
+		return domain.TokenPair{}, fmt.Errorf("rotate refresh token: %w", err)
+	}
+
+	return domain.TokenPair{
+		AccessToken:      t.access,
+		AccessExpiresAt:  t.accessExp,
+		RefreshToken:     t.plainRefresh,
+		RefreshExpiresAt: t.refreshExp,
+	}, nil
+}
