@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -10,7 +11,6 @@ import (
 	"os/signal"
 	"runtime/debug"
 	"syscall"
-	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -26,8 +26,15 @@ import (
 	"github.com/identicalaffiliation/web-go-project/auth/pkg/logger"
 )
 
+// routePrefix — часть контракта API: тот же путь прописан в nginx и у клиентов,
+// поэтому это константа, а не настройка.
+const routePrefix = "/api/v1/auth"
+
 func main() {
-	if err := run(); err != nil {
+	configPath := flag.String("config", "configs/auth.yml", "path to config file")
+	flag.Parse()
+
+	if err := run(*configPath); err != nil {
 		// Конфиг мог не загрузиться, поэтому логгера по уровню из него ещё нет:
 		// сообщение о причине остановки пишем временным логгером с уровнем по умолчанию.
 		logging.New(logger.New(slog.LevelInfo)).WithError(err).Error("auth service stopped")
@@ -35,13 +42,19 @@ func main() {
 	}
 }
 
-func run() error {
-	cfg, err := config.Load()
+func run(configPath string) error {
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	logLevel, err := cfg.Log.SlogLevel()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	log := logging.New(logger.New(cfg.LogLevel))
+	log := logging.New(logger.New(logLevel))
+	// Только путь: в значениях конфига есть DSN с паролем.
+	log.Info("config loaded", "path", configPath)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -99,8 +112,8 @@ func run() error {
 	// из канала уже некому.
 	errCh := make(chan error, 1)
 	go func() {
-		log.Info("auth service listening", "addr", cfg.HTTPAddr)
-		if err := e.Start(cfg.HTTPAddr); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Info("auth service listening", "addr", cfg.HTTP.Addr)
+		if err := e.Start(cfg.HTTP.Addr); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- fmt.Errorf("listen: %w", err)
 			return
 		}
@@ -113,7 +126,7 @@ func run() error {
 		// Контекст ctx уже отменён сигналом, им Shutdown ограничивать нельзя:
 		// он сразу бы прервал ожидание активных запросов. Нужен новый контекст
 		// с собственным дедлайном.
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.HTTP.ShutdownTimeout)
 		defer cancel()
 		if err := e.Shutdown(shutdownCtx); err != nil {
 			return fmt.Errorf("shutdown: %w", err)
@@ -123,9 +136,6 @@ func run() error {
 		return err
 	}
 }
-
-// shutdownTimeout — сколько ждём завершения активных запросов при остановке.
-const shutdownTimeout = 5 * time.Second
 
 // serverSetup собирает echo: таймауты, middleware и маршруты. Выделено из run,
 // чтобы run отвечал за жизненный цикл, а serverSetup — за то, что сервер умеет.
@@ -139,13 +149,13 @@ func serverSetup(cfg config.Config, svc ports.AuthService, log ports.Logger) *ec
 
 	// Свой http.Server не создаём: echo держит его в e.Server, и Start/Shutdown
 	// работают именно с ним.
-	e.Server.ReadTimeout = cfg.HTTPReadTimeout
-	e.Server.WriteTimeout = cfg.HTTPWriteTimeout
-	e.Server.IdleTimeout = cfg.HTTPIdleTimeout
+	e.Server.ReadTimeout = cfg.HTTP.ReadTimeout
+	e.Server.WriteTimeout = cfg.HTTP.WriteTimeout
+	e.Server.IdleTimeout = cfg.HTTP.IdleTimeout
 
 	e.Use(recoverMiddleware(log))
 
-	g := e.Group("/api/v1/auth")
+	g := e.Group(routePrefix)
 	g.POST("/register", rest.RegisterHandler(svc, log))
 	g.POST("/login", rest.LoginHandler(svc, log))
 	g.POST("/refresh", rest.RefreshHandler(svc, log))
