@@ -20,6 +20,14 @@ migrations-up:
 init_kafka_topics:
 	docker compose up --build -d init-kafka
 
+.PHONY: keys
+keys:
+	go -C backend/auth run ./cmd/keygen -out ../../secrets/jwt
+
+.PHONY: keys-force
+keys-force:
+	go -C backend/auth run ./cmd/keygen -out ../../secrets/jwt -force
+
 .PHONY: run
 run:
 	docker compose up --build -d auth-service
@@ -49,3 +57,7 @@ unit:
 .PHONY: gen
 gen:
 	cd backend/catalog && go generate ./...
+
+.PHONY: swag
+swag:
+	cd backend/catalog && swag init -g cmd/catalog/main.go -o docs/catalog --parseDependency --parseInternal

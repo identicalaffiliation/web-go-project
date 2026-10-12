@@ -1,6 +1,6 @@
 package middlewares
 
-import "github.com/labstack/echo"
+import "github.com/labstack/echo/v4"
 
 const (
 	Business Role = "business"

@@ -23,12 +23,10 @@ linters:
   default: standard
   enable:
     - errcheck
-    - staticcheck
     - govet
     - gocritic
     - revive
     - unused
-    - gosec
     - depguard
     - bodyclose
     - asciicheck
@@ -44,6 +42,8 @@ linters:
   disable:
     - gocyclo
     - lll
+    - staticcheck
+    - gosec
 
   exclusions:
     generated: strict

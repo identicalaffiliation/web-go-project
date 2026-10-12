@@ -1,0 +1,105 @@
+package config
+
+import (
+	"fmt"
+	"log/slog"
+	"time"
+
+	"github.com/ilyakaznacheev/cleanenv"
+)
+
+type Config struct {
+	Postgres PostgresConfig
+	JWT      JWTConfig
+	HTTPAddr string `env:"AUTH_HTTP_ADDR" env-default:":8080"`
+
+	HTTPReadTimeout  time.Duration `env:"AUTH_HTTP_READ_TIMEOUT" env-default:"5s"`
+	HTTPWriteTimeout time.Duration `env:"AUTH_HTTP_WRITE_TIMEOUT" env-default:"10s"`
+	HTTPIdleTimeout  time.Duration `env:"AUTH_HTTP_IDLE_TIMEOUT" env-default:"60s"`
+
+	LogLevel slog.Level `env:"AUTH_LOG_LEVEL" env-default:"info"`
+}
+
+type PostgresConfig struct {
+	DSN string `env:"MASTER_DSN" env-required:"true"`
+
+	MaxConns          int32         `env:"AUTH_DB_MAX_CONNS" env-default:"20"`
+	MinConns          int32         `env:"AUTH_DB_MIN_CONNS" env-default:"2"`
+	MaxConnLifetime   time.Duration `env:"AUTH_DB_MAX_CONN_LIFETIME" env-default:"30m"`
+	MaxConnIdleTime   time.Duration `env:"AUTH_DB_MAX_CONN_IDLE_TIME" env-default:"5m"`
+	HealthCheckPeriod time.Duration `env:"AUTH_DB_HEALTH_CHECK_PERIOD" env-default:"30s"`
+	ConnectTimeout    time.Duration `env:"AUTH_DB_CONNECT_TIMEOUT" env-default:"5s"`
+}
+
+type JWTConfig struct {
+	PrivateKeyPath string        `env:"PRIVATE_KEY_PATH" env-required:"true"`
+	PublicKeyPath  string        `env:"PUBLIC_KEY_PATH" env-required:"true"`
+	KeyID          string        `env:"AUTH_JWT_KEY_ID" env-required:"true"`
+	Issuer         string        `env:"AUTH_JWT_ISSUER" env-required:"true"`
+	AccessTTL      time.Duration `env:"AUTH_ACCESS_TOKEN_TTL" env-default:"15m"`
+	RefreshTTL     time.Duration `env:"AUTH_REFRESH_TOKEN_TTL" env-default:"168h"`
+}
+
+func Load() (Config, error) {
+	var cfg Config
+	if err := cleanenv.ReadEnv(&cfg); err != nil {
+		return Config{}, fmt.Errorf("read config from env: %w", err)
+	}
+	if err := cfg.validate(); err != nil {
+		return Config{}, err
+	}
+	return cfg, nil
+}
+
+func (c Config) validate() error {
+	if c.JWT.AccessTTL <= 0 {
+		return fmt.Errorf("AUTH_ACCESS_TOKEN_TTL must be positive, got %s", c.JWT.AccessTTL)
+	}
+	if c.JWT.RefreshTTL <= 0 {
+		return fmt.Errorf("AUTH_REFRESH_TOKEN_TTL must be positive, got %s", c.JWT.RefreshTTL)
+	}
+
+	for _, d := range []struct {
+		name  string
+		value time.Duration
+	}{
+		{"AUTH_HTTP_READ_TIMEOUT", c.HTTPReadTimeout},
+		{"AUTH_HTTP_WRITE_TIMEOUT", c.HTTPWriteTimeout},
+		{"AUTH_HTTP_IDLE_TIMEOUT", c.HTTPIdleTimeout},
+	} {
+		if d.value <= 0 {
+			return fmt.Errorf("%s must be > 0, got %v", d.name, d.value)
+		}
+	}
+	return c.Postgres.validate()
+}
+
+func (c PostgresConfig) validate() error {
+	if c.MaxConns < 1 {
+		return fmt.Errorf("AUTH_DB_MAX_CONNS must be >= 1, got %d", c.MaxConns)
+	}
+	if c.MinConns < 0 {
+		return fmt.Errorf("AUTH_DB_MIN_CONNS must be >= 0, got %d", c.MinConns)
+	}
+	if c.MinConns > c.MaxConns {
+		return fmt.Errorf("AUTH_DB_MIN_CONNS (%d) must not exceed AUTH_DB_MAX_CONNS (%d)",
+			c.MinConns, c.MaxConns)
+	}
+
+	durations := []struct {
+		name  string
+		value time.Duration
+	}{
+		{"AUTH_DB_MAX_CONN_LIFETIME", c.MaxConnLifetime},
+		{"AUTH_DB_MAX_CONN_IDLE_TIME", c.MaxConnIdleTime},
+		{"AUTH_DB_HEALTH_CHECK_PERIOD", c.HealthCheckPeriod},
+		{"AUTH_DB_CONNECT_TIMEOUT", c.ConnectTimeout},
+	}
+	for _, d := range durations {
+		if d.value <= 0 {
+			return fmt.Errorf("%s must be > 0, got %v", d.name, d.value)
+		}
+	}
+
+	return nil
+}

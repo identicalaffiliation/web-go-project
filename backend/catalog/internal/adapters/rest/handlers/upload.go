@@ -7,9 +7,25 @@ import (
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/dto"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/ports"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/service/catalog"
-	"github.com/labstack/echo"
+	"github.com/labstack/echo/v4"
 )
 
+// UploadImage godoc
+// @Summary      Upload product image
+// @Description  Generates a pre-signed URL (or uploads an image) for the product. Requires Bearer token.
+// @Tags         catalog
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id      path   string  true   "Product ID"
+// @Param        format  query  string  false  "Image format"  Enums(jpeg, png)
+// @Success      200  {object}  dto.ProductResponse
+// @Failure      400
+// @Failure      401
+// @Failure      403
+// @Failure      404
+// @Failure      500
+// @Router       /catalog/{productId}/image [post]
 func UploadImage(app ports.UploadImageCase) echo.HandlerFunc {
 	return func(ctx echo.Context) error {
 		id := ctx.Param(idMux)
