@@ -55,3 +55,7 @@ unit:
 .PHONY: gen
 gen:
 	cd backend/catalog && go generate ./...
+
+.PHONY: swag
+swag:
+	cd backend/catalog && swag init -g cmd/catalog/main.go -o docs/catalog --parseDependency --parseInternal

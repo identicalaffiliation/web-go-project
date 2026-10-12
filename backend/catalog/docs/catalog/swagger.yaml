@@ -1,0 +1,173 @@
+basePath: /api/v1
+definitions:
+  github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.CreateProductRequest:
+    properties:
+      description:
+        type: string
+      price:
+        type: integer
+      title:
+        minLength: 1
+        type: string
+    required:
+    - price
+    - title
+    type: object
+  github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.Product:
+    properties:
+      createdAt:
+        type: string
+      description:
+        type: string
+      price:
+        type: integer
+      productId:
+        type: string
+      title:
+        type: string
+      updatedAt:
+        type: string
+      url:
+        type: string
+    type: object
+  github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.ProductResponse:
+    properties:
+      product:
+        $ref: '#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.Product'
+    type: object
+host: http://localhost:8080
+info:
+  contact: {}
+  description: 'Service for shop catalog: creating for business and parsing for customers.'
+  title: Shop catalog service API
+  version: "1.0"
+paths:
+  /catalog:
+    get:
+      description: Returns a page of catalog items. Public endpoint. Use `cursor`
+        from the previous response to fetch the next page.
+      parameters:
+      - description: Page size (default 50)
+        in: query
+        name: limit
+        type: integer
+      - description: Opaque cursor from previous response
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+      summary: List catalog items (cursor pagination)
+      tags:
+      - catalog
+    post:
+      consumes:
+      - application/json
+      description: Creates a new product and returns it. Requires Bearer token.
+      parameters:
+      - description: Product payload
+        in: body
+        name: item
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.CreateProductRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.ProductResponse'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Add item to catalog
+      tags:
+      - catalog
+  /catalog/{productId}:
+    get:
+      description: Returns a single product by its ID. Public endpoint.
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.ProductResponse'
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Get item by ID
+      tags:
+      - catalog
+  /catalog/{productId}/image:
+    post:
+      consumes:
+      - application/json
+      description: Generates a pre-signed URL (or uploads an image) for the product.
+        Requires Bearer token.
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Image format
+        enum:
+        - jpeg
+        - png
+        in: query
+        name: format
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.ProductResponse'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Upload product image
+      tags:
+      - catalog
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and the JWT.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
