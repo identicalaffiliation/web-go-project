@@ -21,7 +21,7 @@ type Config struct {
 }
 
 type PostgresConfig struct {
-	DSN string `env:"AUTH_DB_DSN" env-required:"true"`
+	DSN string `env:"MASTER_DSN" env-required:"true"`
 
 	MaxConns          int32         `env:"AUTH_DB_MAX_CONNS" env-default:"20"`
 	MinConns          int32         `env:"AUTH_DB_MIN_CONNS" env-default:"2"`
@@ -32,8 +32,8 @@ type PostgresConfig struct {
 }
 
 type JWTConfig struct {
-	PrivateKeyPath string        `env:"AUTH_JWT_PRIVATE_KEY_PATH" env-required:"true"`
-	PublicKeyPath  string        `env:"AUTH_JWT_PUBLIC_KEY_PATH" env-required:"true"`
+	PrivateKeyPath string        `env:"PRIVATE_KEY_PATH" env-required:"true"`
+	PublicKeyPath  string        `env:"PUBLIC_KEY_PATH" env-required:"true"`
 	KeyID          string        `env:"AUTH_JWT_KEY_ID" env-required:"true"`
 	Issuer         string        `env:"AUTH_JWT_ISSUER" env-required:"true"`
 	AccessTTL      time.Duration `env:"AUTH_ACCESS_TOKEN_TTL" env-default:"15m"`
@@ -58,7 +58,7 @@ func (c Config) validate() error {
 	if c.JWT.RefreshTTL <= 0 {
 		return fmt.Errorf("AUTH_REFRESH_TOKEN_TTL must be positive, got %s", c.JWT.RefreshTTL)
 	}
-	
+
 	for _, d := range []struct {
 		name  string
 		value time.Duration
