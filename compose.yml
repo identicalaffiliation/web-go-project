@@ -337,15 +337,10 @@ services:
       - ./secrets/jwt:/app/keys:ro
 
     depends_on:
-      auth-service:
-        condition: service_started
-      catalog-service:
-        condition: service_started
-      profile-service:
-        condition: service_started
       auth-postgres:
         condition: service_healthy
       shop-zookeeper:
+        condition: service_healthy
 
   profile-service:
     container_name: profile-service

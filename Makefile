@@ -33,7 +33,6 @@ run:
 	docker compose up --build -d auth-service
 	docker compose up --build -d catalog-service
 	docker compose up --build -d profile-service
-	docker compose up --build -d shop-nginx
 
 .PHONY: clean
 clean:
