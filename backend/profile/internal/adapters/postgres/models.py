@@ -1,11 +1,12 @@
 import uuid
 from datetime import datetime
 
-from internal.domain.models import ProfileType
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy import String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from internal.domain.models import ProfileType
 
 
 class Base(DeclarativeBase):
@@ -21,7 +22,11 @@ class ProfileModel(Base):
     )
 
     profile_type: Mapped[ProfileType] = mapped_column(
-        SQLEnum(ProfileType, name="profile_type"), nullable=False
+        SQLEnum(
+            ProfileType,
+            name="profile_type",
+            values_callable=lambda obj: [e.value for e in obj],
+        )
     )
 
     first_name: Mapped[str | None] = mapped_column(String(100), nullable=True)

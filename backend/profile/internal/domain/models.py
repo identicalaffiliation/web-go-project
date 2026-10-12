@@ -32,9 +32,11 @@ class OrderDTO:
     status: str
     created_at: datetime
 
+
 @dataclass
 class BalanceDTO:
     amount: float
+
 
 @dataclass
 class WishlistItemDTO:

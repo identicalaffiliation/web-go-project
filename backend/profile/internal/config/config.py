@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     KAFKA_BOOTSTRAP_SERVERS: str
     KAFKA_CONSUMER_GROUP: str = "profile_service_group"
-    KAFKA_USER_REGISTERED_TOPIC: str = "auth.user.registered"
+    KAFKA_USER_REGISTERED_TOPIC: str = "users.created"
 
     ORDERS_GRPC_HOST: str = "localhost:50051"
     PAYMENTS_GRPC_HOST: str = "localhost:50052"
