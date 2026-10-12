@@ -3,12 +3,14 @@ package rest
 import (
 	"fmt"
 
+	_ "github.com/identicalaffiliation/web-go-project/backend/catalog/docs/catalog"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/rest/handlers"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/rest/middlewares"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/config"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/service/catalog"
-	"github.com/labstack/echo"
-	"github.com/labstack/echo/middleware"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
 func SetupServer(cfg *config.HTTPConfig, c *catalog.Service) *echo.Echo {
@@ -20,7 +22,9 @@ func SetupServer(cfg *config.HTTPConfig, c *catalog.Service) *echo.Echo {
 
 	e.Use(middleware.Recover())
 	e.Use(middleware.Logger())
+
 	baseAPI := e.Group("/api/v1")
+	baseAPI.GET("/swagger/*", echoSwagger.WrapHandler)
 
 	internal := baseAPI.Group("/catalog")
 	internal.POST("", handlers.AddItemToCatalog(c),
