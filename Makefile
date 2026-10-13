@@ -27,10 +27,12 @@ keys:
 .PHONY: keys-force
 keys-force:
 	go -C backend/auth run ./cmd/keygen -out ../../secrets/jwt -force
+
 .PHONY: run
 run:
 	docker compose up --build -d auth-service
 	docker compose up --build -d catalog-service
+	docker compose up --build -d profile-service
 
 .PHONY: clean
 clean:

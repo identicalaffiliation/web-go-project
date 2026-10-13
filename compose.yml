@@ -341,6 +341,32 @@ services:
         condition: service_healthy
       shop-zookeeper:
         condition: service_healthy
+
+  profile-service:
+    container_name: profile-service
+    build:
+      context: ./backend/profile
+      dockerfile: Dockerfile
+
+    environment:
+      POSTGRES_HOST: profile-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: profile-db
+
+      KAFKA_BOOTSTRAP_SERVERS: shop-kafka:9092
+      KAFKA_USER_REGISTERED_TOPIC: users.created
+
+      ORDERS_GRPC_HOST: catalog-service:50051
+      PAYMENTS_GRPC_HOST: payments-service:50052
+
+    ports:
+      - "8000:8000"
+
+    depends_on:
+      profile-postgres:
+        condition: service_healthy
       shop-kafka:
         condition: service_healthy
 
