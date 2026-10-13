@@ -4,10 +4,9 @@ import "errors"
 
 var (
 	ErrInvalidEmail    = errors.New("invalid email")
-	ErrInvalidPassword = errors.New("invalid password") 
-	ErrInvalidRole     = errors.New("invalid role") 
+	ErrInvalidPassword = errors.New("invalid password")
+	ErrInvalidRole     = errors.New("invalid role")
 	ErrEmailTaken      = errors.New("email already taken")
-
 
 	ErrInvalidCredentials = errors.New("invalid credentials")
 

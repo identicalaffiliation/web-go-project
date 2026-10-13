@@ -10,8 +10,6 @@ import (
 	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
-
-
 func RegisterHandler(svc ports.AuthService, log ports.Logger) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		var req registerRequest

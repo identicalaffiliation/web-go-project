@@ -18,6 +18,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
@@ -83,7 +84,9 @@ func run(stdout io.Writer, outDir string, bits int, force bool) error {
 		return err
 	}
 
-	printSummary(stdout, privPath, pubPath, kid, force)
+	if err := printSummary(stdout, privPath, pubPath, kid, force); err != nil {
+		return fmt.Errorf("print summary: %w", err)
+	}
 	return nil
 }
 
@@ -172,19 +175,25 @@ func replaceFile(path string, data []byte, perm os.FileMode) error {
 	return nil
 }
 
-func printSummary(w io.Writer, privPath, pubPath, kid string, force bool) {
-	fmt.Fprintln(w, "Keys written:")
-	fmt.Fprintln(w, "  private:", privPath)
-	fmt.Fprintln(w, "  public: ", pubPath)
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Environment variables for auth:")
-	fmt.Fprintf(w, "AUTH_JWT_PRIVATE_KEY_PATH=%s\n", privPath)
-	fmt.Fprintf(w, "AUTH_JWT_PUBLIC_KEY_PATH=%s\n", pubPath)
-	fmt.Fprintf(w, "AUTH_JWT_KEY_ID=%s\n", kid)
-	fmt.Fprintf(w, "AUTH_JWT_ISSUER=%s\n", suggestedIssuer)
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "validator needs only public.pem; never commit or share private.pem.")
+// printSummary собирает текст целиком и пишет его одним вызовом: так ошибку
+// записи достаточно проверить один раз, а не после каждой строки.
+func printSummary(w io.Writer, privPath, pubPath, kid string, force bool) error {
+	var b strings.Builder
+	b.WriteString("Keys written:\n")
+	b.WriteString("  private: " + privPath + "\n")
+	b.WriteString("  public:  " + pubPath + "\n")
+	b.WriteString("\n")
+	b.WriteString("Environment variables for auth:\n")
+	b.WriteString("PRIVATE_KEY_PATH=" + privPath + "\n")
+	b.WriteString("PUBLIC_KEY_PATH=" + pubPath + "\n")
+	b.WriteString("AUTH_JWT_KEY_ID=" + kid + "\n")
+	b.WriteString("AUTH_JWT_ISSUER=" + suggestedIssuer + "\n")
+	b.WriteString("\n")
+	b.WriteString("validator needs only public.pem; never commit or share private.pem.\n")
 	if force {
-		fmt.Fprintln(w, "WARNING: keys were replaced. All issued tokens are now invalid; restart auth and validator.")
+		b.WriteString("WARNING: keys were replaced. All issued tokens are now invalid; restart auth and validator.\n")
 	}
+
+	_, err := io.WriteString(w, b.String())
+	return err
 }

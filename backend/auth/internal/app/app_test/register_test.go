@@ -56,7 +56,7 @@ func TestRegister_Success(t *testing.T) {
 			if !got.CreatedAt.Equal(fixedNow) {
 				t.Errorf("want created at %v, got %v", fixedNow, got.CreatedAt)
 			}
-			
+
 			if got.ID.Version() != 7 {
 				t.Errorf("user ID must be UUIDv7, got %s", got.ID)
 			}

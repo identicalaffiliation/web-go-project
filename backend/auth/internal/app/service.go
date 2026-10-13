@@ -21,7 +21,6 @@ type Service struct {
 
 type Option func(*Service)
 
-
 func WithNow(now func() time.Time) Option {
 	return func(s *Service) {
 		s.now = now
