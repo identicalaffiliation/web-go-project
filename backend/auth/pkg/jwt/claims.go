@@ -35,6 +35,11 @@ func fromClaims(c claims) (domain.Claims, error) {
 		return domain.Claims{}, fmt.Errorf("parse subject: %w", err)
 	}
 
+	// Роль уходит в заголовок X-User-Role, поэтому неизвестное значение отсекаем здесь.
+	if !domain.Role(c.Role).Valid() {
+		return domain.Claims{}, fmt.Errorf("%w: %q", domain.ErrInvalidRole, c.Role)
+	}
+
 	return domain.Claims{
 		UserID: userID,
 		Email:  domain.Email(c.Email),

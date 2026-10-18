@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
 	"errors"
 	"flag"
 	"fmt"
@@ -92,7 +93,9 @@ func run(configPath string) error {
 	}
 
 	issuer := jwt.NewIssuer(privateKey, cfg.JWT.KeyID, cfg.JWT.Issuer, cfg.JWT.AccessTTL)
-	verifier := jwt.NewVerifier(publicKey, cfg.JWT.Issuer)
+	// Карта по kid: так верификатор выбирает ключ и сможет работать с несколькими
+	// ключами при ротации; сейчас конфиг даёт ровно один.
+	verifier := jwt.NewVerifier(map[string]*rsa.PublicKey{cfg.JWT.KeyID: publicKey}, cfg.JWT.Issuer)
 
 	service := app.NewService(
 		postgres.NewUserRepository(pool),
@@ -104,7 +107,7 @@ func run(configPath string) error {
 		cfg.JWT.RefreshTTL,
 	)
 
-	e := serverSetup(cfg, service, log)
+	e := serverSetup(cfg, service, verifier, log)
 
 	// Start блокирует до остановки сервера, поэтому запускаем его в горутине,
 	// а main-горутина тем временем ждёт сигнал или ошибку сервера.
@@ -139,7 +142,7 @@ func run(configPath string) error {
 
 // serverSetup собирает echo: таймауты, middleware и маршруты. Выделено из run,
 // чтобы run отвечал за жизненный цикл, а serverSetup — за то, что сервер умеет.
-func serverSetup(cfg config.Config, svc ports.AuthService, log ports.Logger) *echo.Echo {
+func serverSetup(cfg config.Config, svc ports.AuthService, verifier ports.AccessTokenVerifier, log ports.Logger) *echo.Echo {
 	e := echo.New()
 	e.HideBanner = true
 	e.HidePort = true
@@ -160,11 +163,7 @@ func serverSetup(cfg config.Config, svc ports.AuthService, log ports.Logger) *ec
 	g.POST("/login", rest.LoginHandler(svc, log))
 	g.POST("/refresh", rest.RefreshHandler(svc, log))
 	g.POST("/logout", rest.LogoutHandler(svc, log))
-	//TODO: create the validate controller for jwt token with X-User-Role header and X-User-ID (for other services)
-	g.GET("/validate", func(ctx echo.Context) error {
-		ctx.Response().Header().Set("X-User-Role", "business")
-		return ctx.NoContent(http.StatusOK)
-	})
+	g.GET("/validate", rest.ValidateHandler(verifier, log))
 
 	return e
 }

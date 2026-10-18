@@ -24,10 +24,14 @@ func generateKeyPair(t *testing.T) (*rsa.PrivateKey, *rsa.PublicKey) {
 	return key, &key.PublicKey
 }
 
+func keysFor(pub *rsa.PublicKey) map[string]*rsa.PublicKey {
+	return map[string]*rsa.PublicKey{"test-kid": pub}
+}
+
 func TestIssueAndVerify_Success(t *testing.T) {
 	priv, pub := generateKeyPair(t)
 	issuer := authjwt.NewIssuer(priv, "test-kid", "auth-service", 15*time.Minute)
-	verifier := authjwt.NewVerifier(pub, "auth-service")
+	verifier := authjwt.NewVerifier(keysFor(pub), "auth-service")
 
 	claims := domain.Claims{UserID: testUserID, Email: "alice@example.com", Role: domain.RoleCustomer}
 
@@ -54,7 +58,7 @@ func TestIssueAndVerify_Success(t *testing.T) {
 func TestVerify_WrongIssuer(t *testing.T) {
 	priv, pub := generateKeyPair(t)
 	issuer := authjwt.NewIssuer(priv, "test-kid", "auth-service", 15*time.Minute)
-	verifier := authjwt.NewVerifier(pub, "some-other-service")
+	verifier := authjwt.NewVerifier(keysFor(pub), "some-other-service")
 
 	token, _, err := issuer.Issue(domain.Claims{UserID: testUserID})
 	if err != nil {
@@ -71,7 +75,7 @@ func TestVerify_Expired(t *testing.T) {
 	priv, pub := generateKeyPair(t)
 	// TTL в прошлом — токен просрочен сразу после выпуска.
 	issuer := authjwt.NewIssuer(priv, "test-kid", "auth-service", -time.Minute)
-	verifier := authjwt.NewVerifier(pub, "auth-service")
+	verifier := authjwt.NewVerifier(keysFor(pub), "auth-service")
 
 	token, _, err := issuer.Issue(domain.Claims{UserID: testUserID})
 	if err != nil {
@@ -89,7 +93,7 @@ func TestVerify_WrongKey(t *testing.T) {
 	_, pub2 := generateKeyPair(t)
 
 	issuer := authjwt.NewIssuer(priv1, "test-kid", "auth-service", 15*time.Minute)
-	verifier := authjwt.NewVerifier(pub2, "auth-service") // чужой публичный ключ
+	verifier := authjwt.NewVerifier(keysFor(pub2), "auth-service") // чужой публичный ключ
 
 	token, _, err := issuer.Issue(domain.Claims{UserID: testUserID})
 	if err != nil {
