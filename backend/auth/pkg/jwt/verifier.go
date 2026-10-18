@@ -34,7 +34,7 @@ func (v *Verifier) Verify(tokenString string) (domain.Claims, error) {
 		if errors.Is(err, jwt.ErrTokenExpired) {
 			return domain.Claims{}, ErrTokenExpired
 		}
-		return domain.Claims{}, fmt.Errorf("%w: %v", ErrInvalidToken, err)
+		return domain.Claims{}, fmt.Errorf("%w: %w", ErrInvalidToken, err)
 	}
 	if !token.Valid {
 		return domain.Claims{}, ErrInvalidToken
@@ -42,7 +42,7 @@ func (v *Verifier) Verify(tokenString string) (domain.Claims, error) {
 
 	out, err := fromClaims(cl)
 	if err != nil {
-		return domain.Claims{}, fmt.Errorf("%w: %v", ErrInvalidToken, err)
+		return domain.Claims{}, fmt.Errorf("%w: %w", ErrInvalidToken, err)
 	}
 
 	return out, nil

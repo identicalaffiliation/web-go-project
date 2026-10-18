@@ -32,7 +32,8 @@ func setupPool(t *testing.T) *pgxpool.Pool {
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
 				WithOccurrence(2).
-				WithStartupTimeout(30*time.Second)),
+				WithStartupTimeout(30*time.Second),
+		),
 	)
 	if err != nil {
 		t.Fatalf("start postgres container: %v", err)

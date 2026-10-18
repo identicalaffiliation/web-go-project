@@ -1,0 +1,12 @@
+profile
+├── cmd/profile/main.py
+├── internal/
+│   ├── domain/
+│   ├── ports/
+│   ├── app/
+│   ├── adapters/{postgres,grpc}/
+│   ├── config/
+│   └── pkg/{jwt,hasher}/
+├── migrations/
+├── configs/
+└── Dockerfile 

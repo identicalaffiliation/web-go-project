@@ -1,0 +1,33 @@
+http:
+  addr: ":8080"                # AUTH_HTTP_ADDR
+  read_timeout: 5s             # AUTH_HTTP_READ_TIMEOUT
+  write_timeout: 10s           # AUTH_HTTP_WRITE_TIMEOUT
+  idle_timeout: 60s            # AUTH_HTTP_IDLE_TIMEOUT
+  shutdown_timeout: 5s         # AUTH_HTTP_SHUTDOWN_TIMEOUT
+
+postgres:
+  max_conns: 20                # AUTH_DB_MAX_CONNS
+  min_conns: 2                 # AUTH_DB_MIN_CONNS
+  max_conn_lifetime: 30m       # AUTH_DB_MAX_CONN_LIFETIME
+  max_conn_idle_time: 5m       # AUTH_DB_MAX_CONN_IDLE_TIME
+  health_check_period: 30s     # AUTH_DB_HEALTH_CHECK_PERIOD
+  connect_timeout: 5s          # AUTH_DB_CONNECT_TIMEOUT
+
+jwt:
+  issuer: auth-service         # AUTH_JWT_ISSUER
+  access_ttl: 15m              # AUTH_ACCESS_TOKEN_TTL
+  refresh_ttl: 168h            # AUTH_REFRESH_TOKEN_TTL
+
+log:
+  level: info                  # AUTH_LOG_LEVEL: debug, info, warn, error
+
+kafka:
+  brokers: ["shop-kafka:9092"] # AUTH_KAFKA_BROKERS, список через запятую
+  topic: users.created         # AUTH_KAFKA_TOPIC
+  write_timeout: 5s            # AUTH_KAFKA_WRITE_TIMEOUT
+
+outbox:
+  interval: 1s                 # AUTH_OUTBOX_INTERVAL
+  batch_size: 100              # AUTH_OUTBOX_BATCH_SIZE
+  publish_timeout: 10s         # AUTH_OUTBOX_PUBLISH_TIMEOUT
+  max_attempts: 5              # AUTH_OUTBOX_MAX_ATTEMPTS

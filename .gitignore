@@ -33,4 +33,6 @@ secrets/
 
 # Editor/IDE
 .idea/
+__pycache__/
+.venv/
 # .vscode/

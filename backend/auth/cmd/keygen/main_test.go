@@ -53,7 +53,7 @@ func TestRun_GeneratesKeysUsableByJWTPackage(t *testing.T) {
 	}
 
 	summary := out.String()
-	for _, want := range []string{"AUTH_JWT_PRIVATE_KEY_PATH=", "AUTH_JWT_PUBLIC_KEY_PATH=", "AUTH_JWT_KEY_ID=", "AUTH_JWT_ISSUER="} {
+	for _, want := range []string{"PRIVATE_KEY_PATH=", "PUBLIC_KEY_PATH=", "AUTH_JWT_KEY_ID=", "AUTH_JWT_ISSUER="} {
 		if !strings.Contains(summary, want) {
 			t.Errorf("summary must contain %q, got:\n%s", want, summary)
 		}

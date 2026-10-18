@@ -12,6 +12,15 @@ import (
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/pkg/shortcut"
 )
 
+// @title Shop catalog service API
+// @version 1.0
+// @description Service for shop catalog: creating for business and parsing for customers.
+// @host http://localhost:8080
+// @BasePath /api/v1
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and the JWT.
 func main() {
 	var configPath string
 	flag.StringVar(&configPath, "config", "", "path to config file")
