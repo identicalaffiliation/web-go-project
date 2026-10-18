@@ -19,7 +19,9 @@ type OutboxEvent struct {
 }
 
 // UserCreatedPayload — тело события users.created.
-// Контракт с Profile — предложение, нужно согласовать с владельцем Profile.
+// Совместим с backend/profile/internal/adapters/kafka/consumer.py: Profile читает
+// из тела только user_id и event_id. Ключ сообщения и заголовок event_id нужны
+// нам (порядок по партиции), Profile их не использует.
 type UserCreatedPayload struct {
 	EventID    uuid.UUID `json:"event_id"`
 	UserID     uuid.UUID `json:"user_id"`
