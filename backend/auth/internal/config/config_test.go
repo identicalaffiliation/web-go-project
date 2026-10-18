@@ -3,6 +3,7 @@ package config
 import (
 	"log/slog"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -26,6 +27,13 @@ var allEnvKeys = []string{
 	"AUTH_DB_MAX_CONN_IDLE_TIME",
 	"AUTH_DB_HEALTH_CHECK_PERIOD",
 	"AUTH_DB_CONNECT_TIMEOUT",
+	"AUTH_KAFKA_BROKERS",
+	"AUTH_KAFKA_TOPIC",
+	"AUTH_KAFKA_WRITE_TIMEOUT",
+	"AUTH_OUTBOX_INTERVAL",
+	"AUTH_OUTBOX_BATCH_SIZE",
+	"AUTH_OUTBOX_PUBLISH_TIMEOUT",
+	"AUTH_OUTBOX_MAX_ATTEMPTS",
 }
 
 func setEnv(t *testing.T, vars map[string]string) {
@@ -48,6 +56,7 @@ func requiredVars() map[string]string {
 		"AUTH_JWT_PUBLIC_KEY_PATH":  "/keys/public.pem",
 		"AUTH_JWT_KEY_ID":           "kid-1",
 		"AUTH_JWT_ISSUER":           "auth-service",
+		"AUTH_KAFKA_BROKERS":        "shop-kafka:9092",
 	}
 }
 
@@ -58,6 +67,7 @@ func TestLoad_MissingRequired(t *testing.T) {
 		"AUTH_JWT_PUBLIC_KEY_PATH",
 		"AUTH_JWT_KEY_ID",
 		"AUTH_JWT_ISSUER",
+		"AUTH_KAFKA_BROKERS",
 	} {
 		t.Run(missing, func(t *testing.T) {
 			vars := requiredVars()
@@ -109,6 +119,58 @@ func TestLoad_Defaults(t *testing.T) {
 	}
 	if cfg.Postgres != wantPostgres {
 		t.Errorf("Postgres = %+v, want %+v", cfg.Postgres, wantPostgres)
+	}
+
+	wantKafka := KafkaConfig{
+		Brokers:      []string{"shop-kafka:9092"},
+		Topic:        "users.created",
+		WriteTimeout: 5 * time.Second,
+	}
+	if !reflect.DeepEqual(cfg.Kafka, wantKafka) {
+		t.Errorf("Kafka = %+v, want %+v", cfg.Kafka, wantKafka)
+	}
+
+	wantOutbox := OutboxConfig{Interval: time.Second, BatchSize: 100, PublishTimeout: 10 * time.Second, MaxAttempts: 5}
+	if cfg.Outbox != wantOutbox {
+		t.Errorf("Outbox = %+v, want %+v", cfg.Outbox, wantOutbox)
+	}
+}
+
+func TestLoad_KafkaBrokersList(t *testing.T) {
+	vars := requiredVars()
+	vars["AUTH_KAFKA_BROKERS"] = "k1:9092,k2:9092"
+	setEnv(t, vars)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if want := []string{"k1:9092", "k2:9092"}; !reflect.DeepEqual(cfg.Kafka.Brokers, want) {
+		t.Errorf("Brokers = %v, want %v", cfg.Kafka.Brokers, want)
+	}
+}
+
+func TestLoad_InvalidKafkaAndOutbox(t *testing.T) {
+	tests := map[string]map[string]string{
+		"empty topic":          {"AUTH_KAFKA_TOPIC": " "},
+		"zero write timeout":   {"AUTH_KAFKA_WRITE_TIMEOUT": "0s"},
+		"zero outbox interval": {"AUTH_OUTBOX_INTERVAL": "0s"},
+		"zero batch size":      {"AUTH_OUTBOX_BATCH_SIZE": "0"},
+		"negative publish":     {"AUTH_OUTBOX_PUBLISH_TIMEOUT": "-1s"},
+		"zero max attempts":    {"AUTH_OUTBOX_MAX_ATTEMPTS": "0"},
+	}
+	for name, overrides := range tests {
+		t.Run(name, func(t *testing.T) {
+			vars := requiredVars()
+			for k, v := range overrides {
+				vars[k] = v
+			}
+			setEnv(t, vars)
+
+			if _, err := Load(); err == nil {
+				t.Fatalf("expected error for %v", overrides)
+			}
+		})
 	}
 }
 
@@ -190,8 +252,14 @@ func TestLoad_AllSet(t *testing.T) {
 		HTTPWriteTimeout: 4 * time.Second,
 		HTTPIdleTimeout:  30 * time.Second,
 		LogLevel:         slog.LevelInfo,
+		Kafka: KafkaConfig{
+			Brokers:      []string{"shop-kafka:9092"},
+			Topic:        "users.created",
+			WriteTimeout: 5 * time.Second,
+		},
+		Outbox: OutboxConfig{Interval: time.Second, BatchSize: 100, PublishTimeout: 10 * time.Second, MaxAttempts: 5},
 	}
-	if cfg != want {
+	if !reflect.DeepEqual(cfg, want) {
 		t.Errorf("cfg = %+v, want %+v", cfg, want)
 	}
 }

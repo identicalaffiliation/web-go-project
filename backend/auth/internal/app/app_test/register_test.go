@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -22,11 +23,13 @@ func TestRegister_Success(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			fixedNow := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 			var createdUser domain.User
+			var createdEvent domain.OutboxEvent
 
 			users := mocks.NewMockUserRepository(ctrl)
-			users.EXPECT().Create(gomock.Any(), gomock.Any()).
-				DoAndReturn(func(_ context.Context, u domain.User) error {
+			users.EXPECT().CreateWithEvent(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, u domain.User, e domain.OutboxEvent) error {
 					createdUser = u
+					createdEvent = e
 					return nil
 				})
 			hasher := mocks.NewMockPasswordHasher(ctrl)
@@ -62,6 +65,22 @@ func TestRegister_Success(t *testing.T) {
 			}
 			if createdUser.ID != got.ID || createdUser.Role != role {
 				t.Errorf("repository got unexpected user: %+v", createdUser)
+			}
+
+			if createdEvent.Topic != "users.created" {
+				t.Errorf("event topic = %q, want users.created", createdEvent.Topic)
+			}
+			if createdEvent.Key != got.ID {
+				t.Errorf("event key = %s, want user id %s", createdEvent.Key, got.ID)
+			}
+			var payload domain.UserCreatedPayload
+			if err := json.Unmarshal(createdEvent.Payload, &payload); err != nil {
+				t.Fatalf("unmarshal payload: %v", err)
+			}
+			if payload.EventID != createdEvent.ID || payload.UserID != got.ID ||
+				payload.Email != "alice@example.com" || payload.Role != string(role) ||
+				!payload.OccurredAt.Equal(fixedNow) {
+				t.Errorf("unexpected payload: %+v", payload)
 			}
 		})
 	}
@@ -105,7 +124,7 @@ func TestRegister_InvalidPassword_DoesNotTouchRepository(t *testing.T) {
 func TestRegister_EmailTaken_PropagatesFromRepository(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	users := mocks.NewMockUserRepository(ctrl)
-	users.EXPECT().Create(gomock.Any(), gomock.Any()).Return(domain.ErrEmailTaken)
+	users.EXPECT().CreateWithEvent(gomock.Any(), gomock.Any(), gomock.Any()).Return(domain.ErrEmailTaken)
 	hasher := mocks.NewMockPasswordHasher(ctrl)
 	hasher.EXPECT().Hash(gomock.Any()).Return("hashed", nil)
 

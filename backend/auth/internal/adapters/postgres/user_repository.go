@@ -25,12 +25,38 @@ func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 }
 
 func (r *UserRepository) Create(ctx context.Context, user domain.User) error {
+	return insertUser(ctx, r.pool, user)
+}
+
+func (r *UserRepository) CreateWithEvent(ctx context.Context, user domain.User, event domain.OutboxEvent) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	// После успешного Commit Rollback вернёт ErrTxClosed и ничего не сделает;
+	// при любой ошибке ниже откатит обе вставки разом.
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if err := insertUser(ctx, tx, user); err != nil {
+		return err
+	}
+	if err := insertOutboxEvent(ctx, tx, event); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit tx: %w", err)
+	}
+	return nil
+}
+
+func insertUser(ctx context.Context, q execer, user domain.User) error {
 	const query = `
 		INSERT INTO auth_users (id, email, password_hash, role, created_at)
 		VALUES ($1, $2, $3, $4::user_role, $5)
 	`
 
-	_, err := r.pool.Exec(ctx, query, user.ID, user.Email, user.PasswordHash, user.Role, user.CreatedAt)
+	_, err := q.Exec(ctx, query, user.ID, user.Email, user.PasswordHash, user.Role, user.CreatedAt)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return domain.ErrEmailTaken

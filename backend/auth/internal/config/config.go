@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/ilyakaznacheev/cleanenv"
@@ -11,6 +12,8 @@ import (
 type Config struct {
 	Postgres PostgresConfig
 	JWT      JWTConfig
+	Kafka    KafkaConfig
+	Outbox   OutboxConfig
 	HTTPAddr string `env:"AUTH_HTTP_ADDR" env-default:":8080"`
 
 	HTTPReadTimeout  time.Duration `env:"AUTH_HTTP_READ_TIMEOUT" env-default:"5s"`
@@ -38,6 +41,19 @@ type JWTConfig struct {
 	Issuer         string        `env:"AUTH_JWT_ISSUER" env-required:"true"`
 	AccessTTL      time.Duration `env:"AUTH_ACCESS_TOKEN_TTL" env-default:"15m"`
 	RefreshTTL     time.Duration `env:"AUTH_REFRESH_TOKEN_TTL" env-default:"168h"`
+}
+
+type KafkaConfig struct {
+	Brokers      []string      `env:"AUTH_KAFKA_BROKERS" env-separator:"," env-required:"true"`
+	Topic        string        `env:"AUTH_KAFKA_TOPIC" env-default:"users.created"`
+	WriteTimeout time.Duration `env:"AUTH_KAFKA_WRITE_TIMEOUT" env-default:"5s"`
+}
+
+type OutboxConfig struct {
+	Interval       time.Duration `env:"AUTH_OUTBOX_INTERVAL" env-default:"1s"`
+	BatchSize      int           `env:"AUTH_OUTBOX_BATCH_SIZE" env-default:"100"`
+	PublishTimeout time.Duration `env:"AUTH_OUTBOX_PUBLISH_TIMEOUT" env-default:"10s"`
+	MaxAttempts    int           `env:"AUTH_OUTBOX_MAX_ATTEMPTS" env-default:"5"`
 }
 
 func Load() (Config, error) {
@@ -71,7 +87,42 @@ func (c Config) validate() error {
 			return fmt.Errorf("%s must be > 0, got %v", d.name, d.value)
 		}
 	}
+	if err := c.Kafka.validate(); err != nil {
+		return err
+	}
+	if err := c.Outbox.validate(); err != nil {
+		return err
+	}
 	return c.Postgres.validate()
+}
+
+func (c KafkaConfig) validate() error {
+	if len(c.Brokers) == 0 {
+		return fmt.Errorf("AUTH_KAFKA_BROKERS must not be empty")
+	}
+	if strings.TrimSpace(c.Topic) == "" {
+		return fmt.Errorf("AUTH_KAFKA_TOPIC must not be empty")
+	}
+	if c.WriteTimeout <= 0 {
+		return fmt.Errorf("AUTH_KAFKA_WRITE_TIMEOUT must be > 0, got %v", c.WriteTimeout)
+	}
+	return nil
+}
+
+func (c OutboxConfig) validate() error {
+	if c.Interval <= 0 {
+		return fmt.Errorf("AUTH_OUTBOX_INTERVAL must be > 0, got %v", c.Interval)
+	}
+	if c.BatchSize < 1 {
+		return fmt.Errorf("AUTH_OUTBOX_BATCH_SIZE must be >= 1, got %d", c.BatchSize)
+	}
+	if c.MaxAttempts < 1 {
+		return fmt.Errorf("AUTH_OUTBOX_MAX_ATTEMPTS must be >= 1, got %d", c.MaxAttempts)
+	}
+	if c.PublishTimeout <= 0 {
+		return fmt.Errorf("AUTH_OUTBOX_PUBLISH_TIMEOUT must be > 0, got %v", c.PublishTimeout)
+	}
+	return nil
 }
 
 func (c PostgresConfig) validate() error {
