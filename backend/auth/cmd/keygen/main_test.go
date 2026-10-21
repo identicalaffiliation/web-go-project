@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/rsa"
 	"errors"
 	"os"
 	"path/filepath"
@@ -44,11 +45,11 @@ func TestRun_GeneratesKeysUsableByJWTPackage(t *testing.T) {
 	// Токен, подписанный сгенерированным приватным ключом, должен проверяться
 	// сгенерированным публичным: так мы убеждаемся, что это именно пара.
 	issuer := authjwt.NewIssuer(priv, "kid", suggestedIssuer, time.Minute)
-	token, _, err := issuer.Issue(domain.Claims{UserID: uuid.MustParse("019a0000-0000-7000-8000-000000000001")})
+	token, _, err := issuer.Issue(domain.Claims{UserID: uuid.MustParse("019a0000-0000-7000-8000-000000000001"), Role: domain.RoleCustomer})
 	if err != nil {
 		t.Fatalf("Issue: %v", err)
 	}
-	if _, err := authjwt.NewVerifier(pub, suggestedIssuer).Verify(token); err != nil {
+	if _, err := authjwt.NewVerifier(map[string]*rsa.PublicKey{"kid": pub}, suggestedIssuer).Verify(token); err != nil {
 		t.Fatalf("Verify: %v", err)
 	}
 
