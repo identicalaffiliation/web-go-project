@@ -1,0 +1,10 @@
+kafka:
+    brokers: [shop-kafka:9092]
+    consume_topic: stock.created
+    group_id: inventory-service
+    queue_capacity: 50
+    read_batch_timeout: 500ms
+    workers: 3
+    tick_time: 300ms
+
+operation_duration: 30s

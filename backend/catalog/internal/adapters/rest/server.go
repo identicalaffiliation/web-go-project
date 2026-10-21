@@ -36,12 +36,7 @@ func SetupServer(cfg *config.HTTPConfig, c *catalog.Service) *echo.Echo {
 			middlewares.Business,
 		),
 	)
-	internal.GET("", handlers.GetItemsPage(c),
-		middlewares.RoleMiddleware(
-			middlewares.Customer,
-			middlewares.Business,
-		),
-	)
+	internal.GET("", handlers.GetItemsPage(c))
 	internal.POST("/:productId/image", handlers.UploadImage(c),
 		middlewares.RoleMiddleware(middlewares.Business),
 	)
