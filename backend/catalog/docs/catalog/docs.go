@@ -207,6 +207,7 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "price",
+                "quantity",
                 "title"
             ],
             "properties": {
@@ -215,6 +216,10 @@ const docTemplate = `{
                 },
                 "price": {
                     "type": "integer"
+                },
+                "quantity": {
+                    "type": "integer",
+                    "minimum": 1
                 },
                 "title": {
                     "type": "string",

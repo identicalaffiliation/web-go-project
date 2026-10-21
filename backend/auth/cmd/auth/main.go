@@ -32,7 +32,7 @@ import (
 const routePrefix = "/api/v1/auth"
 
 func main() {
-	configPath := flag.String("config", "configs/auth.yml", "path to config file")
+	configPath := flag.String("config", "", "path to config file")
 	flag.Parse()
 
 	if err := run(*configPath); err != nil {

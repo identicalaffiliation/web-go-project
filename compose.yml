@@ -335,6 +335,7 @@ services:
 
     volumes:
       - ./secrets/jwt:/app/keys:ro
+      - ./backend/auth/configs/auth.yml:/app/config.yml:ro
 
     depends_on:
       auth-postgres:

@@ -15,4 +15,5 @@ WORKDIR /app
 
 COPY --from=builder /app/auth-service .
 
-CMD ["./auth-service"]
+ENTRYPOINT ["./auth-service"]
+CMD ["-config", "config.yml"]

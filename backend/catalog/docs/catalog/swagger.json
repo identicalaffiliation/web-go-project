@@ -201,6 +201,7 @@
             "type": "object",
             "required": [
                 "price",
+                "quantity",
                 "title"
             ],
             "properties": {
@@ -209,6 +210,10 @@
                 },
                 "price": {
                     "type": "integer"
+                },
+                "quantity": {
+                    "type": "integer",
+                    "minimum": 1
                 },
                 "title": {
                     "type": "string",

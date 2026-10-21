@@ -14,6 +14,7 @@ func TestToDomain(t *testing.T) {
 			Title:       "aa",
 			Description: new("bb"),
 			Price:       123,
+			Quantity:    10,
 		}
 
 		d := r.ToDomain()
@@ -21,6 +22,7 @@ func TestToDomain(t *testing.T) {
 		require.Equal(t, r.Title, d.Title)
 		require.Equal(t, *r.Description, d.Description)
 		require.Equal(t, r.Price, d.Price)
+		require.Equal(t, r.Quantity, d.Quantity)
 		require.Equal(t, "", d.ImageKey)
 		require.Empty(t, d.CreatedAt)
 		require.Empty(t, d.UpdatedAt)

@@ -10,10 +10,23 @@ import (
 
 func TestCreateProductRequest_ValidateJSON(t *testing.T) {
 
+	t.Run("invalid quantity", func(t *testing.T) {
+		req := &CreateProductRequest{
+			Title:    "some title",
+			Price:    100,
+			Quantity: 0,
+		}
+
+		err := req.ValidateJSON()
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInvalidJSON)
+	})
+
 	t.Run("valid request", func(t *testing.T) {
 		req := &CreateProductRequest{
-			Title: "some title",
-			Price: 100,
+			Title:    "some title",
+			Price:    100,
+			Quantity: 10,
 		}
 		require.NoError(t, req.ValidateJSON())
 	})
