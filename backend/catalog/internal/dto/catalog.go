@@ -30,17 +30,26 @@ func (f ImageFormat) Ext() (string, bool) {
 	return ext, ok
 }
 
+// CreateProductRequest - Data transfer object структура JSON запроса для создания товара в каталоге.
+// Поля:
+// Title - название товара, минимальная длина - 1, поле обязательно.
+// Description - описание товара, поле опционально.
+// Price - цена товара, минимальное значение - 1, не может быть отрицательно, поле обязательно.
+// Quantity - количество товара, диапозон количества [1, 100), поле обязательно.
 type CreateProductRequest struct {
 	Title       string  `json:"title" validate:"required,min=1"`
 	Description *string `json:"description,omitempty"`
 	Price       int64   `json:"price" validate:"required,gt=0"`
+	Quantity    int16   `json:"quantity" validate:"required,gte=1,lt=100"`
 }
 
+// ToDomain - метод преобразования DTO в domain структуру.
 func (req *CreateProductRequest) ToDomain() *domain.Product {
 	model := &domain.Product{
-		ID:    uuid.New(),
-		Title: req.Title,
-		Price: req.Price,
+		ID:       uuid.New(),
+		Title:    req.Title,
+		Price:    req.Price,
+		Quantity: req.Quantity,
 	}
 
 	if req.Description != nil {
@@ -50,11 +59,14 @@ func (req *CreateProductRequest) ToDomain() *domain.Product {
 	return model
 }
 
+// Page - структура страницы продуктов.
+// NextCursor - Опциональное поле следующей пейджи.
 type Page struct {
-	Products   []Product `json:"products"`
-	NextCursor *string   `json:"nextCursor,omitempty"`
+	Products   []ProductResponse `json:"products"`
+	NextCursor *string           `json:"nextCursor,omitempty"`
 }
 
+// ProductResponse - основная dto структура продукта
 type ProductResponse struct {
 	Product Product `json:"product"`
 }

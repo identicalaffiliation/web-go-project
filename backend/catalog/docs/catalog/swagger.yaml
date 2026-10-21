@@ -6,11 +6,15 @@ definitions:
         type: string
       price:
         type: integer
+      quantity:
+        minimum: 1
+        type: integer
       title:
         minLength: 1
         type: string
     required:
     - price
+    - quantity
     - title
     type: object
   github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.Product:
