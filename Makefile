@@ -48,9 +48,18 @@ clean:
 lint:
 	cd backend/catalog && golangci-lint run ./...
 	cd backend/auth && golangci-lint run ./...
+	cd backend/profile && ruff check .
+	cd backend/profile && ruff format --check .
+	cd backend/profile && python3 -m compileall -q -x 'internal/adapters/grpc/generated' cmd internal
 
 .PHONY: test
 test: unit integrations
+	@cd backend/profile && \
+	if find . -path ./.venv -prune -o \( -name 'test_*.py' -o -name '*_test.py' \) -print | grep -q .; then \
+		python3 -m pytest; \
+	else \
+		echo "profile: no tests found, skipping"; \
+	fi
 
 .PHONY: integrations
 integrations:
