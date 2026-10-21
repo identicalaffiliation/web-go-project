@@ -4,7 +4,7 @@ import "github.com/labstack/echo/v4"
 
 const (
 	Business Role = "business"
-	Client   Role = "client"
+	Customer Role = "customer"
 )
 
 const (

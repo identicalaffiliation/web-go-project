@@ -5,6 +5,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from aiokafka import AIOKafkaConsumer
+
 from internal.ports.message_broker import IEventConsumer
 
 logger = logging.getLogger(__name__)

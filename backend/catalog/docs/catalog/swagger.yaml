@@ -39,7 +39,7 @@ definitions:
       product:
         $ref: '#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.Product'
     type: object
-host: http://localhost:8080
+host: localhost
 info:
   contact: {}
   description: 'Service for shop catalog: creating for business and parsing for customers.'
