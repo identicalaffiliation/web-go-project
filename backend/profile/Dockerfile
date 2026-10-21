@@ -1,7 +1,7 @@
 # Используем легковесный официальный образ Python
 # (В вашем pyproject.toml указан target-version = "py314", 
 # но так как стабильной версии 3.14 еще нет, используем актуальную 3.12 или 3.13)
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 WORKDIR /app
 

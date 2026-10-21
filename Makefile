@@ -33,6 +33,12 @@ run:
 	docker compose up --build -d auth-service
 	docker compose up --build -d catalog-service
 	docker compose up --build -d profile-service
+	docker compose up -d gateway
+
+.PHONY: nginx-reload
+nginx-reload:
+	docker compose exec gateway nginx -t
+	docker compose exec gateway nginx -s reload
 
 .PHONY: clean
 clean:
@@ -41,6 +47,7 @@ clean:
 .PHONY: lint
 lint:
 	cd backend/catalog && golangci-lint run ./...
+	cd backend/auth && golangci-lint run ./...
 
 .PHONY: test
 test: unit integrations
@@ -48,10 +55,12 @@ test: unit integrations
 .PHONY: integrations
 integrations:
 	cd backend/catalog && go test -v -race -tags=integration ./...
+	cd backend/auth && go test -v -race -tags=integration ./...
 
 .PHONY: unit
 unit:
 	cd backend/catalog && go test -v -race -tags=unit ./...
+	cd backend/auth && go test -v -race -tags=unit ./...
 
 .PHONY: gen
 gen:

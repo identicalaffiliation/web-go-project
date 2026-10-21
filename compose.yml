@@ -301,9 +301,6 @@ services:
     volumes:
       - ./backend/catalog/configs/catalog.yml:/app/config.yml:ro
 
-    ports:
-      - "8080:8080"
-
     depends_on:
       catalog-master-postgres:
         condition: service_healthy
@@ -329,9 +326,6 @@ services:
       PUBLIC_KEY_PATH: /app/keys/public.pem
       AUTH_JWT_KEY_ID: auth-2024-01
       AUTH_JWT_ISSUER: auth.example.com
-
-    ports:
-      - "8081:8080"
 
     volumes:
       - ./secrets/jwt:/app/keys:ro
@@ -362,14 +356,34 @@ services:
       ORDERS_GRPC_HOST: catalog-service:50051
       PAYMENTS_GRPC_HOST: payments-service:50052
 
-    ports:
-      - "8000:8000"
-
     depends_on:
       profile-postgres:
         condition: service_healthy
       shop-kafka:
         condition: service_healthy
+
+  # API GATEWAY
+  gateway:
+    container_name: gateway
+    image: nginx:1.27-alpine
+
+    # external connection: http://localhost:80
+    ports:
+      - "80:80"
+
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost/healthz || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    depends_on:
+      - auth-service
+      - catalog-service
+      - profile-service
 
 volumes:
   auth_postgres_data:

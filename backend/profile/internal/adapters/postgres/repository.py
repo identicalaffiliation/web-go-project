@@ -1,12 +1,13 @@
 import uuid
 
+from sqlalchemy import select, update
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from internal.adapters.postgres.models import ProfileModel
 from internal.domain.exceptions import ProfileNotFoundError
 from internal.domain.models import Profile, ProfileType
 from internal.ports.repository import IProfileRepository
-from sqlalchemy import select, update
-from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class SqlAlchemyProfileRepository(IProfileRepository):

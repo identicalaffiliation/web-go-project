@@ -32,13 +32,13 @@ func SetupServer(cfg *config.HTTPConfig, c *catalog.Service) *echo.Echo {
 	)
 	internal.GET("/:productId", handlers.GetItem(c),
 		middlewares.RoleMiddleware(
-			middlewares.Client,
+			middlewares.Customer,
 			middlewares.Business,
 		),
 	)
 	internal.GET("", handlers.GetItemsPage(c),
 		middlewares.RoleMiddleware(
-			middlewares.Client,
+			middlewares.Customer,
 			middlewares.Business,
 		),
 	)
