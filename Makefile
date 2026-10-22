@@ -82,3 +82,7 @@ gen:
 .PHONY: swag
 swag:
 	cd backend/catalog && swag init -g cmd/catalog/main.go -o docs/catalog --parseDependency --parseInternal
+
+.PHONY: swag-auth
+swag-auth:
+	go -C backend/auth tool swag init -g cmd/auth/swagger.go -o docs/auth --parseDependency --parseInternal

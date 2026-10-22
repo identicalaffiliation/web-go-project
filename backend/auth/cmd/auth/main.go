@@ -159,6 +159,7 @@ func serverSetup(cfg config.Config, svc ports.AuthService, verifier ports.Access
 	e.Use(recoverMiddleware(log))
 
 	g := e.Group(routePrefix)
+	rest.RegisterSwagger(g)
 	g.POST("/register", rest.RegisterHandler(svc, log))
 	g.POST("/login", rest.LoginHandler(svc, log))
 	g.POST("/refresh", rest.RefreshHandler(svc, log))

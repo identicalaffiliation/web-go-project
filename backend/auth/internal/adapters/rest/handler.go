@@ -10,6 +10,18 @@ import (
 	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
+// RegisterHandler godoc
+// @Summary      Register a new user
+// @Description  Creates a user with the given role. Password: 8-72 bytes, not blank.
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      registerRequest  true  "Registration payload"
+// @Success      201   {object}  registerResponse
+// @Failure      400   {object}  errorResponse  "Invalid body, email, password or role"
+// @Failure      409   {object}  errorResponse  "Email already taken"
+// @Failure      500   {object}  errorResponse
+// @Router       /register [post]
 func RegisterHandler(svc ports.AuthService, log ports.Logger) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		var req registerRequest
@@ -33,6 +45,18 @@ func RegisterHandler(svc ports.AuthService, log ports.Logger) echo.HandlerFunc {
 	}
 }
 
+// LoginHandler godoc
+// @Summary      Log in
+// @Description  Checks credentials and returns an access JWT (use it as "Authorization: Bearer <token>") and a refresh token.
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      loginRequest  true  "Credentials"
+// @Success      200   {object}  tokenPairResponse
+// @Failure      400   {object}  errorResponse  "Invalid body, email or password missing"
+// @Failure      401   {object}  errorResponse  "Invalid credentials"
+// @Failure      500   {object}  errorResponse
+// @Router       /login [post]
 func LoginHandler(svc ports.AuthService, log ports.Logger) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		var req loginRequest
@@ -54,6 +78,18 @@ func LoginHandler(svc ports.AuthService, log ports.Logger) echo.HandlerFunc {
 	}
 }
 
+// RefreshHandler godoc
+// @Summary      Refresh tokens
+// @Description  Exchanges a valid refresh token for a new pair. The old refresh token is revoked (rotation).
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      refreshRequest  true  "Refresh token"
+// @Success      200   {object}  tokenPairResponse
+// @Failure      400   {object}  errorResponse  "Invalid body"
+// @Failure      401   {object}  errorResponse  "Refresh token unknown, expired or revoked"
+// @Failure      500   {object}  errorResponse
+// @Router       /refresh [post]
 func RefreshHandler(svc ports.AuthService, log ports.Logger) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		var req refreshRequest
@@ -70,6 +106,17 @@ func RefreshHandler(svc ports.AuthService, log ports.Logger) echo.HandlerFunc {
 	}
 }
 
+// LogoutHandler godoc
+// @Summary      Log out
+// @Description  Revokes the refresh token. Idempotent: an unknown token also gives 204.
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body  logoutRequest  true  "Refresh token"
+// @Success      204   "Token revoked"
+// @Failure      400   {object}  errorResponse  "Invalid body"
+// @Failure      500   {object}  errorResponse
+// @Router       /logout [post]
 func LogoutHandler(svc ports.AuthService, log ports.Logger) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		var req logoutRequest
