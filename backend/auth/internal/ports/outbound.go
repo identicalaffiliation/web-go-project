@@ -13,6 +13,9 @@ import (
 
 type UserRepository interface {
 	Create(ctx context.Context, user domain.User) error
+	// CreateWithEvent пишет пользователя и событие outbox в одной транзакции:
+	// либо оба, либо ни одного.
+	CreateWithEvent(ctx context.Context, user domain.User, event domain.OutboxEvent) error
 	GetByEmail(ctx context.Context, email domain.Email) (domain.User, error)
 	GetByID(ctx context.Context, id uuid.UUID) (domain.User, error)
 }

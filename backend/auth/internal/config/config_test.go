@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -33,6 +34,13 @@ var allEnvKeys = []string{
 	"AUTH_DB_MAX_CONN_IDLE_TIME",
 	"AUTH_DB_HEALTH_CHECK_PERIOD",
 	"AUTH_DB_CONNECT_TIMEOUT",
+	"AUTH_KAFKA_BROKERS",
+	"AUTH_KAFKA_TOPIC",
+	"AUTH_KAFKA_WRITE_TIMEOUT",
+	"AUTH_OUTBOX_INTERVAL",
+	"AUTH_OUTBOX_BATCH_SIZE",
+	"AUTH_OUTBOX_PUBLISH_TIMEOUT",
+	"AUTH_OUTBOX_MAX_ATTEMPTS",
 }
 
 func setEnv(t *testing.T, vars map[string]string) {
@@ -102,6 +110,12 @@ func fileDefaults() Config {
 			RefreshTTL:     7 * 24 * time.Hour,
 		},
 		Log: LogConfig{Level: "info"},
+		Kafka: KafkaConfig{
+			Brokers:      []string{"shop-kafka:9092"},
+			Topic:        "users.created",
+			WriteTimeout: 5 * time.Second,
+		},
+		Outbox: OutboxConfig{Interval: time.Second, BatchSize: 100, PublishTimeout: 10 * time.Second, MaxAttempts: 5},
 	}
 }
 
@@ -114,8 +128,42 @@ func TestLoad_RealFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if want := fileDefaults(); cfg != want {
+	// DeepEqual, а не ==: в Kafka.Brokers лежит срез, и Config перестал быть comparable.
+	if want := fileDefaults(); !reflect.DeepEqual(cfg, want) {
 		t.Errorf("cfg = %+v, want %+v", cfg, want)
+	}
+}
+
+func TestLoad_KafkaBrokersList(t *testing.T) {
+	setEnv(t, withOverrides(map[string]string{"AUTH_KAFKA_BROKERS": "k1:9092,k2:9092"}))
+
+	cfg, err := Load(realConfigPath)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if want := []string{"k1:9092", "k2:9092"}; !reflect.DeepEqual(cfg.Kafka.Brokers, want) {
+		t.Errorf("Brokers = %v, want %v", cfg.Kafka.Brokers, want)
+	}
+}
+
+func TestLoad_InvalidKafkaAndOutbox(t *testing.T) {
+	tests := map[string]map[string]string{
+		"empty topic":          {"AUTH_KAFKA_TOPIC": " "},
+		"empty broker in list": {"AUTH_KAFKA_BROKERS": "k1:9092,,k2:9092"},
+		"zero write timeout":   {"AUTH_KAFKA_WRITE_TIMEOUT": "0s"},
+		"zero outbox interval": {"AUTH_OUTBOX_INTERVAL": "0s"},
+		"zero batch size":      {"AUTH_OUTBOX_BATCH_SIZE": "0"},
+		"negative publish":     {"AUTH_OUTBOX_PUBLISH_TIMEOUT": "-1s"},
+		"zero max attempts":    {"AUTH_OUTBOX_MAX_ATTEMPTS": "0"},
+	}
+	for name, overrides := range tests {
+		t.Run(name, func(t *testing.T) {
+			setEnv(t, withOverrides(overrides))
+
+			if _, err := Load(realConfigPath); !errors.Is(err, ErrInvalid) {
+				t.Fatalf("err = %v, want ErrInvalid for %v", err, overrides)
+			}
+		})
 	}
 }
 
@@ -136,6 +184,13 @@ func TestLoad_EnvOverridesFile(t *testing.T) {
 		"AUTH_ACCESS_TOKEN_TTL":       "5m",
 		"AUTH_REFRESH_TOKEN_TTL":      "24h",
 		"AUTH_LOG_LEVEL":              "debug",
+		"AUTH_KAFKA_BROKERS":          "k1:9092,k2:9092",
+		"AUTH_KAFKA_TOPIC":            "other.topic",
+		"AUTH_KAFKA_WRITE_TIMEOUT":    "2s",
+		"AUTH_OUTBOX_INTERVAL":        "3s",
+		"AUTH_OUTBOX_BATCH_SIZE":      "50",
+		"AUTH_OUTBOX_PUBLISH_TIMEOUT": "4s",
+		"AUTH_OUTBOX_MAX_ATTEMPTS":    "7",
 	}))
 
 	cfg, err := Load(realConfigPath)
@@ -169,8 +224,14 @@ func TestLoad_EnvOverridesFile(t *testing.T) {
 			RefreshTTL:     24 * time.Hour,
 		},
 		Log: LogConfig{Level: "debug"},
+		Kafka: KafkaConfig{
+			Brokers:      []string{"k1:9092", "k2:9092"},
+			Topic:        "other.topic",
+			WriteTimeout: 2 * time.Second,
+		},
+		Outbox: OutboxConfig{Interval: 3 * time.Second, BatchSize: 50, PublishTimeout: 4 * time.Second, MaxAttempts: 7},
 	}
-	if cfg != want {
+	if !reflect.DeepEqual(cfg, want) {
 		t.Errorf("cfg = %+v, want %+v", cfg, want)
 	}
 }
@@ -186,7 +247,7 @@ func TestLoad_SingleEnvOverride(t *testing.T) {
 
 	want := fileDefaults()
 	want.HTTP.ShutdownTimeout = 45 * time.Second
-	if cfg != want {
+	if !reflect.DeepEqual(cfg, want) {
 		t.Errorf("cfg = %+v, want %+v", cfg, want)
 	}
 }
@@ -296,6 +357,7 @@ func TestLoad_MisspelledKey(t *testing.T) {
 		"addr", "read_timeout", "write_timeout", "idle_timeout", "shutdown_timeout",
 		"max_conns", "max_conn_lifetime", "max_conn_idle_time", "health_check_period",
 		"connect_timeout", "issuer", "access_ttl", "refresh_ttl", "level",
+		"brokers", "topic", "interval", "batch_size", "publish_timeout", "max_attempts",
 	} {
 		t.Run(key, func(t *testing.T) {
 			old := "  " + key + ":"
