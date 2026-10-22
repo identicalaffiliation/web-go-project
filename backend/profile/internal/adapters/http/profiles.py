@@ -1,7 +1,8 @@
+import logging
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, logger, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from internal.adapters.http.dependencies import get_current_user_id, get_profile_service
 from internal.adapters.http.schemas import (
@@ -18,6 +19,8 @@ router = APIRouter(prefix="/profiles", tags=["Profiles"])
 
 UserIdDep = Annotated[uuid.UUID, Depends(get_current_user_id)]
 ProfileServiceDep = Annotated[ProfileService, Depends(get_profile_service)]
+
+logger = logging.getLogger(__name__)
 
 
 @router.get("/me", response_model=list[ProfileResponse])

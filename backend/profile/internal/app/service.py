@@ -2,8 +2,7 @@ import logging
 import uuid
 from typing import Any
 
-from backend.profile.internal.adapters.http.schemas import CreateBusinessProfileRequest
-
+from internal.adapters.http.schemas import CreateBusinessProfileRequest
 from internal.domain.exceptions import ProfileAlreadyExistsError, ProfileNotFoundError
 from internal.domain.models import BalanceDTO, OrderDTO, Profile, ProfileType
 from internal.ports.repository import IProfileRepository
