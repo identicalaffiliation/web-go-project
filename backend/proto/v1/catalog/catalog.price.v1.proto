@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package catalog.price.v1;
+
+option go_package = "github.com/identicalaffiliation/web-go-project/backend/catalog/gen/pb/price/v1;pricev1";
+
+service PriceService {
+  rpc GetPriceByProductId (PriceRequest) returns (PriceResponse);
+}
+
+message PriceRequest {
+  string product_id = 1; // uuid product id
+}
+
+message PriceResponse {
+  string product_id = 1;
+  int64 price = 2; // price of 1 product
+}

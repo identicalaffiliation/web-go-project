@@ -19,6 +19,7 @@ func ProvideConfig(configPath string) (*Config, error) {
 type Config struct {
 	DBConfig
 	HTTPConfig        HTTPConfig    `yaml:"server"`
+	GRPCConfig        GRPCConfig    `yaml:"grpc"`
 	MinioConfig       MinioConfig   `yaml:"s3"`
 	OperationDuration time.Duration `yaml:"operation_duration"`
 	Cache             RedisConfig   `yaml:"cache"`
@@ -38,6 +39,11 @@ type HTTPConfig struct {
 	WriteTimeout    time.Duration `yaml:"write_timeout"`
 	IdleTimeout     time.Duration `yaml:"idle_timeout"`
 	ShutdownTimeout time.Duration `yaml:"shutdown_timeout"`
+}
+
+type GRPCConfig struct {
+	Host string `yaml:"host"`
+	Port int    `yaml:"port"`
 }
 
 type MinioConfig struct {

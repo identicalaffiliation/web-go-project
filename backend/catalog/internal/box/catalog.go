@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,6 +20,7 @@ import (
 	catalogRepository "github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/catalog"
 	outboxRepository "github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/outbox"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/rest"
+	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/rpc"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/s3"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/config"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/ports"
@@ -26,6 +28,7 @@ import (
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/service/outbox"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 )
 
 func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logger) error {
@@ -87,14 +90,28 @@ func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logge
 
 	server := rest.SetupServer(&cfg.HTTPConfig, service)
 
+	grpcListener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.GRPCConfig.Host, cfg.GRPCConfig.Port))
+	if err != nil {
+		return fmt.Errorf("error ListenGRPC: %w", err)
+	}
+
+	grpcServer := rpc.NewGRPCServer(service)
+
 	notifyChan := make(chan os.Signal, 1)
 	signal.Notify(notifyChan, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(notifyChan)
 
-	errChan := make(chan error, 1)
+	errChan := make(chan error, 2)
 	go func() {
 		logger.Debug("start listening", zap.Int("port", cfg.HTTPConfig.Port))
 		if err := server.Start(server.Server.Addr); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errChan <- err
+		}
+	}()
+
+	go func() {
+		logger.Debug("start grpc listening", zap.Int("port", cfg.GRPCConfig.Port))
+		if err := grpcServer.Serve(grpcListener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 			errChan <- err
 		}
 	}()
@@ -105,6 +122,8 @@ func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logge
 	case serverError := <-errChan:
 		logger.WithError(serverError).Error("failed to start server")
 	}
+
+	grpcServer.GracefulStop()
 
 	shutdownCtx, cancel := context.WithTimeout(ctx, cfg.HTTPConfig.ShutdownTimeout)
 	defer cancel()
