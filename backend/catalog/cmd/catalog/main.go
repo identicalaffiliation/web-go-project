@@ -15,7 +15,7 @@ import (
 // @title Shop catalog service API
 // @version 1.0
 // @description Service for shop catalog: creating for business and parsing for customers.
-// @host http://localhost:8080
+// @host localhost
 // @BasePath /api/v1
 // @securityDefinitions.apikey BearerAuth
 // @in header

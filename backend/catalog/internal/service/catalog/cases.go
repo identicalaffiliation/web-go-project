@@ -19,12 +19,14 @@ func (s *Service) AddProductToCatalog(ctx context.Context, req *dto.CreateProduc
 
 	var created *domain.Product
 	err := s.manager.Do(ctx, func(ctx context.Context) error {
-		product := req.ToDomain()
+		domainProduct := req.ToDomain()
 
-		product, err := s.catalog.Insert(ctx, product)
+		product, err := s.catalog.Insert(ctx, domainProduct)
 		if err != nil {
 			return err
 		}
+
+		product.Quantity = domainProduct.Quantity
 
 		event, err := s.toEvent(product)
 		if err != nil {

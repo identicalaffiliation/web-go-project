@@ -16,7 +16,7 @@ import (
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/rest/handlers"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/dto"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/service/catalog"
-	"github.com/labstack/echo"
+	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 )
@@ -31,7 +31,7 @@ type HandlersSuite struct {
 }
 
 func (s *HandlersSuite) Test_AddItemToCatalogHandler() {
-	body := `{"title":"test item","price":12000}`
+	body := `{"title":"test item","price":12000,"quantity":10}`
 
 	request := httptest.NewRequest(http.MethodPost, "/catalog", strings.NewReader(body))
 	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -115,8 +115,10 @@ func (s *HandlersSuite) Test_GetPageHandler() {
 		id := uuid.NewV7()
 
 		p := &dto.Page{
-			Products: append([]dto.Product{}, dto.Product{
-				ProductID: id,
+			Products: append([]dto.ProductResponse{}, dto.ProductResponse{
+				Product: dto.Product{
+					ProductID: id,
+				},
 			}),
 			NextCursor: nil,
 		}
@@ -141,10 +143,10 @@ func (s *HandlersSuite) Test_GetPageHandler() {
 		}
 
 		p := &dto.Page{
-			Products: []dto.Product{
-				{ProductID: id},
-				{ProductID: id},
-				{ProductID: prelastID},
+			Products: []dto.ProductResponse{
+				{Product: dto.Product{ProductID: id}},
+				{Product: dto.Product{ProductID: id}},
+				{Product: dto.Product{ProductID: prelastID}},
 			},
 
 			NextCursor: new(prelastID.String()),
@@ -160,7 +162,7 @@ func (s *HandlersSuite) Test_GetPageHandler() {
 
 		s.Require().NoError(json.Unmarshal(response.Body.Bytes(), &pageRespone))
 		s.Require().Len(pageRespone.Products, 3)
-		s.Require().Equal(pageRespone.Products[len(pageRespone.Products)-1].ProductID, prelastID)
+		s.Require().Equal(pageRespone.Products[len(pageRespone.Products)-1].Product.ProductID, prelastID)
 		s.Require().Equal(http.StatusOK, response.Code)
 	})
 
@@ -170,10 +172,10 @@ func (s *HandlersSuite) Test_GetPageHandler() {
 		response := httptest.NewRecorder()
 
 		p := &dto.Page{
-			Products: []dto.Product{
-				{ProductID: uuid.NewV7()},
-				{ProductID: uuid.NewV7()},
-				{ProductID: uuid.NewV7()},
+			Products: []dto.ProductResponse{
+				{Product: dto.Product{ProductID: uuid.NewV7()}},
+				{Product: dto.Product{ProductID: uuid.NewV7()}},
+				{Product: dto.Product{ProductID: uuid.NewV7()}},
 			},
 
 			NextCursor: nil,

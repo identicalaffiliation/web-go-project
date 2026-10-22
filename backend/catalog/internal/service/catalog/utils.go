@@ -23,6 +23,8 @@ func buildImageKey(ext string) string {
 	return path.Join("image", strconv.Itoa(now.Year()), now.Month().String(), uuid.New().String()+ext)
 }
 
+// toEvent - метод преобразования domain Product структуры в domain Event структуру для дальнейшей
+// оптравки в Kafka
 func (s *Service) toEvent(product *domain.Product) (*domain.Event, error) {
 	payload, err := json.Marshal(product)
 	if err != nil {
@@ -66,7 +68,7 @@ func (s *Service) toResponseOne(product *domain.Product, url string) *dto.Produc
 }
 
 func (s *Service) getPage(products []*domain.Product, nextCursor *string) *dto.Page {
-	m := make([]dto.Product, 0, len(products))
+	m := make([]dto.ProductResponse, 0, len(products))
 	for _, v := range products {
 		var (
 			d *string
@@ -81,14 +83,16 @@ func (s *Service) getPage(products []*domain.Product, nextCursor *string) *dto.P
 			u = &v.ImageKey
 		}
 
-		m = append(m, dto.Product{
-			ProductID:    v.ID,
-			Title:        v.Title,
-			Description:  d,
-			PresignedURL: u,
-			Price:        v.Price,
-			CreatedAt:    v.CreatedAt,
-			UpdatedAt:    v.UpdatedAt,
+		m = append(m, dto.ProductResponse{
+			Product: dto.Product{
+				ProductID:    v.ID,
+				Title:        v.Title,
+				Description:  d,
+				PresignedURL: u,
+				Price:        v.Price,
+				CreatedAt:    v.CreatedAt,
+				UpdatedAt:    v.UpdatedAt,
+			},
 		})
 	}
 

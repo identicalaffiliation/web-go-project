@@ -207,6 +207,7 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "price",
+                "quantity",
                 "title"
             ],
             "properties": {
@@ -215,6 +216,10 @@ const docTemplate = `{
                 },
                 "price": {
                     "type": "integer"
+                },
+                "quantity": {
+                    "type": "integer",
+                    "minimum": 1
                 },
                 "title": {
                     "type": "string",
@@ -270,7 +275,7 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
-	Host:             "http://localhost:8080",
+	Host:             "localhost",
 	BasePath:         "/api/v1",
 	Schemes:          []string{},
 	Title:            "Shop catalog service API",

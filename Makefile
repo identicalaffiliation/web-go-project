@@ -32,7 +32,14 @@ keys-force:
 run:
 	docker compose up --build -d auth-service
 	docker compose up --build -d catalog-service
+	docker compose up --build -d inventory-service
 	docker compose up --build -d profile-service
+	docker compose up -d gateway
+
+.PHONY: nginx-reload
+nginx-reload:
+	docker compose exec gateway nginx -t
+	docker compose exec gateway nginx -s reload
 
 .PHONY: clean
 clean:
@@ -41,17 +48,32 @@ clean:
 .PHONY: lint
 lint:
 	cd backend/catalog && golangci-lint run ./...
+	cd backend/auth && golangci-lint run ./...
+	cd backend/inventory && golangci-lint run ./...
+	cd backend/profile && ruff check .
+	cd backend/profile && ruff format --check .
+	cd backend/profile && python3 -m compileall -q -x 'internal/adapters/grpc/generated' cmd internal
 
 .PHONY: test
 test: unit integrations
+	@cd backend/profile && \
+	if find . -path ./.venv -prune -o \( -name 'test_*.py' -o -name '*_test.py' \) -print | grep -q .; then \
+		python3 -m pytest; \
+	else \
+		echo "profile: no tests found, skipping"; \
+	fi
 
 .PHONY: integrations
 integrations:
 	cd backend/catalog && go test -v -race -tags=integration ./...
+	cd backend/auth && go test -v -race -tags=integration ./...
+	cd backend/inventory && go test -v -race -tags=integration ./...
 
 .PHONY: unit
 unit:
 	cd backend/catalog && go test -v -race -tags=unit ./...
+	cd backend/auth && go test -v -race -tags=unit ./...
+	cd backend/inventory && go test -v -race -tags=unit ./...
 
 .PHONY: gen
 gen:

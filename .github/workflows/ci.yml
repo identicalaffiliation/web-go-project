@@ -1,4 +1,4 @@
-name: ci.yml
+name: CI
 
 on:
   push:
@@ -13,13 +13,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: $${ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-
 jobs:
-  build:
-    runs-on: ubuntu-22.04
+  go-lint:
+    name: Lint (${{ matrix.service }})
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     strategy:
@@ -27,7 +27,8 @@ jobs:
       matrix:
         service:
           - backend/catalog
-          - migrator
+          - backend/auth
+          - backend/inventory
 
     steps:
       - name: Checkout
@@ -36,15 +37,157 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.27"
-          cache: true
+          go-version-file: ${{ matrix.service }}/go.mod
           cache-dependency-path: ${{ matrix.service }}/go.sum
 
-      # 2 main jobs - build, test
-      - name: Build ${{ matrix.service }}
-        working-directory: ${{ matrix.service }}
-        run: go build ./cmd/...
+      # goinstall собирает линтер той же версией Go, что и сервис,
+      # иначе бинарь, собранный старым Go, отказывается линтить модуль с go 1.27
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.14.0
+          install-mode: goinstall
+          working-directory: ${{ matrix.service }}
+          args: --timeout=5m
 
-      - name: Test ${{ matrix.service }}
+  go-test:
+    name: Test (${{ matrix.service }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - backend/catalog
+          - backend/auth
+          - backend/inventory
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ matrix.service }}/go.mod
+          cache-dependency-path: ${{ matrix.service }}/go.sum
+
+      - name: Unit tests
         working-directory: ${{ matrix.service }}
-        run: go test -race -timeout=5m ./...
+        run: go test -race -timeout=5m -tags=unit ./...
+
+      # интеграционные тесты поднимают зависимости через testcontainers (docker есть на раннере)
+      - name: Integration tests
+        working-directory: ${{ matrix.service }}
+        run: go test -race -timeout=10m -tags=integration ./...
+
+  go-build:
+    name: Build (${{ matrix.service }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - backend/catalog
+          - backend/auth
+          - migrator
+          - backend/inventory
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ matrix.service }}/go.mod
+          cache-dependency-path: ${{ matrix.service }}/go.sum
+
+      - name: Vet
+        working-directory: ${{ matrix.service }}
+        run: go vet ./...
+
+      - name: Build
+        working-directory: ${{ matrix.service }}
+        run: go build ./...
+
+  profile-lint:
+    name: Lint (backend/profile)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: backend/profile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: backend/profile/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt ruff
+
+      - name: Ruff check
+        run: ruff check --output-format=github .
+
+      - name: Ruff format
+        run: ruff format --check .
+
+      - name: Compile
+        run: python -m compileall -q -x 'internal/adapters/grpc/generated' cmd internal
+
+      # тестов в profile пока нет — шаг запустится, как только появятся test_*.py
+      - name: Tests
+        run: |
+          if find . -path ./.venv -prune -o \( -name 'test_*.py' -o -name '*_test.py' \) -print | grep -q .; then
+            pip install pytest pytest-asyncio
+            pytest
+          else
+            echo "No tests found, skipping"
+          fi
+
+  docker-build:
+    name: Docker (${{ matrix.service }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    needs:
+      - go-build
+      - profile-lint
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - catalog
+          - auth
+          - profile
+          - inventory
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend/${{ matrix.service }}
+          file: backend/${{ matrix.service }}/Dockerfile
+          push: false
+          tags: web-go-project/${{ matrix.service }}:ci
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}

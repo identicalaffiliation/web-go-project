@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime
 
-from internal.domain.models import ProfileType
 from pydantic import BaseModel, ConfigDict, Field
+
+from internal.domain.models import ProfileType
 
 
 class ProfileResponse(BaseModel):
