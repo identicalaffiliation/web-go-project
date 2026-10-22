@@ -57,6 +57,20 @@ func (mr *MockUserRepositoryMockRecorder) Create(ctx, user any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockUserRepository)(nil).Create), ctx, user)
 }
 
+// CreateWithEvent mocks base method.
+func (m *MockUserRepository) CreateWithEvent(ctx context.Context, user domain.User, event domain.OutboxEvent) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateWithEvent", ctx, user, event)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateWithEvent indicates an expected call of CreateWithEvent.
+func (mr *MockUserRepositoryMockRecorder) CreateWithEvent(ctx, user, event any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateWithEvent", reflect.TypeOf((*MockUserRepository)(nil).CreateWithEvent), ctx, user, event)
+}
+
 // GetByEmail mocks base method.
 func (m *MockUserRepository) GetByEmail(ctx context.Context, email domain.Email) (domain.User, error) {
 	m.ctrl.T.Helper()

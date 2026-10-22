@@ -14,7 +14,9 @@ import (
 	"syscall"
 
 	"github.com/labstack/echo/v4"
+	"golang.org/x/sync/errgroup"
 
+	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/kafka"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/logging"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/postgres"
 	"github.com/identicalaffiliation/web-go-project/auth/internal/adapters/refreshtoken"
@@ -105,39 +107,61 @@ func run(configPath string) error {
 		verifier,
 		refreshtoken.New(),
 		cfg.JWT.RefreshTTL,
+		app.WithUserCreatedTopic(cfg.Kafka.Topic),
 	)
+
+	// Defer'ы выполняются в обратном порядке: producer закроется раньше пула,
+	// а оба — только после g.Wait ниже, то есть когда воркер уже остановился
+	// и никто больше не пишет в Kafka и в базу.
+	producer := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.WriteTimeout)
+	defer func() {
+		if err := producer.Close(); err != nil {
+			log.WithError(err).Error("close kafka producer")
+		}
+	}()
+
+	worker := app.NewOutboxWorker(postgres.NewOutboxStore(pool), producer, log, app.OutboxWorkerConfig{
+		Interval:       cfg.Outbox.Interval,
+		BatchSize:      cfg.Outbox.BatchSize,
+		PublishTimeout: cfg.Outbox.PublishTimeout,
+		MaxAttempts:    cfg.Outbox.MaxAttempts,
+	})
 
 	e := serverSetup(cfg, service, verifier, log)
 
-	// Start блокирует до остановки сервера, поэтому запускаем его в горутине,
-	// а main-горутина тем временем ждёт сигнал или ошибку сервера.
-	// Буфер 1: горутина отправит результат и завершится, даже если читать
-	// из канала уже некому.
-	errCh := make(chan error, 1)
-	go func() {
+	// errgroup запускает горутины и ждёт их все. Контекст gctx отменяется при
+	// сигнале ИЛИ при ошибке любой горутины: так падение HTTP-сервера
+	// останавливает воркер, а не оставляет его работать в одиночку.
+	g, gctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		return worker.Run(gctx)
+	})
+
+	// Start блокирует до остановки сервера, поэтому ему нужна своя горутина.
+	g.Go(func() error {
 		log.Info("auth service listening", "addr", cfg.HTTP.Addr)
 		if err := e.Start(cfg.HTTP.Addr); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			errCh <- fmt.Errorf("listen: %w", err)
-			return
+			return fmt.Errorf("listen: %w", err)
 		}
-		errCh <- nil
-	}()
+		return nil
+	})
 
-	select {
-	case <-ctx.Done():
+	g.Go(func() error {
+		<-gctx.Done()
 		log.Info("shutting down auth service")
-		// Контекст ctx уже отменён сигналом, им Shutdown ограничивать нельзя:
-		// он сразу бы прервал ожидание активных запросов. Нужен новый контекст
-		// с собственным дедлайном.
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.HTTP.ShutdownTimeout)
+		// gctx уже отменён, им Shutdown ограничивать нельзя: он сразу бы
+		// прервал ожидание активных запросов. Нужен новый контекст с дедлайном.
+		// WithoutCancel сохраняет значения родителя, но отрезает отмену.
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(gctx), cfg.HTTP.ShutdownTimeout)
 		defer cancel()
 		if err := e.Shutdown(shutdownCtx); err != nil {
 			return fmt.Errorf("shutdown: %w", err)
 		}
 		return nil
-	case err := <-errCh:
-		return err
-	}
+	})
+
+	return g.Wait()
 }
 
 // serverSetup собирает echo: таймауты, middleware и маршруты. Выделено из run,
