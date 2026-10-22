@@ -1,3 +1,7 @@
+MODULE      := github.com/identicalaffiliation/web-go-project/backend
+PROTO_DIR   := backend/proto
+CATALOG_PROTO := v1/catalog/catalog.price.v1.proto
+
 .PHONY: up
 up:
 	docker compose up --build -d auth-postgres
@@ -80,8 +84,15 @@ unit:
 	cd backend/auth && go test -v -race -tags=unit ./...
 	cd backend/inventory && go test -v -race -tags=unit ./...
 
-.PHONY: gen	
-gen:
+.PHONY: proto
+proto:
+	protoc -I $(PROTO_DIR) \
+		--go_out=backend/catalog --go_opt=module=$(MODULE)/catalog \
+		--go-grpc_out=backend/catalog --go-grpc_opt=module=$(MODULE)/catalog \
+		$(PROTO_DIR)/$(CATALOG_PROTO)
+
+.PHONY: gen
+gen: proto
 	cd backend/catalog && go generate ./...
 	cd backend/inventory && mockery --config configs/mockery.yml
 
