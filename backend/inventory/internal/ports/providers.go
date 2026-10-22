@@ -1,6 +1,10 @@
 package ports
 
-import "go.uber.org/zap"
+import (
+	"context"
+
+	"go.uber.org/zap"
+)
 
 type Logger interface {
 	With(fields ...zap.Field) Logger
@@ -8,4 +12,8 @@ type Logger interface {
 	Error(msg string, fields ...zap.Field)
 	WithError(err error) Logger
 	Sync() error
+}
+
+type TxManager interface {
+	Do(ctx context.Context, fn func(ctx context.Context) error) error
 }

@@ -1,0 +1,19 @@
+all: false
+dir: gen/mocks
+filename: mock_{{ .InterfaceName | snakecase }}.go
+pkgname: mocks
+structname: Mock{{ .InterfaceName | firstUpper }}
+template: testify
+force-file-write: true
+template-data:
+  unroll-variadic: false
+packages:
+  github.com/identicalaffiliation/web-go-project/backend/inventory/internal/ports:
+    interfaces:
+      StockRepository: {}
+      Logger: {}
+      TxManager: {}
+  github.com/identicalaffiliation/web-go-project/backend/inventory/internal/adapters/brokers/kafka:
+    interfaces:
+      messageReader: {}
+      processer: {}
