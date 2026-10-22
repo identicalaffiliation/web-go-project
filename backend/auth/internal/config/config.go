@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/ilyakaznacheev/cleanenv"
@@ -22,6 +23,8 @@ type Config struct {
 	Postgres PostgresConfig `yaml:"postgres"`
 	JWT      JWTConfig      `yaml:"jwt"`
 	Log      LogConfig      `yaml:"log"`
+	Kafka    KafkaConfig    `yaml:"kafka"`
+	Outbox   OutboxConfig   `yaml:"outbox"`
 }
 
 type HTTPConfig struct {
@@ -53,6 +56,21 @@ type JWTConfig struct {
 	Issuer     string        `yaml:"issuer" env:"AUTH_JWT_ISSUER"`
 	AccessTTL  time.Duration `yaml:"access_ttl" env:"AUTH_ACCESS_TOKEN_TTL"`
 	RefreshTTL time.Duration `yaml:"refresh_ttl" env:"AUTH_REFRESH_TOKEN_TTL"`
+}
+
+// KafkaConfig: адреса брокеров не секрет, поэтому живут в файле; в окружении
+// список задаётся через запятую (AUTH_KAFKA_BROKERS=k1:9092,k2:9092).
+type KafkaConfig struct {
+	Brokers      []string      `yaml:"brokers" env:"AUTH_KAFKA_BROKERS" env-separator:","`
+	Topic        string        `yaml:"topic" env:"AUTH_KAFKA_TOPIC"`
+	WriteTimeout time.Duration `yaml:"write_timeout" env:"AUTH_KAFKA_WRITE_TIMEOUT"`
+}
+
+type OutboxConfig struct {
+	Interval       time.Duration `yaml:"interval" env:"AUTH_OUTBOX_INTERVAL"`
+	BatchSize      int           `yaml:"batch_size" env:"AUTH_OUTBOX_BATCH_SIZE"`
+	PublishTimeout time.Duration `yaml:"publish_timeout" env:"AUTH_OUTBOX_PUBLISH_TIMEOUT"`
+	MaxAttempts    int           `yaml:"max_attempts" env:"AUTH_OUTBOX_MAX_ATTEMPTS"`
 }
 
 type LogConfig struct {
@@ -99,7 +117,10 @@ func (c Config) validate() error {
 	if _, err := c.Log.SlogLevel(); err != nil {
 		return err
 	}
-	return nil
+	if err := c.Kafka.validate(); err != nil {
+		return err
+	}
+	return c.Outbox.validate()
 }
 
 func (c HTTPConfig) validate() error {
@@ -111,6 +132,37 @@ func (c HTTPConfig) validate() error {
 		{"http.write_timeout (AUTH_HTTP_WRITE_TIMEOUT)", c.WriteTimeout},
 		{"http.idle_timeout (AUTH_HTTP_IDLE_TIMEOUT)", c.IdleTimeout},
 		{"http.shutdown_timeout (AUTH_HTTP_SHUTDOWN_TIMEOUT)", c.ShutdownTimeout},
+	})
+}
+
+func (c KafkaConfig) validate() error {
+	if len(c.Brokers) == 0 {
+		return fmt.Errorf("%w: kafka.brokers (AUTH_KAFKA_BROKERS) must not be empty", ErrInvalid)
+	}
+	// Пустая переменная AUTH_KAFKA_BROKERS= даёт список из одной пустой строки.
+	for _, b := range c.Brokers {
+		if strings.TrimSpace(b) == "" {
+			return fmt.Errorf("%w: kafka.brokers (AUTH_KAFKA_BROKERS) contains an empty address", ErrInvalid)
+		}
+	}
+	if strings.TrimSpace(c.Topic) == "" {
+		return fmt.Errorf("%w: kafka.topic (AUTH_KAFKA_TOPIC) must not be empty", ErrInvalid)
+	}
+	return positiveDurations([]namedDuration{
+		{"kafka.write_timeout (AUTH_KAFKA_WRITE_TIMEOUT)", c.WriteTimeout},
+	})
+}
+
+func (c OutboxConfig) validate() error {
+	if c.BatchSize < 1 {
+		return fmt.Errorf("%w: outbox.batch_size (AUTH_OUTBOX_BATCH_SIZE) must be >= 1, got %d", ErrInvalid, c.BatchSize)
+	}
+	if c.MaxAttempts < 1 {
+		return fmt.Errorf("%w: outbox.max_attempts (AUTH_OUTBOX_MAX_ATTEMPTS) must be >= 1, got %d", ErrInvalid, c.MaxAttempts)
+	}
+	return positiveDurations([]namedDuration{
+		{"outbox.interval (AUTH_OUTBOX_INTERVAL)", c.Interval},
+		{"outbox.publish_timeout (AUTH_OUTBOX_PUBLISH_TIMEOUT)", c.PublishTimeout},
 	})
 }
 

@@ -35,15 +35,27 @@ func (s *Service) Register(ctx context.Context, in dto.RegisterInput) (domain.Us
 		return domain.User{}, fmt.Errorf("generate user id: %w", err)
 	}
 
+	now := s.now()
 	user := domain.User{
 		ID:           id,
 		Email:        email,
 		PasswordHash: hash,
 		Role:         role,
-		CreatedAt:    s.now(),
+		CreatedAt:    now,
 	}
 
-	if err := s.users.Create(ctx, user); err != nil {
+	eventID, err := uuid.NewV7()
+	if err != nil {
+		return domain.User{}, fmt.Errorf("generate event id: %w", err)
+	}
+	event, err := domain.NewUserCreatedEvent(user, eventID, s.userCreatedTopic, now)
+	if err != nil {
+		return domain.User{}, fmt.Errorf("build users.created event: %w", err)
+	}
+
+	// Событие пишется в той же транзакции, что и пользователь: иначе при сбое
+	// между двумя записями Profile никогда не узнал бы о новом пользователе.
+	if err := s.users.CreateWithEvent(ctx, user, event); err != nil {
 		return domain.User{}, fmt.Errorf("create user: %w", err)
 	}
 

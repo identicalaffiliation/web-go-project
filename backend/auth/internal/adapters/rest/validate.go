@@ -9,6 +9,8 @@ import (
 	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
+// ValidateHandler — только для nginx auth_request: 200 + X-User-Id, X-User-Role
+// при валидном токене, иначе 401. Снаружи закрыт nginx, в swagger не входит.
 func ValidateHandler(verifier ports.AccessTokenVerifier, log ports.Logger) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		token, ok := parseBearer(c.Request().Header.Get(echo.HeaderAuthorization))

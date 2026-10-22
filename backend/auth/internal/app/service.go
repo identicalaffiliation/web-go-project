@@ -8,6 +8,9 @@ import (
 	"github.com/identicalaffiliation/web-go-project/auth/internal/ports"
 )
 
+// DefaultUserCreatedTopic — топик по умолчанию, если конфиг его не переопределил.
+const DefaultUserCreatedTopic = "users.created"
+
 type Service struct {
 	users      ports.UserRepository
 	refreshes  ports.RefreshTokenRepository
@@ -17,9 +20,18 @@ type Service struct {
 	tokens     ports.RefreshTokenGenerator
 	refreshTTL time.Duration
 	now        func() time.Time // подменяется в тестах
+
+	userCreatedTopic string
 }
 
 type Option func(*Service)
+
+// WithUserCreatedTopic задаёт топик события регистрации (из конфига).
+func WithUserCreatedTopic(topic string) Option {
+	return func(s *Service) {
+		s.userCreatedTopic = topic
+	}
+}
 
 func WithNow(now func() time.Time) Option {
 	return func(s *Service) {
@@ -47,6 +59,8 @@ func NewService(
 		tokens:     tokens,
 		refreshTTL: refreshTTL,
 		now:        time.Now,
+
+		userCreatedTopic: DefaultUserCreatedTopic,
 	}
 	for _, opt := range opts {
 		opt(s)

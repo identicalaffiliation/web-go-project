@@ -20,3 +20,14 @@ jwt:
 
 log:
   level: info                  # AUTH_LOG_LEVEL: debug, info, warn, error
+
+kafka:
+  brokers: ["shop-kafka:9092"] # AUTH_KAFKA_BROKERS, список через запятую
+  topic: users.created         # AUTH_KAFKA_TOPIC
+  write_timeout: 5s            # AUTH_KAFKA_WRITE_TIMEOUT
+
+outbox:
+  interval: 1s                 # AUTH_OUTBOX_INTERVAL
+  batch_size: 100              # AUTH_OUTBOX_BATCH_SIZE
+  publish_timeout: 10s         # AUTH_OUTBOX_PUBLISH_TIMEOUT
+  max_attempts: 5              # AUTH_OUTBOX_MAX_ATTEMPTS
