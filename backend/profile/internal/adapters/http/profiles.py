@@ -1,17 +1,18 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, logger, status
 
 from internal.adapters.http.dependencies import get_current_user_id, get_profile_service
 from internal.adapters.http.schemas import (
     BalanceResponse,
+    CreateBusinessProfileRequest,
     OrderResponse,
     ProfileResponse,
     ProfileUpdateRequest,
 )
 from internal.app.service import ProfileService
-from internal.domain.exceptions import ProfileNotFoundError
+from internal.domain.exceptions import ProfileAlreadyExistsError, ProfileNotFoundError
 
 router = APIRouter(prefix="/profiles", tags=["Profiles"])
 
@@ -71,3 +72,37 @@ async def get_my_balance(user_id: UserIdDep, profile_service: ProfileServiceDep)
     """Получить баланс текущего пользователя."""
     balance = await profile_service.get_balance(user_id)
     return balance
+
+
+@router.post(
+    "/business",
+    response_model=ProfileResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Создать бизнес-профиль",
+    description="Создает профиль продавца (BUSINESS) для текущего пользователя.",
+)
+async def create_business_profile_endpoint(
+    request_data: CreateBusinessProfileRequest,
+    user_id: Annotated[uuid.UUID, Depends(get_current_user_id)],
+    profile_service: Annotated[ProfileService, Depends(get_profile_service)],
+):
+    try:
+        created_profile = await profile_service.create_business_profile(
+            user_id=user_id, data=request_data
+        )
+        return created_profile
+
+    except ProfileAlreadyExistsError as e:
+        logger.warning(f"Conflict: business profile for user {user_id} already exists.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(e)
+        ) from None
+
+    except Exception:
+        logger.exception(
+            f"Unexpected error while creating business profile for user {user_id}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal Server Error",
+        ) from None

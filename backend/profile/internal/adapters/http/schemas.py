@@ -45,3 +45,14 @@ class BalanceResponse(BaseModel):
     amount: float
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CreateBusinessProfileRequest(BaseModel):
+    company_name: str = Field(
+        ..., min_length=1, max_length=255, description="Название компании или ИП"
+    )
+    phone: str | None = Field(
+        default=None,
+        pattern=r"^\+?[1-9]\d{1,14}$",
+        description="Контактный номер телефона (международный формат)",
+    )

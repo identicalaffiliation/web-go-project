@@ -2,7 +2,9 @@ import logging
 import uuid
 from typing import Any
 
-from internal.domain.exceptions import ProfileNotFoundError
+from backend.profile.internal.adapters.http.schemas import CreateBusinessProfileRequest
+
+from internal.domain.exceptions import ProfileAlreadyExistsError, ProfileNotFoundError
 from internal.domain.models import BalanceDTO, OrderDTO, Profile, ProfileType
 from internal.ports.repository import IProfileRepository
 from internal.ports.rpc_clients import IOrdersClient, IPaymentsClient
@@ -108,3 +110,47 @@ class ProfileService:
     async def get_balance(self, user_id: uuid.UUID) -> BalanceDTO:
         """Получить баланс пользователя из внешнего сервиса."""
         return await self.payments_client.get_user_balance(user_id)
+
+    async def create_business_profile(
+        self, user_id: uuid.UUID, data: CreateBusinessProfileRequest
+    ) -> Profile:
+        """
+        Создает дополнительный профиль типа BUSINESS для существующего пользователя.
+        """
+
+        existing_profile = await self.repo.get_by_user_id_and_type(
+            user_id=user_id, profile_type=ProfileType.BUSINESS
+        )
+        if existing_profile:
+            logger.warning(f"Business profile already exists for user {user_id}")
+            raise ProfileAlreadyExistsError(
+                "У данного пользователя уже есть бизнес-профиль"
+            )
+
+        new_profile = Profile(
+            id=uuid.uuid4(),
+            user_id=user_id,
+            profile_type=ProfileType.BUSINESS,
+            first_name=None,
+            last_name=None,
+            company_name=data.company_name,
+            phone=data.phone,
+        )
+
+        try:
+            created_profile = await self.repo.create(new_profile)
+
+            if created_profile:
+                await self.uow.commit()
+                logger.info(f"Successfully created BUSINESS profile for user {user_id}")
+                return created_profile
+            else:
+                await self.uow.rollback()
+                raise RuntimeError(
+                    "Failed to create business profile (repository returned None)"
+                )
+
+        except Exception as e:
+            await self.uow.rollback()
+            logger.exception(f"Error creating business profile for user {user_id}")
+            raise e
