@@ -3,18 +3,23 @@ up:
 	docker compose up --build -d auth-postgres
 	docker compose up --build -d profile-postgres
 	docker compose up --build -d catalog-master-postgres
+	docker compose up --build -d inventory-master-postgres
 	docker compose up --build -d catalog-replica-postgres
 	docker compose up --build -d shop-zookeeper
 	docker compose up --build -d shop-kafka
 	docker compose up --build -d kafka-ui
 	docker compose up --build -d shop-minio
 	docker compose up --build -d shop-redis
+	docker compose up --build -d temporal-postgres
+	docker compose up --build -d shop-temporal
+	docker compose up --build -d temporal-ui
 
 .PHONY: migration-up
 migrations-up:
 	docker compose up --build -d auth-migrator
 	docker compose up --build -d profile-migrator
 	docker compose up --build -d catalog-migrator
+	docker compose up --build -d inventory-migrator
 
 .PHONY: init-kafka-topics
 init_kafka_topics:
@@ -43,7 +48,7 @@ nginx-reload:
 
 .PHONY: clean
 clean:
-	docker compose down -v
+	docker compose down -v --remove-orphans
 
 .PHONY: lint
 lint:
@@ -75,9 +80,10 @@ unit:
 	cd backend/auth && go test -v -race -tags=unit ./...
 	cd backend/inventory && go test -v -race -tags=unit ./...
 
-.PHONY: gen
+.PHONY: gen	
 gen:
 	cd backend/catalog && go generate ./...
+	cd backend/inventory && mockery --config configs/mockery.yml
 
 .PHONY: swag
 swag:

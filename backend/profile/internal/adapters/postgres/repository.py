@@ -29,7 +29,7 @@ class SqlAlchemyProfileRepository(IProfileRepository):
         )
 
     async def create(
-        self, profile: Profile, idempotency_key: uuid.UUID
+        self, profile: Profile, idempotency_key: uuid.UUID | None = None
     ) -> Profile | None:
         stmt = (
             insert(ProfileModel)

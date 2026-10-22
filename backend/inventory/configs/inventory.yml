@@ -5,6 +5,11 @@ kafka:
     queue_capacity: 50
     read_batch_timeout: 500ms
     workers: 3
-    tick_time: 300ms
+
+temporal:
+    host_port: shop-temporal:7233
+    namespace: default
+    task_queue: inventory
+    max_concurrent_activities: 50
 
 operation_duration: 30s

@@ -119,6 +119,29 @@ services:
       timeout: 10s
       interval: 10s
 
+  inventory-master-postgres:
+    container_name: inventory-master-postgres
+    image: postgres:16-alpine
+
+    # basics environments
+    environment:
+      POSTGRES_DB: inventory-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    # external connection: localhost:5434
+    ports:
+      - "5434:5432"
+
+    volumes:
+      - inventory_master_postgres_data:/var/lib/postgresql
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d inventory-db" ]
+      retries: 5
+      timeout: 10s
+      interval: 10s
+
   catalog-replica-postgres:
     build:
       context: ./scripts/postgres/catalog/replica
@@ -234,6 +257,72 @@ services:
       shop-kafka:
         condition: service_healthy
 
+  temporal-postgres:
+    container_name: temporal-postgres
+    image: postgres:16-alpine
+
+    # basics environments
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+
+    # external connection: localhost:5435
+    ports:
+      - "5435:5432"
+
+    volumes:
+      - temporal_postgres_data:/var/lib/postgresql
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U temporal" ]
+      retries: 5
+      timeout: 10s
+      interval: 10s
+
+  shop-temporal:
+    container_name: shop-temporal
+    # auto-setup: сам накатывает схемы temporal в бд и создает namespace default
+    image: temporalio/auto-setup:1.29.7
+
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_SEEDS: temporal-postgres
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      DEFAULT_NAMESPACE: default
+
+    # external connection (grpc): localhost:7233
+    ports:
+      - "7233:7233"
+
+    healthcheck:
+      test: [ "CMD-SHELL", "temporal operator namespace describe -n default --address $$(hostname -i):7233" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+    depends_on:
+      temporal-postgres:
+        condition: service_healthy
+
+  temporal-ui:
+    container_name: temporal-ui
+    image: temporalio/ui:2.57.0
+
+    environment:
+      TEMPORAL_ADDRESS: shop-temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:8233
+
+    # external connection: http://localhost:8233
+    ports:
+      - "8233:8080"
+
+    depends_on:
+      shop-temporal:
+        condition: service_healthy
+
   # MIGRATIONS AND TOPICS INITIALIZE
   auth-migrator:
     build:
@@ -243,6 +332,16 @@ services:
       DB_URL: postgres://postgres:postgres@auth-postgres:5432/auth-db?sslmode=disable
     depends_on:
       auth-postgres:
+        condition: service_healthy
+
+  inventory-migrator:
+    build:
+      context: ./migrator
+    environment:
+      MIGRATIONS_PATH: ./migrations/inventory
+      DB_URL: postgres://postgres:postgres@inventory-master-postgres:5432/inventory-db?sslmode=disable
+    depends_on:
+      inventory-master-postgres:
         condition: service_healthy
 
   profile-migrator:
@@ -356,6 +455,10 @@ services:
       ORDERS_GRPC_HOST: catalog-service:50051
       PAYMENTS_GRPC_HOST: payments-service:50052
 
+    # Для тестов расскомментировать, чтобы был доступ к сервису снаружи:
+    # ports:
+    #   - "8000:8000"
+
     depends_on:
       profile-postgres:
         condition: service_healthy
@@ -371,10 +474,17 @@ services:
     volumes:
       - ./backend/inventory/configs/inventory.yml:/app/config.yml:ro
 
+    environment:
+      MASTER_DSN: postgres://postgres:postgres@inventory-master-postgres:5432/inventory-db?sslmode=disable
+
     depends_on:
       shop-kafka:
         condition: service_healthy
       shop-zookeeper:
+        condition: service_healthy
+      inventory-master-postgres:
+        condition: service_healthy
+      shop-temporal:
         condition: service_healthy
 
   # API GATEWAY
@@ -404,6 +514,8 @@ volumes:
   auth_postgres_data:
   profile_postgres_data:
   catalog_master_postgres_data:
+  inventory_master_postgres_data:
+  temporal_postgres_data:
   catalog_replica_postgres_data:
   minio_data:
   redis_data:

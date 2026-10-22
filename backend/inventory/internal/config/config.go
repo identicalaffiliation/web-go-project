@@ -8,7 +8,21 @@ import (
 )
 
 type Config struct {
-	Kafka KafkaConfig `yaml:"kafka"`
+	Kafka             KafkaConfig    `yaml:"kafka"`
+	Temporal          TemporalConfig `yaml:"temporal"`
+	DB                DBConfig
+	OperationDuration time.Duration `yaml:"operation_duration"`
+}
+
+type DBConfig struct {
+	MasterDSN string `env:"MASTER_DSN"`
+}
+
+type TemporalConfig struct {
+	HostPort                string `yaml:"host_port"`
+	Namespace               string `yaml:"namespace"`
+	TaskQueue               string `yaml:"task_queue"`
+	MaxConcurrentActivities int    `yaml:"max_concurrent_activities"`
 }
 
 type KafkaConfig struct {

@@ -5,87 +5,57 @@ package kafka
 import (
 	"context"
 	"errors"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/segmentio/kafka-go"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 
+	"github.com/identicalaffiliation/web-go-project/backend/inventory/gen/mocks"
+	"github.com/identicalaffiliation/web-go-project/backend/inventory/internal/adapters/postgres/stock"
 	"github.com/identicalaffiliation/web-go-project/backend/inventory/internal/config"
-	"github.com/identicalaffiliation/web-go-project/backend/inventory/internal/ports"
 )
 
-type fetchResult struct {
-	msg kafka.Message
-	err error
+type testDeps struct {
+	reader    *mocks.MockMessageReader
+	logger    *mocks.MockLogger
+	processer *mocks.MockProcesser
 }
 
-type fakeReader struct {
-	mu        sync.Mutex
-	results   []fetchResult
-	commitErr error
-	committed []kafka.Message
-	closeErr  error
-	closed    bool
-	cancel    context.CancelFunc
+func newTestConsumer(t *testing.T) (*Consumer, testDeps) {
+	t.Helper()
+
+	deps := testDeps{
+		reader:    mocks.NewMockMessageReader(t),
+		logger:    mocks.NewMockLogger(t),
+		processer: mocks.NewMockProcesser(t),
+	}
+	deps.logger.EXPECT().WithError(mock.Anything).Return(deps.logger).Maybe()
+
+	return &Consumer{reader: deps.reader, logger: deps.logger, taskProcesser: deps.processer}, deps
 }
 
-func (r *fakeReader) FetchMessage(ctx context.Context) (kafka.Message, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+// expectFetches - отдает сообщения по очереди, после последнего отменяет контекст и останавливает цикл чтения.
+func expectFetches(ctx context.Context, cancel context.CancelFunc, reader *mocks.MockMessageReader, results ...func() (kafka.Message, error)) {
+	for _, res := range results {
+		reader.EXPECT().FetchMessage(mock.Anything).RunAndReturn(func(context.Context) (kafka.Message, error) {
+			return res()
+		}).Once()
+	}
 
-	if len(r.results) == 0 {
-		r.cancel()
+	reader.EXPECT().FetchMessage(mock.Anything).RunAndReturn(func(context.Context) (kafka.Message, error) {
+		cancel()
 		return kafka.Message{}, ctx.Err()
-	}
-
-	res := r.results[0]
-	r.results = r.results[1:]
-
-	return res.msg, res.err
+	}).Once()
 }
 
-func (r *fakeReader) CommitMessages(_ context.Context, msgs ...kafka.Message) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if r.commitErr != nil {
-		return r.commitErr
-	}
-	r.committed = append(r.committed, msgs...)
-
-	return nil
+func message(msg kafka.Message) func() (kafka.Message, error) {
+	return func() (kafka.Message, error) { return msg, nil }
 }
 
-func (r *fakeReader) Close() error {
-	r.closed = true
-	return r.closeErr
-}
-
-type fakeLogger struct {
-	mu     sync.Mutex
-	errors []string
-}
-
-func (l *fakeLogger) With(...zap.Field) ports.Logger { return l }
-func (l *fakeLogger) WithError(error) ports.Logger   { return l }
-func (l *fakeLogger) Debug(string, ...zap.Field)     {}
-func (l *fakeLogger) Sync() error                    { return nil }
-
-func (l *fakeLogger) Error(msg string, _ ...zap.Field) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.errors = append(l.errors, msg)
-}
-
-func newTestConsumer(results ...fetchResult) (*Consumer, *fakeReader, *fakeLogger, context.Context) {
-	ctx, cancel := context.WithCancel(context.Background())
-	reader := &fakeReader{results: results, cancel: cancel}
-	logger := &fakeLogger{}
-
-	return &Consumer{reader: reader, logger: logger}, reader, logger, ctx
+func fetchError(err error) func() (kafka.Message, error) {
+	return func() (kafka.Message, error) { return kafka.Message{}, err }
 }
 
 func runReadMessage(t *testing.T, c *Consumer, ctx context.Context) {
@@ -116,101 +86,127 @@ func TestNewConsumer(t *testing.T) {
 		Brokers:      []string{"localhost:9092"},
 		ConsumeTopic: "stock.created",
 		GroupID:      "inventory-service",
-		TickTime:     300 * time.Millisecond,
 	}}
-	logger := &fakeLogger{}
+	logger := mocks.NewMockLogger(t)
+	processer := mocks.NewMockProcesser(t)
 
-	c := NewConsumer(cfg, logger)
+	c := NewConsumer(cfg, logger, processer)
 	require.NotNil(t, c)
 	require.NotNil(t, c.reader)
-	require.Equal(t, cfg.Kafka.TickTime, c.tickTime)
 	require.Same(t, logger, c.logger)
+	require.Same(t, processer, c.taskProcesser)
 	require.NoError(t, c.Close())
 }
 
 func TestConsumer_ReadMessage(t *testing.T) {
-	t.Run("valid messages are committed", func(t *testing.T) {
-		c, reader, logger, ctx := newTestConsumer(
-			fetchResult{msg: validMessage(1)},
-			fetchResult{msg: validMessage(2)},
-		)
+	t.Run("processed messages are committed", func(t *testing.T) {
+		c, deps := newTestConsumer(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		msg1, msg2 := validMessage(1), validMessage(2)
+
+		expectFetches(ctx, cancel, deps.reader, message(msg1), message(msg2))
+		deps.processer.EXPECT().ProcessTask(mock.Anything, mock.Anything).Return(nil).Twice()
+		deps.reader.EXPECT().CommitMessages(mock.Anything, []kafka.Message{msg1}).Return(nil).Once()
+		deps.reader.EXPECT().CommitMessages(mock.Anything, []kafka.Message{msg2}).Return(nil).Once()
 
 		runReadMessage(t, c, ctx)
-
-		require.Len(t, reader.committed, 2)
-		require.Equal(t, int64(1), reader.committed[0].Offset)
-		require.Equal(t, int64(2), reader.committed[1].Offset)
-		require.Empty(t, logger.errors)
 	})
 
 	t.Run("fetch error is logged and reading continues", func(t *testing.T) {
-		c, reader, logger, ctx := newTestConsumer(
-			fetchResult{err: errors.New("broker unavailable")},
-			fetchResult{msg: validMessage(1)},
-		)
+		c, deps := newTestConsumer(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		msg := validMessage(1)
+
+		expectFetches(ctx, cancel, deps.reader, fetchError(errors.New("broker unavailable")), message(msg))
+		deps.logger.EXPECT().Error("failed to fetch message", mock.Anything).Once()
+		deps.processer.EXPECT().ProcessTask(mock.Anything, mock.Anything).Return(nil).Once()
+		deps.reader.EXPECT().CommitMessages(mock.Anything, []kafka.Message{msg}).Return(nil).Once()
 
 		runReadMessage(t, c, ctx)
-
-		require.Equal(t, []string{"failed to fetch message"}, logger.errors)
-		require.Len(t, reader.committed, 1)
 	})
 
-	t.Run("invalid message is not committed", func(t *testing.T) {
-		c, reader, logger, ctx := newTestConsumer(
-			fetchResult{msg: kafka.Message{Offset: 1, Value: []byte("not json")}},
-			fetchResult{msg: validMessage(2)},
-		)
+	t.Run("invalid message is committed and skipped", func(t *testing.T) {
+		c, deps := newTestConsumer(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		msg := kafka.Message{Offset: 1, Value: []byte("not json")}
+
+		expectFetches(ctx, cancel, deps.reader, message(msg))
+		deps.reader.EXPECT().CommitMessages(mock.Anything, []kafka.Message{msg}).Return(nil).Once()
+		deps.logger.EXPECT().Error("failed to map kafka message to domain", mock.Anything).Once()
 
 		runReadMessage(t, c, ctx)
+	})
 
-		require.Equal(t, []string{"failed to map kafka message to domain"}, logger.errors)
-		require.Len(t, reader.committed, 1)
-		require.Equal(t, int64(2), reader.committed[0].Offset)
+	t.Run("non retryable process error is committed", func(t *testing.T) {
+		for _, processErr := range []error{stock.ErrAlreadyExists, stock.ErrInvalidData} {
+			c, deps := newTestConsumer(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			msg := validMessage(1)
+
+			expectFetches(ctx, cancel, deps.reader, message(msg))
+			deps.processer.EXPECT().ProcessTask(mock.Anything, mock.Anything).Return(processErr).Once()
+			deps.reader.EXPECT().CommitMessages(mock.Anything, []kafka.Message{msg}).Return(nil).Once()
+			deps.logger.EXPECT().Error("failed to process task", mock.Anything).Once()
+
+			runReadMessage(t, c, ctx)
+		}
+	})
+
+	t.Run("retryable process error is not committed", func(t *testing.T) {
+		c, deps := newTestConsumer(t)
+		ctx, cancel := context.WithCancel(context.Background())
+
+		expectFetches(ctx, cancel, deps.reader, message(validMessage(1)))
+		deps.processer.EXPECT().ProcessTask(mock.Anything, mock.Anything).Return(errors.New("db down")).Once()
+		deps.logger.EXPECT().Error("failed to process task", mock.Anything).Once()
+
+		runReadMessage(t, c, ctx)
 	})
 
 	t.Run("commit error is logged", func(t *testing.T) {
-		c, reader, logger, ctx := newTestConsumer(fetchResult{msg: validMessage(1)})
-		reader.commitErr = errors.New("commit failed")
+		c, deps := newTestConsumer(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		msg := validMessage(1)
+
+		expectFetches(ctx, cancel, deps.reader, message(msg))
+		deps.processer.EXPECT().ProcessTask(mock.Anything, mock.Anything).Return(nil).Once()
+		deps.reader.EXPECT().CommitMessages(mock.Anything, []kafka.Message{msg}).Return(errors.New("commit failed")).Once()
+		deps.logger.EXPECT().Error("failed to commit message", mock.Anything).Once()
 
 		runReadMessage(t, c, ctx)
-
-		require.Equal(t, []string{"failed to commit message"}, logger.errors)
-		require.Empty(t, reader.committed)
 	})
 
 	t.Run("context canceled from fetch stops reading without error log", func(t *testing.T) {
-		c, reader, logger, ctx := newTestConsumer(fetchResult{err: context.Canceled})
+		c, deps := newTestConsumer(t)
+		ctx, cancel := context.WithCancel(context.Background())
+
+		expectFetches(ctx, cancel, deps.reader)
 
 		runReadMessage(t, c, ctx)
-
-		require.Empty(t, logger.errors)
-		require.Empty(t, reader.committed)
 	})
 
 	t.Run("already canceled context returns immediately", func(t *testing.T) {
-		c, reader, logger, ctx := newTestConsumer(fetchResult{msg: validMessage(1)})
-		reader.cancel()
+		c, _ := newTestConsumer(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
 
 		runReadMessage(t, c, ctx)
-
-		require.Empty(t, logger.errors)
-		require.Empty(t, reader.committed)
-		require.Len(t, reader.results, 1)
 	})
 }
 
 func TestConsumer_Close(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
-		c, reader, _, _ := newTestConsumer()
+		c, deps := newTestConsumer(t)
+		deps.reader.EXPECT().Close().Return(nil).Once()
 
 		require.NoError(t, c.Close())
-		require.True(t, reader.closed)
 	})
 
 	t.Run("error", func(t *testing.T) {
-		c, reader, _, _ := newTestConsumer()
-		reader.closeErr = errors.New("close failed")
+		c, deps := newTestConsumer(t)
+		closeErr := errors.New("close failed")
+		deps.reader.EXPECT().Close().Return(closeErr).Once()
 
-		require.ErrorIs(t, c.Close(), reader.closeErr)
+		require.ErrorIs(t, c.Close(), closeErr)
 	})
 }
