@@ -12,7 +12,7 @@ class IProfileRepository(ABC):
 
     @abstractmethod
     async def create(
-        self, profile: Profile, idempotency_key: uuid.UUID
+        self, profile: Profile, idempotency_key: uuid.UUID | None = None
     ) -> Profile | None:
         """
         Создает новый профиль в БД.

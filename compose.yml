@@ -455,6 +455,10 @@ services:
       ORDERS_GRPC_HOST: catalog-service:50051
       PAYMENTS_GRPC_HOST: payments-service:50052
 
+    # Для тестов расскомментировать, чтобы был доступ к сервису снаружи:
+    # ports:
+    #   - "8000:8000"
+
     depends_on:
       profile-postgres:
         condition: service_healthy
