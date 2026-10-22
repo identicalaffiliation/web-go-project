@@ -6,6 +6,10 @@ server:
   idle_timeout: 30s
   shutdown_timeout: 30s
 
+grpc:
+  host: 0.0.0.0
+  port: 50051
+
 s3:
   external_host: localhost
   internal_host: shop-minio
