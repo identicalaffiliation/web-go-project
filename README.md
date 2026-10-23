@@ -1,6 +1,6 @@
 # web-go-project
 
-Стек: Go, Python, PostgreSQL, Apache Kafka, Redis, S3 MInio, Temporal, Docker, gRPC
+Стек: Go, Python, PostgreSQL, Apache Kafka, Redis, S3 MInio, Temporal, Docker, gRPC, Nginx
 
 
 ## JWT-ключи
