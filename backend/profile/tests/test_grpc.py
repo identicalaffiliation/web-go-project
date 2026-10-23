@@ -10,15 +10,12 @@ from internal.adapters.rpc.grpc_clients import GrpcOrdersClient, GrpcPaymentsCli
 
 @pytest.mark.asyncio
 async def test_grpc_orders_client_success():
-    # 1. Arrange: подменяем Stub внутри файла grpc_clients.py
     with patch(
         "internal.adapters.rpc.grpc_clients.orders_pb2_grpc.OrdersServiceStub"
     ) as StubMock:
         mock_stub_instance = StubMock.return_value
-        # Делаем метод GetOrdersByUser асинхронным моком
         mock_stub_instance.GetOrdersByUser = AsyncMock()
 
-        # Создаем фейковый ответ в формате Protobuf
         ts = Timestamp()
         ts.GetCurrentTime()
         fake_response = orders_pb2.GetOrdersResponse(
@@ -34,21 +31,16 @@ async def test_grpc_orders_client_success():
         )
         mock_stub_instance.GetOrdersByUser.return_value = fake_response
 
-        # Инициализируем клиент (канал нам не важен, так как Stub замокан)
         client = GrpcOrdersClient(channel=AsyncMock())
         user_id = uuid.uuid4()
 
-        # 2. Act
         orders = await client.get_user_orders(user_id)
 
-        # 3. Assert
-        # Проверяем, что Protobuf-ответ правильно конвертировался в наш доменный OrderDTO
         assert len(orders) == 1
         assert orders[0].id == "ord-123"
         assert orders[0].price == 150.0
         assert orders[0].status == "COMPLETED"
 
-        # Проверяем, что в gRPC ушел правильный user_id
         called_request = mock_stub_instance.GetOrdersByUser.call_args[0][0]
         assert called_request.user_id == str(user_id)
 
@@ -62,7 +54,6 @@ async def test_grpc_payments_client_success():
         mock_stub_instance = StubMock.return_value
         mock_stub_instance.GetBalanceByUser = AsyncMock()
 
-        # Фейковый ответ сервиса платежей
         fake_response = payments_pb2.GetBalanceResponse(
             user_id="user-1", amount=100500.50
         )
@@ -71,10 +62,8 @@ async def test_grpc_payments_client_success():
         client = GrpcPaymentsClient(channel=AsyncMock())
         user_id = uuid.uuid4()
 
-        # 2. Act
         balance = await client.get_user_balance(user_id)
 
-        # 3. Assert
         assert balance.amount == 100500.50
 
         called_request = mock_stub_instance.GetBalanceByUser.call_args[0][0]

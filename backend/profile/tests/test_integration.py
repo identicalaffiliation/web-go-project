@@ -20,20 +20,14 @@ TEST_DATABASE_URL = (
 
 @pytest.fixture
 async def test_db_setup():
-    """
-    Фикстура управляет жизненным циклом БД строго внутри цикла событий теста.
-    Возвращает фабрику сессий (maker) для переопределения зависимостей.
-    """
     engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)
     maker = async_sessionmaker(engine, expire_on_commit=False)
 
-    # Создаем таблицы
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    yield maker  # Передаем фабрику в следующую фикстуру
+    yield maker
 
-    # Удаляем таблицы и корректно закрываем пулы
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
@@ -41,9 +35,6 @@ async def test_db_setup():
 
 @pytest.fixture
 def override_service_for_e2e(test_db_setup):
-    """
-    Подменяем зависимость FastAPI. Теперь мы используем maker из фикстуры выше.
-    """
     maker = test_db_setup
 
     async def _test_build_profile_service():
@@ -68,7 +59,6 @@ def override_service_for_e2e(test_db_setup):
 async def test_e2e_create_and_get_business_profile(override_service_for_e2e):
     user_id = str(uuid.uuid4())
 
-    # 1. Отправляем запрос на создание профиля
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as ac:
@@ -80,7 +70,6 @@ async def test_e2e_create_and_get_business_profile(override_service_for_e2e):
 
     assert post_response.status_code == 201
 
-    # 2. Отправляем запрос на получение профилей этого пользователя
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as ac:
@@ -91,7 +80,6 @@ async def test_e2e_create_and_get_business_profile(override_service_for_e2e):
     assert get_response.status_code == 200
     profiles = get_response.json()
 
-    # 3. Проверяем, что в БД действительно сохранился наш профиль
     assert len(profiles) == 1
     assert profiles[0]["company_name"] == "ООО Интеграция"
     assert profiles[0]["profile_type"] == "business"
