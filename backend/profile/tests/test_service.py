@@ -202,3 +202,45 @@ async def test_update_profile_not_found(mock_service):
 
     repo_mock.update.assert_not_called()
     uow_mock.commit.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_process_registration_event_success(mock_service):
+    # 1. Arrange
+    service, repo_mock, uow_mock = mock_service
+    user_id = str(uuid.uuid4())
+    event_id = str(uuid.uuid4())
+    event_data = {"user_id": user_id, "event_id": event_id}
+
+    # Имитируем успешное создание в БД (репозиторий возвращает профиль)
+    repo_mock.create.return_value = Profile(
+        id=uuid.uuid4(), user_id=uuid.UUID(user_id), profile_type=ProfileType.CUSTOMER
+    )
+
+    # 2. Act
+    await service.process_registration_event(event_data)
+
+    # 3. Assert
+    repo_mock.create.assert_called_once()
+    uow_mock.commit.assert_called_once()  # Успешная обработка завершается коммитом
+
+
+@pytest.mark.asyncio
+async def test_process_registration_event_idempotency_duplicate(mock_service):
+    # 1. Arrange
+    service, repo_mock, uow_mock = mock_service
+    user_id = str(uuid.uuid4())
+    event_id = str(uuid.uuid4())
+    event_data = {"user_id": user_id, "event_id": event_id}
+
+    # Имитируем конфликт уникальности: профиль с таким event_id уже есть,
+    # и репозиторий возвращает None (как прописано в методе create репозитория)
+    repo_mock.create.return_value = None
+
+    # 2. Act
+    await service.process_registration_event(event_data)
+
+    # 3. Assert
+    repo_mock.create.assert_called_once()
+    uow_mock.commit.assert_not_called()
+    uow_mock.rollback.assert_called_once()  # Произошел откат транзакции (дубль пропущен)

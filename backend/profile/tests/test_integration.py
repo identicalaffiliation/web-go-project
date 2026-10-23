@@ -1,5 +1,3 @@
-import asyncio
-import sys
 import uuid
 from unittest.mock import AsyncMock
 
@@ -14,10 +12,6 @@ from internal.adapters.postgres.models import Base
 from internal.adapters.postgres.repository import SqlAlchemyProfileRepository
 from internal.adapters.postgres.uow import SqlAlchemyUnitOfWork
 from internal.app.service import ProfileService
-
-# Лечим конфликт asyncpg и Windows
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 TEST_DATABASE_URL = (
     "postgresql+asyncpg://postgres:postgres@127.0.0.1:5440/test_profile_db"
