@@ -88,7 +88,20 @@ func (r *Repository) GetOrdersByUserID(ctx context.Context, id uuid.UUID) ([]*do
 	return models, nil
 }
 
-// UpdateStatusByOrderID TODO
+// UpdateStatusByOrderID метод обновления статуса после Saga workflow заказа.
+// Статусы заказа: Created(default), Paid(successful), Failed(fail)
 func (r *Repository) UpdateStatusByOrderID(ctx context.Context, id uuid.UUID, newStatus domain.Status) error {
+	const query = `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2`
+
+	conn := r.txGetter.DefaultTrOrDB(ctx, r.pool)
+	tag, err := conn.Exec(ctx, query, newStatus, id)
+	if err != nil {
+		return fmt.Errorf("update order status: %w", err)
+	}
+
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
 	return nil
 }

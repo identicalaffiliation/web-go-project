@@ -1,3 +1,20 @@
 grpc:
   host: 0.0.0.0
   port: 50052
+
+server:
+  host: 0.0.0.0
+  port: 8080
+  read_timeout: 5s
+  write_timeout: 5s
+  idle_timeout: 30s
+  shutdown_timeout: 30s
+
+temporal:
+  host_port: shop-temporal:7233
+  namespace: default
+  task_queue: orders
+  max_concurrent_activities: 50
+
+catalog:
+  addr: catalog-service:50051

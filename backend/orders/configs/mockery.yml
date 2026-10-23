@@ -1,0 +1,38 @@
+all: false
+dir: gen/mocks
+filename: mock_{{ .InterfaceName | snakecase }}.go
+pkgname: mocks
+structname: Mock{{ .InterfaceName | firstUpper }}
+template: testify
+force-file-write: true
+template-data:
+  unroll-variadic: false
+packages:
+  github.com/identicalaffiliation/web-go-project/backend/orders/internal/ports:
+    interfaces:
+      Repository: {}
+      Logger: {}
+      TxManager: {}
+      PriceProvider: {}
+      WorkflowStarter: {}
+  github.com/identicalaffiliation/web-go-project/backend/orders/internal/adapters/rest/controller:
+    interfaces:
+      Service:
+        config:
+          structname: MockCreateOrderService
+          filename: mock_create_order_service.go
+  github.com/identicalaffiliation/web-go-project/backend/orders/internal/adapters/rpc:
+    interfaces:
+      Service:
+        config:
+          structname: MockUserOrdersService
+          filename: mock_user_orders_service.go
+  github.com/identicalaffiliation/web-go-project/backend/orders/internal/adapters/temporal:
+    interfaces:
+      statusUpdater: {}
+  github.com/identicalaffiliation/web-go-project/backend/orders/gen/pb/price/v1:
+    config:
+      # сгенерированный protoc код по умолчанию пропускается
+      include-auto-generated: true
+    interfaces:
+      PriceServiceClient: {}
