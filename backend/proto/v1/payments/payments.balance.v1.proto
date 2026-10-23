@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package payments.balance.v1;
+
+option go_package = "github.com/identicalaffiliation/web-go-project/backend/payments/gen/pb/balance/v1;balancev1";
+
+service PaymentsService {
+  rpc GetBalanceByUser (GetBalanceRequest) returns (GetBalanceResponse);
+}
+
+message GetBalanceRequest {
+  string user_id = 1; // uuid user id
+}
+
+message GetBalanceResponse {
+  string user_id = 1;
+  int64 amount = 2; // balance in the same units as order total_price
+}

@@ -1,0 +1,28 @@
+all: false
+dir: gen/mocks
+filename: mock_{{ .InterfaceName | snakecase }}.go
+pkgname: mocks
+structname: Mock{{ .InterfaceName | firstUpper }}
+template: testify
+force-file-write: true
+template-data:
+  unroll-variadic: false
+packages:
+  github.com/identicalaffiliation/web-go-project/backend/payments/internal/ports:
+    interfaces:
+      Repository: {}
+      Logger: {}
+      TxManager: {}
+  github.com/identicalaffiliation/web-go-project/backend/payments/internal/adapters/brokers/kafka:
+    interfaces:
+      messageReader: {}
+      processer: {}
+  github.com/identicalaffiliation/web-go-project/backend/payments/internal/adapters/rpc:
+    interfaces:
+      Service:
+        config:
+          structname: MockBalanceService
+          filename: mock_balance_service.go
+  github.com/identicalaffiliation/web-go-project/backend/payments/internal/adapters/temporal:
+    interfaces:
+      paymentService: {}

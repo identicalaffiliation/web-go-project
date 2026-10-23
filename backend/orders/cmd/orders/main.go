@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"os"
 
 	"github.com/identicalaffiliation/web-go-project/backend/orders/internal/box"
 	"github.com/identicalaffiliation/web-go-project/backend/orders/internal/config"
 	"github.com/identicalaffiliation/web-go-project/backend/orders/pkg/logger"
+	"github.com/identicalaffiliation/web-go-project/backend/orders/pkg/shortcut"
 )
 
 func main() {
@@ -19,10 +19,7 @@ func main() {
 	ctx := context.Background()
 
 	log, err := logger.ProvideLogger()
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	shortcut.ErrNotNilFatal(err)
 
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {

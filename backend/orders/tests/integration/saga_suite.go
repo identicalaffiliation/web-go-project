@@ -84,6 +84,61 @@ func (f *fakeInventory) calls(orderID uuid.UUID) (reserved, released int) {
 	return f.reserved[orderID], f.released[orderID]
 }
 
+type fakePayments struct {
+	mu        sync.Mutex
+	noFunds   map[uuid.UUID]struct{}
+	charged   map[uuid.UUID]int64
+	refunded  map[uuid.UUID]int
+	lastInput map[uuid.UUID]temporal.PaymentInput
+}
+
+func newFakePayments() *fakePayments {
+	return &fakePayments{
+		noFunds:   make(map[uuid.UUID]struct{}),
+		charged:   make(map[uuid.UUID]int64),
+		refunded:  make(map[uuid.UUID]int),
+		lastInput: make(map[uuid.UUID]temporal.PaymentInput),
+	}
+}
+
+func (f *fakePayments) Charge(_ context.Context, in temporal.PaymentInput) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.lastInput[in.OrderID] = in
+
+	if _, ok := f.noFunds[in.UserID]; ok {
+		return sdktemporal.NewNonRetryableApplicationError("insufficient funds", "InsufficientFunds", nil)
+	}
+
+	f.charged[in.OrderID] += in.Amount
+
+	return nil
+}
+
+func (f *fakePayments) Refund(_ context.Context, in temporal.PaymentInput) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.refunded[in.OrderID]++
+
+	return nil
+}
+
+func (f *fakePayments) setNoFunds(userID uuid.UUID) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.noFunds[userID] = struct{}{}
+}
+
+func (f *fakePayments) calls(orderID uuid.UUID) (charged int64, refunded int, in temporal.PaymentInput) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	return f.charged[orderID], f.refunded[orderID], f.lastInput[orderID]
+}
+
 type SagaSuite struct {
 	suite.Suite
 
@@ -92,11 +147,13 @@ type SagaSuite struct {
 	service   *orders.Service
 	catalog   *fakeCatalog
 	inventory *fakeInventory
+	payments  *fakePayments
 	temporal  client.Client
 
 	stopOrders      chan struct{}
 	ordersDone      chan error
 	inventoryWorker worker.Worker
+	paymentsWorker  worker.Worker
 }
 
 func (s *SagaSuite) SetupSuite() {
@@ -127,6 +184,12 @@ func (s *SagaSuite) SetupSuite() {
 	s.inventoryWorker.RegisterActivityWithOptions(s.inventory.ReleaseStock, activity.RegisterOptions{Name: temporal.ReleaseStockActivity})
 	s.Require().NoError(s.inventoryWorker.Start())
 
+	s.payments = newFakePayments()
+	s.paymentsWorker = worker.New(s.temporal, temporal.PaymentsTaskQueue, worker.Options{})
+	s.paymentsWorker.RegisterActivityWithOptions(s.payments.Charge, activity.RegisterOptions{Name: temporal.ChargeActivity})
+	s.paymentsWorker.RegisterActivityWithOptions(s.payments.Refund, activity.RegisterOptions{Name: temporal.RefundActivity})
+	s.Require().NoError(s.paymentsWorker.Start())
+
 	s.service = orders.NewService(
 		s.repo,
 		log,
@@ -138,6 +201,7 @@ func (s *SagaSuite) SetupSuite() {
 
 func (s *SagaSuite) TearDownSuite() {
 	s.inventoryWorker.Stop()
+	s.paymentsWorker.Stop()
 	close(s.stopOrders)
 	s.NoError(<-s.ordersDone)
 	s.temporal.Close()
