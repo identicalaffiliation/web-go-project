@@ -1,5 +1,8 @@
 # web-go-project
 
+Стек: Go, Python, PostgreSQL, Apache Kafka, Redis, S3 MInio, Temporal, Docker, gRPC
+
+
 ## JWT-ключи
 
 Auth подписывает токены приватным RSA-ключом, validator проверяет их публичным.
