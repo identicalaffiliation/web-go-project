@@ -1,12 +1,15 @@
 MODULE      := github.com/identicalaffiliation/web-go-project/backend
 PROTO_DIR   := backend/proto
 CATALOG_PROTO := v1/catalog/catalog.price.v1.proto
+ORDERS_PROTO := v1/orders/orders.orders.v1.proto
 
 .PHONY: up
 up:
 	docker compose up --build -d auth-postgres
 	docker compose up --build -d profile-postgres
 	docker compose up --build -d catalog-master-postgres
+	docker compose up --build -d orders-master-postgres
+	docker compose up --build -d orders-replica-postgres
 	docker compose up --build -d inventory-master-postgres
 	docker compose up --build -d catalog-replica-postgres
 	docker compose up --build -d shop-zookeeper
@@ -24,6 +27,7 @@ migrations-up:
 	docker compose up --build -d profile-migrator
 	docker compose up --build -d catalog-migrator
 	docker compose up --build -d inventory-migrator
+	docker compose up --build -d orders-migrator
 
 .PHONY: init-kafka-topics
 init_kafka_topics:
@@ -43,6 +47,7 @@ run:
 	docker compose up --build -d catalog-service
 	docker compose up --build -d inventory-service
 	docker compose up --build -d profile-service
+	docker compose up --build -d orders-service
 	docker compose up -d gateway
 
 .PHONY: nginx-reload
@@ -59,6 +64,7 @@ lint:
 	cd backend/catalog && golangci-lint run ./...
 	cd backend/auth && golangci-lint run ./...
 	cd backend/inventory && golangci-lint run ./...
+	cd backend/orders && golangci-lint run ./...
 	cd backend/profile && ruff check .
 	cd backend/profile && ruff format --check .
 	cd backend/profile && python3 -m compileall -q -x 'internal/adapters/grpc/generated' cmd internal
@@ -77,19 +83,25 @@ integrations:
 	cd backend/catalog && go test -v -race -tags=integration ./...
 	cd backend/auth && go test -v -race -tags=integration ./...
 	cd backend/inventory && go test -v -race -tags=integration ./...
+	cd backend/orders && go test -v -race -tags=integration ./...
 
 .PHONY: unit
 unit:
 	cd backend/catalog && go test -v -race -tags=unit ./...
 	cd backend/auth && go test -v -race -tags=unit ./...
 	cd backend/inventory && go test -v -race -tags=unit ./...
+	cd backend/orders && go test -v -race -tags=unit ./...
 
 .PHONY: proto
 proto:
 	protoc -I $(PROTO_DIR) \
-		--go_out=backend/catalog --go_opt=module=$(MODULE)/catalog \
-		--go-grpc_out=backend/catalog --go-grpc_opt=module=$(MODULE)/catalog \
-		$(PROTO_DIR)/$(CATALOG_PROTO)
+    	--go_out=backend/catalog --go_opt=module=$(MODULE)/catalog \
+    	--go-grpc_out=backend/catalog --go-grpc_opt=module=$(MODULE)/catalog \
+    	$(PROTO_DIR)/$(CATALOG_PROTO) && \
+	protoc -I $(PROTO_DIR) \
+		--go_out=backend/orders --go_opt=module=$(MODULE)/orders \
+		--go-grpc_out=backend/orders --go-grpc_opt=module=$(MODULE)/orders \
+		$(PROTO_DIR)/$(ORDERS_PROTO)
 
 .PHONY: gen
 gen: proto
@@ -98,7 +110,8 @@ gen: proto
 
 .PHONY: swag
 swag:
-	cd backend/catalog && swag init -g cmd/catalog/main.go -o docs/catalog --parseDependency --parseInternal
+	cd backend/catalog && swag init -g cmd/catalog/main.go -o docs/catalog --parseDependency --parseInternal && \
+
 
 .PHONY: swag-auth
 swag-auth:

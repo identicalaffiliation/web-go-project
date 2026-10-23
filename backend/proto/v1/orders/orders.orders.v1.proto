@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package orders.orders.v1;
+
+option go_package = "github.com/identicalaffiliation/web-go-project/backend/orders/gen/pb/orders/v1;ordersv1";
+
+import "google/protobuf/timestamp.proto";
+
+service OrdersService {
+  rpc GetUserOrders(UserOrdersRequest) returns (UserOrdersResponse);
+}
+
+message UserOrdersRequest {
+  string user_id = 1;
+}
+
+enum OrderStatus {
+  CREATED = 0;
+  FAILED = 1;
+  CANCELLED = 2;
+}
+
+message UserOrdersResponse {
+  repeated UserOrderResponse orders = 1;
+}
+
+message UserOrderResponse {
+  string order_id = 1;
+  string product_id = 2;
+  string user_id = 3;
+  int64 quantity = 4;
+  int64 total_price = 5;
+  OrderStatus status = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
