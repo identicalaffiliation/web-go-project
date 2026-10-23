@@ -151,12 +151,10 @@ jobs:
       - name: Compile
         run: python -m compileall -q -x 'internal/adapters/grpc/generated' cmd internal
 
-      # тестов в profile пока нет — шаг запустится, как только появятся test_*.py
       - name: Tests
         run: |
           if find . -path ./.venv -prune -o \( -name 'test_*.py' -o -name '*_test.py' \) -print | grep -q .; then
-            pip install pytest pytest-asyncio
-            pytest
+            docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
           else
             echo "No tests found, skipping"
           fi
