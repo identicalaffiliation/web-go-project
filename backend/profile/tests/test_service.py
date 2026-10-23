@@ -1,8 +1,12 @@
 import uuid
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 
+from apps.profile.main import app
+from internal.adapters.http.dependencies import get_profile_service
 from internal.adapters.http.schemas import CreateBusinessProfileRequest
 from internal.app.service import ProfileService
 from internal.domain.exceptions import ProfileAlreadyExistsError
@@ -89,3 +93,85 @@ async def test_create_business_profile_already_exists_raises_error(mock_service)
     # Убеждаемся, что мы НЕ пытались сохранить дубликат и НЕ сделали commit
     repo_mock.create.assert_not_called()
     uow_mock.commit.assert_not_called()
+
+
+@pytest.fixture
+def mock_profile_service():
+    """Создаем асинхронную заглушку для слоя бизнес-логики."""
+    return AsyncMock()
+
+
+@pytest.fixture
+def override_get_service(mock_profile_service):
+    """
+    Подменяем реальную зависимость FastAPI на нашу заглушку.
+    После завершения теста возвращаем всё как было.
+    """
+    app.dependency_overrides[get_profile_service] = lambda: mock_profile_service
+    yield
+    app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_create_business_profile_api_success(
+    mock_profile_service, override_get_service
+):
+    # 1. Arrange
+    user_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)  # Создаем фиктивную дату
+
+    # Настраиваем сервис так, чтобы он вернул успешный результат с датами
+    mock_profile_service.create_business_profile.return_value = Profile(
+        id=uuid.uuid4(),
+        user_id=uuid.UUID(user_id),
+        profile_type=ProfileType.BUSINESS,
+        company_name="ООО Вектор",
+        phone="+79991234567",
+        created_at=now,  # Добавлено
+        updated_at=now,  # Добавлено
+    )
+
+    # 2. Act
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        response = await ac.post(
+            "/api/v1/profiles/business",
+            json={"company_name": "ООО Вектор", "phone": "+79991234567"},
+            headers={"X-User-Id": user_id},
+        )
+
+    # 3. Assert
+    assert response.status_code == 201
+    data = response.json()
+    assert data["company_name"] == "ООО Вектор"
+    assert data["profile_type"] == "business"
+    assert "created_at" in data
+
+
+@pytest.mark.asyncio
+async def test_create_business_profile_api_conflict(
+    mock_profile_service, override_get_service
+):
+    # 1. Arrange
+    user_id = str(uuid.uuid4())
+
+    # Имитируем выброс ошибки из слоя бизнес-логики
+    mock_profile_service.create_business_profile.side_effect = (
+        ProfileAlreadyExistsError("Уже есть")
+    )
+
+    # 2. Act
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        response = await ac.post(
+            "/api/v1/profiles/business",
+            json={"company_name": "ООО Вектор"},
+            headers={"X-User-Id": user_id},
+        )
+
+    # 3. Assert
+    # Проверяем, что FastAPI корректно перехватил ошибку и вернул 409 Conflict
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Уже есть"

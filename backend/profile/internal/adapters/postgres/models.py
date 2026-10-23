@@ -35,7 +35,7 @@ class ProfileModel(Base):
     company_name: Mapped[str | None] = mapped_column(String, nullable=True)
 
     idempotency_key: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), unique=True, nullable=False
+        UUID(as_uuid=True), unique=True, nullable=True
     )
 
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
