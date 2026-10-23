@@ -173,6 +173,64 @@ services:
       timeout: 10s
       interval: 10s
 
+  orders-master-postgres:
+    build:
+      context: ./scripts/postgres/orders/master
+      dockerfile: Dockerfile
+
+    container_name: orders-master-postgres
+    image: catalog-master-postgres:1
+
+    # basics environments
+    environment:
+      POSTGRES_DB: orders-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    # external connection: localhost:5436
+    ports:
+      - "5436:5432"
+
+    volumes:
+      - orders_master_postgres_data:/var/lib/postgresql
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d orders-db" ]
+      retries: 5
+      timeout: 10s
+      interval: 10s
+
+  orders-replica-postgres:
+    build:
+      context: ./scripts/postgres/orders/replica
+      dockerfile: Dockerfile
+
+    container_name: orders-replica-postgres
+    image: orders-replica-postgres:1
+
+    # basics environments
+    environment:
+      POSTGRES_DB: orders-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    # external connection: localhost:5437
+    ports:
+      - "5437:5432"
+
+    volumes:
+      - orders_replica_postgres_data:/var/lib/postgresql
+
+    depends_on:
+      orders-master-postgres:
+        condition: service_healthy
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d orders-db" ]
+      retries: 5
+      timeout: 10s
+      interval: 10s
+
   shop-zookeeper:
     image: confluentinc/cp-zookeeper:7.7.8
 
@@ -364,6 +422,16 @@ services:
       catalog-master-postgres:
         condition: service_healthy
 
+  orders-migrator:
+    build:
+      context: ./migrator
+    environment:
+      MIGRATIONS_PATH: ./migrations/orders
+      DB_URL: postgres://postgres:postgres@orders-master-postgres:5432/orders-db?sslmode=disable
+    depends_on:
+      catalog-master-postgres:
+        condition: service_healthy
+
   init-kafka:
     image: confluentinc/cp-kafka:7.7.8
     entrypoint: [ '/bin/sh', '-c' ]
@@ -381,6 +449,27 @@ services:
       "
     depends_on:
       shop-kafka:
+        condition: service_healthy
+
+  orders-service:
+    container_name: orders-service
+
+    build:
+      context: ./backend/orders
+      dockerfile: Dockerfile
+
+    environment:
+      MASTER_DSN: ${MASTER_ORDERS_POSTGRES_DSN}
+      REPLICA_DSN: ${REPLICA_ORDERS_POSTGRES_DSN}
+
+    ports:
+      - "50051:50052"
+
+    volumes:
+      - ./backend/orders/configs/orders.yml:/app/config.yml:ro
+
+    depends_on:
+      orders-master-postgres:
         condition: service_healthy
 
   catalog-service:
@@ -517,5 +606,7 @@ volumes:
   inventory_master_postgres_data:
   temporal_postgres_data:
   catalog_replica_postgres_data:
+  orders_master_postgres_data:
+  orders_replica_postgres_data:
   minio_data:
   redis_data:

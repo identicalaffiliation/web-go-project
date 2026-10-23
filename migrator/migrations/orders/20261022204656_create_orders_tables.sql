@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS orders (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_orders_by_user_id ON orders(user_id);
+CREATE INDEX idx_orders_by_user_id ON orders(user_id, created_at DESC);
 
 -- +goose Down
 DROP TABLE IF EXISTS orders;

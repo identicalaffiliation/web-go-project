@@ -29,6 +29,7 @@ jobs:
           - backend/catalog
           - backend/auth
           - backend/inventory
+          - backend/orders
 
     steps:
       - name: Checkout
@@ -62,6 +63,7 @@ jobs:
           - backend/catalog
           - backend/auth
           - backend/inventory
+          - backend/orders
 
     steps:
       - name: Checkout
@@ -95,6 +97,7 @@ jobs:
           - backend/auth
           - migrator
           - backend/inventory
+          - backend/orders
 
     steps:
       - name: Checkout
@@ -174,6 +177,7 @@ jobs:
           - auth
           - profile
           - inventory
+          - orders
 
     steps:
       - name: Checkout
