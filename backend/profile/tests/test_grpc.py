@@ -47,7 +47,6 @@ async def test_grpc_orders_client_success():
 
 @pytest.mark.asyncio
 async def test_grpc_payments_client_success():
-    # 1. Arrange
     with patch(
         "internal.adapters.rpc.grpc_clients.payments_pb2_grpc.PaymentsServiceStub"
     ) as StubMock:
