@@ -1,3 +1,4 @@
+import os
 import uuid
 from unittest.mock import AsyncMock
 
@@ -13,8 +14,9 @@ from internal.adapters.postgres.repository import SqlAlchemyProfileRepository
 from internal.adapters.postgres.uow import SqlAlchemyUnitOfWork
 from internal.app.service import ProfileService
 
-TEST_DATABASE_URL = (
-    "postgresql+asyncpg://postgres:postgres@127.0.0.1:5440/test_profile_db"
+TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    "postgresql+asyncpg://postgres:postgres@127.0.0.1:5440/test_profile_db",
 )
 
 

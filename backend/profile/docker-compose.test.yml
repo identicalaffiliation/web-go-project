@@ -1,4 +1,3 @@
-version: '3.8'
 # Test environment for the profile service
 
 services:
