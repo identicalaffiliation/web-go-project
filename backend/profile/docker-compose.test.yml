@@ -1,0 +1,32 @@
+# Test environment for the profile service
+
+services:
+  db-test:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: test_profile_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d test_profile_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@db-test:5432/test_profile_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=db-test
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=test_profile_db
+      - KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+    command: >
+      bash -c "pip install pytest pytest-asyncio pytest-mock httpx && pytest tests/ -v"
+    depends_on:
+      db-test:
+        condition: service_healthy
