@@ -2,8 +2,9 @@ MODULE        := github.com/identicalaffiliation/web-go-project/backend
 PROTO_DIR     := backend/proto
 CATALOG_PROTO := v1/catalog/catalog.price.v1.proto
 ORDERS_PROTO  := v1/orders/orders.orders.v1.proto
+PAYMENTS_PROTO := v1/payments/payments.balance.v1.proto
 
-GO_SERVICES := catalog auth inventory orders
+GO_SERVICES := catalog auth inventory orders payments
 
 INFRA := \
 	auth-postgres \
@@ -13,6 +14,8 @@ INFRA := \
 	orders-master-postgres \
 	orders-replica-postgres \
 	inventory-master-postgres \
+	payments-master-postgres \
+	payments-replica-postgres \
 	shop-zookeeper \
 	shop-kafka \
 	kafka-ui \
@@ -27,14 +30,16 @@ MIGRATORS := \
 	profile-migrator \
 	catalog-migrator \
 	inventory-migrator \
-	orders-migrator
+	orders-migrator \
+	payments-migrator
 
 SERVICES := \
 	auth-service \
 	catalog-service \
 	inventory-service \
 	profile-service \
-	orders-service
+	orders-service \
+	payments-service
 
 .DEFAULT_GOAL := help
 
@@ -92,6 +97,7 @@ lint: ## линтеры всех сервисов
 	cd backend/auth && golangci-lint run ./...
 	cd backend/inventory && golangci-lint run ./...
 	cd backend/orders && golangci-lint run ./...
+	cd backend/payments && golangci-lint run ./...
 	cd backend/profile && ruff check .
 	cd backend/profile && ruff format --check .
 	cd backend/profile && python3 -m compileall -q -x 'internal/adapters/grpc/generated' cmd internal
@@ -124,6 +130,7 @@ gen: proto ## proto + моки
 	cd backend/catalog && go generate ./...
 	cd backend/inventory && mockery --config configs/mockery.yml
 	cd backend/orders && mockery --config configs/mockery.yml
+	cd backend/payments && mockery --config configs/mockery.yml
 
 # клиент catalog для orders генерится отдельно: go_package в proto указывает на модуль catalog
 .PHONY: proto
@@ -142,6 +149,10 @@ proto: ## сгенерировать go код из proto
 		--go-grpc_out=backend/orders --go-grpc_opt=module=$(MODULE)/orders \
 		--go-grpc_opt=M$(CATALOG_PROTO)=$(MODULE)/orders/gen/pb/price/v1\;pricev1 \
 		$(PROTO_DIR)/$(CATALOG_PROTO)
+	protoc -I $(PROTO_DIR) \
+		--go_out=backend/payments --go_opt=module=$(MODULE)/payments \
+		--go-grpc_out=backend/payments --go-grpc_opt=module=$(MODULE)/payments \
+		$(PROTO_DIR)/$(PAYMENTS_PROTO)
 
 .PHONY: swag
 swag: ## swagger всех сервисов

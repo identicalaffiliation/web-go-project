@@ -43,6 +43,11 @@ func (s *SagaSuite) Test_CreateOrder_ReservedAndPaid() {
 	reserved, released := s.inventory.calls(resp.Order.ID)
 	s.Equal(1, reserved)
 	s.Equal(0, released)
+
+	charged, refunded, in := s.payments.calls(resp.Order.ID)
+	s.Equal(int64(300), charged)
+	s.Equal(0, refunded)
+	s.Equal(req.UserID, in.UserID)
 }
 
 func (s *SagaSuite) Test_CreateOrder_OutOfStock_CompensatedAndFailed() {
@@ -58,6 +63,31 @@ func (s *SagaSuite) Test_CreateOrder_OutOfStock_CompensatedAndFailed() {
 	reserved, released := s.inventory.calls(resp.Order.ID)
 	s.Equal(0, reserved)
 	s.Equal(1, released)
+
+	charged, refunded, _ := s.payments.calls(resp.Order.ID)
+	s.Equal(int64(0), charged)
+	s.Equal(1, refunded)
+}
+
+// Денег не хватает - резерв возвращается, заказ failed.
+func (s *SagaSuite) Test_CreateOrder_InsufficientFunds_CompensatedAndFailed() {
+	req := s.newRequest(100)
+	s.payments.setNoFunds(req.UserID)
+
+	resp, err := s.service.CreateOrder(s.T().Context(), req)
+	s.Require().NoError(err)
+
+	s.Require().NoError(s.waitSagaCompleted(resp.Order.ID))
+	s.waitStatus(resp.Order.ID, domain.Failed)
+
+	reserved, released := s.inventory.calls(resp.Order.ID)
+	s.Equal(1, reserved)
+	s.Equal(1, released)
+
+	charged, refunded, in := s.payments.calls(resp.Order.ID)
+	s.Equal(int64(0), charged)
+	s.Equal(1, refunded)
+	s.Equal(int64(300), in.Amount)
 }
 
 // Повтор с тем же operation_id отклоняется: второго заказа и второй саги нет.

@@ -44,9 +44,11 @@ func (w *Worker) StartOrderSaga(ctx context.Context, order *domain.Order) error 
 		ID:        "order-" + order.ID.String(),
 		TaskQueue: w.taskQueue,
 	}, OrderSagaWorkflow, SagaInput{
-		OrderID:   order.ID,
-		ProductID: order.ProductID,
-		Quantity:  order.Quantity,
+		OrderID:    order.ID,
+		ProductID:  order.ProductID,
+		UserID:     order.UserID,
+		Quantity:   order.Quantity,
+		TotalPrice: order.TotalPrice,
 	})
 	if err != nil {
 		return fmt.Errorf("start order saga: %w", err)
