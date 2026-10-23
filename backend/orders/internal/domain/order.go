@@ -23,15 +23,15 @@ var integerStatuses = map[Status]int32{
 type Status string
 
 type Order struct {
-	ID          uuid.UUID
-	ProductID   uuid.UUID
-	UserID      uuid.UUID
-	OperationID uuid.UUID
-	Quantity    int16
-	TotalPrice  int64
-	Status      Status
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID          uuid.UUID `json:"id"`
+	ProductID   uuid.UUID `json:"productId"`
+	UserID      uuid.UUID `json:"userId"`
+	OperationID uuid.UUID `json:"-"`
+	Quantity    int16     `json:"quantity"`
+	TotalPrice  int64     `json:"totalPrice"`
+	Status      Status    `json:"status"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 func (o *Order) ToResponseRPC() *ordersv1.UserOrderResponse {

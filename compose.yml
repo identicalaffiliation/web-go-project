@@ -462,7 +462,9 @@ services:
       MASTER_DSN: ${MASTER_ORDERS_POSTGRES_DSN}
       REPLICA_DSN: ${REPLICA_ORDERS_POSTGRES_DSN}
 
+    # external connection: http://localhost:8080 (rest), localhost:50051 (grpc)
     ports:
+      - "8080:8080"
       - "50051:50052"
 
     volumes:
@@ -471,6 +473,12 @@ services:
     depends_on:
       orders-master-postgres:
         condition: service_healthy
+      orders-replica-postgres:
+        condition: service_healthy
+      shop-temporal:
+        condition: service_healthy
+      catalog-service:
+        condition: service_started
 
   catalog-service:
     container_name: catalog-service
@@ -598,6 +606,7 @@ services:
       - auth-service
       - catalog-service
       - profile-service
+      - orders-service
 
 volumes:
   auth_postgres_data:
