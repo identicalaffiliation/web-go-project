@@ -20,6 +20,14 @@ type UserRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (domain.User, error)
 }
 
+// UserRoleUpdater — узкий порт для консьюмера: ему не нужны остальные методы
+// UserRepository, поэтому интерфейс объявлен отдельно на стороне потребителя.
+type UserRoleUpdater interface {
+	// UpdateRole идемпотентна: повторная установка той же роли не ошибка, это
+	// повторная доставка того же события Kafka. Неизвестный id даёт ErrUserNotFound.
+	UpdateRole(ctx context.Context, id uuid.UUID, role domain.Role) error
+}
+
 type RefreshTokenRepository interface {
 	Create(ctx context.Context, token domain.RefreshToken) error
 	GetByHash(ctx context.Context, hash string) (domain.RefreshToken, error)

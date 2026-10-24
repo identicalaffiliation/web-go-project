@@ -85,6 +85,23 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (domain.User
 	return r.scanUser(r.pool.QueryRow(ctx, query, id))
 }
 
+// UpdateRole ставит роль одним UPDATE без предварительного чтения. Повтор с той
+// же ролью затрагивает ту же одну строку, поэтому не ошибка; 0 строк значит, что
+// пользователя нет. Вариант «AND role <> $2» не отличил бы «роль уже такая» от
+// «пользователя нет» без второго запроса.
+func (r *UserRepository) UpdateRole(ctx context.Context, id uuid.UUID, role domain.Role) error {
+	const query = `UPDATE auth_users SET role = $2::user_role WHERE id = $1`
+
+	tag, err := r.pool.Exec(ctx, query, id, role)
+	if err != nil {
+		return fmt.Errorf("update user role: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ports.ErrUserNotFound
+	}
+	return nil
+}
+
 func (r *UserRepository) scanUser(row pgx.Row) (domain.User, error) {
 	var user domain.User
 
