@@ -25,6 +25,8 @@ type Config struct {
 	Log      LogConfig      `yaml:"log"`
 	Kafka    KafkaConfig    `yaml:"kafka"`
 	Outbox   OutboxConfig   `yaml:"outbox"`
+
+	RoleConsumer RoleConsumerConfig `yaml:"role_consumer"`
 }
 
 type HTTPConfig struct {
@@ -71,6 +73,17 @@ type OutboxConfig struct {
 	BatchSize      int           `yaml:"batch_size" env:"AUTH_OUTBOX_BATCH_SIZE"`
 	PublishTimeout time.Duration `yaml:"publish_timeout" env:"AUTH_OUTBOX_PUBLISH_TIMEOUT"`
 	MaxAttempts    int           `yaml:"max_attempts" env:"AUTH_OUTBOX_MAX_ATTEMPTS"`
+}
+
+// RoleConsumerConfig — консьюмер события «создан бизнес-профиль». Адреса
+// брокеров общие с kafka.brokers.
+type RoleConsumerConfig struct {
+	Topic   string `yaml:"topic" env:"AUTH_ROLE_CONSUMER_TOPIC"`
+	GroupID string `yaml:"group_id" env:"AUTH_ROLE_CONSUMER_GROUP_ID"`
+	// RetryBackoff — пауза перед повтором при сбое БД или чтения из Kafka.
+	RetryBackoff  time.Duration `yaml:"retry_backoff" env:"AUTH_ROLE_CONSUMER_RETRY_BACKOFF"`
+	CommitTimeout time.Duration `yaml:"commit_timeout" env:"AUTH_ROLE_CONSUMER_COMMIT_TIMEOUT"`
+	MaxWait       time.Duration `yaml:"max_wait" env:"AUTH_ROLE_CONSUMER_MAX_WAIT"`
 }
 
 type LogConfig struct {
@@ -120,7 +133,10 @@ func (c Config) validate() error {
 	if err := c.Kafka.validate(); err != nil {
 		return err
 	}
-	return c.Outbox.validate()
+	if err := c.Outbox.validate(); err != nil {
+		return err
+	}
+	return c.RoleConsumer.validate()
 }
 
 func (c HTTPConfig) validate() error {
@@ -163,6 +179,20 @@ func (c OutboxConfig) validate() error {
 	return positiveDurations([]namedDuration{
 		{"outbox.interval (AUTH_OUTBOX_INTERVAL)", c.Interval},
 		{"outbox.publish_timeout (AUTH_OUTBOX_PUBLISH_TIMEOUT)", c.PublishTimeout},
+	})
+}
+
+func (c RoleConsumerConfig) validate() error {
+	if strings.TrimSpace(c.Topic) == "" {
+		return fmt.Errorf("%w: role_consumer.topic (AUTH_ROLE_CONSUMER_TOPIC) must not be empty", ErrInvalid)
+	}
+	if strings.TrimSpace(c.GroupID) == "" {
+		return fmt.Errorf("%w: role_consumer.group_id (AUTH_ROLE_CONSUMER_GROUP_ID) must not be empty", ErrInvalid)
+	}
+	return positiveDurations([]namedDuration{
+		{"role_consumer.retry_backoff (AUTH_ROLE_CONSUMER_RETRY_BACKOFF)", c.RetryBackoff},
+		{"role_consumer.commit_timeout (AUTH_ROLE_CONSUMER_COMMIT_TIMEOUT)", c.CommitTimeout},
+		{"role_consumer.max_wait (AUTH_ROLE_CONSUMER_MAX_WAIT)", c.MaxWait},
 	})
 }
 

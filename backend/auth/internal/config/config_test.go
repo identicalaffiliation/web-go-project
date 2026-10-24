@@ -41,6 +41,11 @@ var allEnvKeys = []string{
 	"AUTH_OUTBOX_BATCH_SIZE",
 	"AUTH_OUTBOX_PUBLISH_TIMEOUT",
 	"AUTH_OUTBOX_MAX_ATTEMPTS",
+	"AUTH_ROLE_CONSUMER_TOPIC",
+	"AUTH_ROLE_CONSUMER_GROUP_ID",
+	"AUTH_ROLE_CONSUMER_RETRY_BACKOFF",
+	"AUTH_ROLE_CONSUMER_COMMIT_TIMEOUT",
+	"AUTH_ROLE_CONSUMER_MAX_WAIT",
 }
 
 func setEnv(t *testing.T, vars map[string]string) {
@@ -116,6 +121,13 @@ func fileDefaults() Config {
 			WriteTimeout: 5 * time.Second,
 		},
 		Outbox: OutboxConfig{Interval: time.Second, BatchSize: 100, PublishTimeout: 10 * time.Second, MaxAttempts: 5},
+		RoleConsumer: RoleConsumerConfig{
+			Topic:         "profiles.business.created",
+			GroupID:       "auth-service",
+			RetryBackoff:  2 * time.Second,
+			CommitTimeout: 5 * time.Second,
+			MaxWait:       500 * time.Millisecond,
+		},
 	}
 }
 
@@ -155,6 +167,12 @@ func TestLoad_InvalidKafkaAndOutbox(t *testing.T) {
 		"zero batch size":      {"AUTH_OUTBOX_BATCH_SIZE": "0"},
 		"negative publish":     {"AUTH_OUTBOX_PUBLISH_TIMEOUT": "-1s"},
 		"zero max attempts":    {"AUTH_OUTBOX_MAX_ATTEMPTS": "0"},
+
+		"empty role topic":        {"AUTH_ROLE_CONSUMER_TOPIC": " "},
+		"empty role group":        {"AUTH_ROLE_CONSUMER_GROUP_ID": " "},
+		"zero role retry backoff": {"AUTH_ROLE_CONSUMER_RETRY_BACKOFF": "0s"},
+		"negative role commit":    {"AUTH_ROLE_CONSUMER_COMMIT_TIMEOUT": "-1s"},
+		"zero role max wait":      {"AUTH_ROLE_CONSUMER_MAX_WAIT": "0s"},
 	}
 	for name, overrides := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -191,6 +209,12 @@ func TestLoad_EnvOverridesFile(t *testing.T) {
 		"AUTH_OUTBOX_BATCH_SIZE":      "50",
 		"AUTH_OUTBOX_PUBLISH_TIMEOUT": "4s",
 		"AUTH_OUTBOX_MAX_ATTEMPTS":    "7",
+
+		"AUTH_ROLE_CONSUMER_TOPIC":          "other.business",
+		"AUTH_ROLE_CONSUMER_GROUP_ID":       "other-group",
+		"AUTH_ROLE_CONSUMER_RETRY_BACKOFF":  "9s",
+		"AUTH_ROLE_CONSUMER_COMMIT_TIMEOUT": "8s",
+		"AUTH_ROLE_CONSUMER_MAX_WAIT":       "1s",
 	}))
 
 	cfg, err := Load(realConfigPath)
@@ -230,6 +254,13 @@ func TestLoad_EnvOverridesFile(t *testing.T) {
 			WriteTimeout: 2 * time.Second,
 		},
 		Outbox: OutboxConfig{Interval: 3 * time.Second, BatchSize: 50, PublishTimeout: 4 * time.Second, MaxAttempts: 7},
+		RoleConsumer: RoleConsumerConfig{
+			Topic:         "other.business",
+			GroupID:       "other-group",
+			RetryBackoff:  9 * time.Second,
+			CommitTimeout: 8 * time.Second,
+			MaxWait:       time.Second,
+		},
 	}
 	if !reflect.DeepEqual(cfg, want) {
 		t.Errorf("cfg = %+v, want %+v", cfg, want)
@@ -358,6 +389,7 @@ func TestLoad_MisspelledKey(t *testing.T) {
 		"max_conns", "max_conn_lifetime", "max_conn_idle_time", "health_check_period",
 		"connect_timeout", "issuer", "access_ttl", "refresh_ttl", "level",
 		"brokers", "topic", "interval", "batch_size", "publish_timeout", "max_attempts",
+		"group_id", "retry_backoff", "commit_timeout", "max_wait",
 	} {
 		t.Run(key, func(t *testing.T) {
 			old := "  " + key + ":"

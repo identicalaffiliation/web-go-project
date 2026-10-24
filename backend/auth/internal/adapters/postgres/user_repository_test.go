@@ -144,6 +144,48 @@ func TestUserRepository_Create_DuplicateEmail(t *testing.T) {
 	}
 }
 
+func TestUserRepository_UpdateRole_Idempotent(t *testing.T) {
+	pool := setupPool(t)
+	repo := postgres.NewUserRepository(pool)
+	ctx := context.Background()
+
+	user := domain.User{
+		ID:           uuid.New(),
+		Email:        "carol@example.com",
+		PasswordHash: "hash",
+		Role:         domain.RoleCustomer,
+		CreatedAt:    time.Now().UTC(),
+	}
+	if err := repo.Create(ctx, user); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	// Второй вызов имитирует повторную доставку того же события Kafka.
+	for i := range 2 {
+		if err := repo.UpdateRole(ctx, user.ID, domain.RoleBusiness); err != nil {
+			t.Fatalf("UpdateRole call %d: %v", i+1, err)
+		}
+
+		got, err := repo.GetByID(ctx, user.ID)
+		if err != nil {
+			t.Fatalf("GetByID: %v", err)
+		}
+		if got.Role != domain.RoleBusiness {
+			t.Fatalf("after call %d role = %q, want %q", i+1, got.Role, domain.RoleBusiness)
+		}
+	}
+}
+
+func TestUserRepository_UpdateRole_NotFound(t *testing.T) {
+	pool := setupPool(t)
+	repo := postgres.NewUserRepository(pool)
+
+	err := repo.UpdateRole(context.Background(), uuid.New(), domain.RoleBusiness)
+	if !errors.Is(err, ports.ErrUserNotFound) {
+		t.Fatalf("want ErrUserNotFound, got %v", err)
+	}
+}
+
 func TestUserRepository_GetByEmail_NotFound(t *testing.T) {
 	pool := setupPool(t)
 	repo := postgres.NewUserRepository(pool)
