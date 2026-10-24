@@ -1,0 +1,2264 @@
+This file is a merged representation of a subset of the codebase, containing specifically included files, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Only files matching these patterns are included: backend/profile/**, backend/proto/**, compose.yml
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+backend/
+  profile/
+    cmd/
+      profile/
+        __init__.py
+        main.py
+      __init__.py
+    internal/
+      adapters/
+        grpc/
+          generated/
+            __init__.py
+            payments_pb2_grpc.py
+            payments_pb2.py
+            v1_pb2_grpc.py
+            v1_pb2.py
+        http/
+          dependencies.py
+          profiles.py
+          schemas.py
+        kafka/
+          consumer.py
+        postgres/
+          database.py
+          models.py
+          repository.py
+          uow.py
+        rpc/
+          grpc_clients.py
+      app/
+        service.py
+      config/
+        config.py
+      domain/
+        exceptions.py
+        models.py
+      ports/
+        message_broker.py
+        repository.py
+        rpc_clients.py
+        uow.py
+    .dockerignore
+    Dockerfile
+    openapi.json
+    pyproject.toml
+    requirements.in
+    requirements.txt
+    template.txt
+  proto/
+    v1/
+      catalog/
+        catalog.price.v1.proto
+      orders/
+        orders.orders.v1.proto
+    payments.proto
+compose.yml
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="backend/profile/cmd/profile/__init__.py">
+
+</file>
+
+<file path="backend/profile/cmd/profile/main.py">
+import logging
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
+import grpc
+from fastapi import FastAPI
+
+from internal.adapters.http.dependencies import get_profile_service
+from internal.adapters.http.profiles import router as profiles_router
+from internal.adapters.kafka.consumer import KafkaUserRegisteredConsumer
+from internal.adapters.postgres.database import async_session_maker, engine
+from internal.adapters.postgres.repository import SqlAlchemyProfileRepository
+from internal.adapters.postgres.uow import SqlAlchemyUnitOfWork
+from internal.adapters.rpc.grpc_clients import GrpcOrdersClient, GrpcPaymentsClient
+from internal.app.service import ProfileService
+from internal.config.config import settings
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+kafka_consumer: KafkaUserRegisteredConsumer | None = None
+
+orders_channel = grpc.aio.insecure_channel(settings.ORDERS_GRPC_HOST)
+payments_channel = grpc.aio.insecure_channel(settings.PAYMENTS_GRPC_HOST)
+
+grpc_orders_client = GrpcOrdersClient(orders_channel)
+grpc_payments_client = GrpcPaymentsClient(payments_channel)
+
+
+async def build_profile_service() -> AsyncGenerator[ProfileService, None]:
+    async with async_session_maker() as session:
+        try:
+            repo = SqlAlchemyProfileRepository(session)
+            uow = SqlAlchemyUnitOfWork(session)
+
+            service = ProfileService(
+                repo=repo,
+                uow=uow,
+                orders_client=grpc_orders_client,
+                payments_client=grpc_payments_client,
+            )
+            yield service
+        finally:
+            await session.close()
+
+
+async def process_kafka_message(msg_data: dict) -> None:
+    async with async_session_maker() as session:
+        repo = SqlAlchemyProfileRepository(session)
+        uow = SqlAlchemyUnitOfWork(session)
+
+        service = ProfileService(
+            repo=repo,
+            uow=uow,
+            orders_client=grpc_orders_client,
+            payments_client=grpc_payments_client,
+        )
+        await service.process_registration_event(msg_data)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global kafka_consumer
+
+    logger.info("Starting Profile Service...")
+
+    kafka_consumer = KafkaUserRegisteredConsumer(
+        bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+        group_id=settings.KAFKA_CONSUMER_GROUP,
+        topic=settings.KAFKA_USER_REGISTERED_TOPIC,
+        process_callback=process_kafka_message,
+    )
+
+    await kafka_consumer.start()
+
+    yield
+
+    logger.info("Shutting down Profile Service...")
+
+    if kafka_consumer:
+        await kafka_consumer.stop()
+
+    await engine.dispose()
+
+    await orders_channel.close()
+    await payments_channel.close()
+
+
+app = FastAPI(
+    title="Profile Service",
+    description="Микросервис управления профилями",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+app.dependency_overrides[get_profile_service] = build_profile_service
+
+app.include_router(profiles_router, prefix="/api/v1")
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="127.0.0.1", port=8000)
+</file>
+
+<file path="backend/profile/cmd/__init__.py">
+
+</file>
+
+<file path="backend/profile/internal/adapters/grpc/generated/__init__.py">
+
+</file>
+
+<file path="backend/profile/internal/adapters/grpc/generated/payments_pb2_grpc.py">
+# Generated by the gRPC Python protocol compiler plugin. DO NOT EDIT!
+"""Client and server classes corresponding to protobuf-defined services."""
+import grpc
+import warnings
+
+from internal.adapters.grpc.generated import payments_pb2 as backend_dot_proto_dot_payments__pb2
+
+GRPC_GENERATED_VERSION = '1.84.0'
+GRPC_VERSION = grpc.__version__
+_version_not_supported = False
+
+try:
+    from grpc._utilities import first_version_is_lower
+    _version_not_supported = first_version_is_lower(GRPC_VERSION, GRPC_GENERATED_VERSION)
+except ImportError:
+    _version_not_supported = True
+
+if _version_not_supported:
+    raise RuntimeError(
+        f'The grpc package installed is at version {GRPC_VERSION},'
+        + ' but the generated code in internal/adapters/grpc/generated/payments_pb2_grpc.py depends on'
+        + f' grpcio>={GRPC_GENERATED_VERSION}.'
+        + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
+        + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
+    )
+
+
+class PaymentsServiceStub:
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.GetBalanceByUser = channel.unary_unary(
+                '/payments.PaymentsService/GetBalanceByUser',
+                request_serializer=backend_dot_proto_dot_payments__pb2.GetBalanceRequest.SerializeToString,
+                response_deserializer=backend_dot_proto_dot_payments__pb2.GetBalanceResponse.FromString,
+                _registered_method=True)
+
+
+class PaymentsServiceServicer:
+    """Missing associated documentation comment in .proto file."""
+
+    def GetBalanceByUser(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_PaymentsServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'GetBalanceByUser': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetBalanceByUser,
+                    request_deserializer=backend_dot_proto_dot_payments__pb2.GetBalanceRequest.FromString,
+                    response_serializer=backend_dot_proto_dot_payments__pb2.GetBalanceResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'payments.PaymentsService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('payments.PaymentsService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class PaymentsService:
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def GetBalanceByUser(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/payments.PaymentsService/GetBalanceByUser',
+            backend_dot_proto_dot_payments__pb2.GetBalanceRequest.SerializeToString,
+            backend_dot_proto_dot_payments__pb2.GetBalanceResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+</file>
+
+<file path="backend/profile/internal/adapters/grpc/generated/payments_pb2.py">
+# -*- coding: utf-8 -*-
+# Generated by the protocol buffer compiler.  DO NOT EDIT!
+# NO CHECKED-IN PROTOBUF GENCODE
+# source: backend/proto/payments.proto
+# Protobuf Python Version: 7.35.1
+"""Generated protocol buffer code."""
+from google.protobuf import descriptor as _descriptor
+from google.protobuf import descriptor_pool as _descriptor_pool
+from google.protobuf import runtime_version as _runtime_version
+from google.protobuf import symbol_database as _symbol_database
+from google.protobuf.internal import builder as _builder
+_runtime_version.ValidateProtobufRuntimeVersion(
+    _runtime_version.Domain.PUBLIC,
+    7,
+    35,
+    1,
+    '',
+    'backend/proto/payments.proto'
+)
+# @@protoc_insertion_point(imports)
+
+_sym_db = _symbol_database.Default()
+
+
+
+
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1c\x62\x61\x63kend/proto/payments.proto\x12\x08payments\"$\n\x11GetBalanceRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\"5\n\x12GetBalanceResponse\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x0e\n\x06\x61mount\x18\x02 \x01(\x02\x32`\n\x0fPaymentsService\x12M\n\x10GetBalanceByUser\x12\x1b.payments.GetBalanceRequest\x1a\x1c.payments.GetBalanceResponseb\x06proto3')
+
+_globals = globals()
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'backend.proto.payments_pb2', _globals)
+if not _descriptor._USE_C_DESCRIPTORS:
+  DESCRIPTOR._loaded_options = None
+  _globals['_GETBALANCEREQUEST']._serialized_start=42
+  _globals['_GETBALANCEREQUEST']._serialized_end=78
+  _globals['_GETBALANCERESPONSE']._serialized_start=80
+  _globals['_GETBALANCERESPONSE']._serialized_end=133
+  _globals['_PAYMENTSSERVICE']._serialized_start=135
+  _globals['_PAYMENTSSERVICE']._serialized_end=231
+# @@protoc_insertion_point(module_scope)
+</file>
+
+<file path="backend/profile/internal/adapters/grpc/generated/v1_pb2_grpc.py">
+# Generated by the gRPC Python protocol compiler plugin. DO NOT EDIT!
+"""Client and server classes corresponding to protobuf-defined services."""
+import grpc
+import warnings
+
+from internal.adapters.grpc.generated import v1_pb2 as backend_dot_proto_dot_v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2
+
+GRPC_GENERATED_VERSION = '1.84.0'
+GRPC_VERSION = grpc.__version__
+_version_not_supported = False
+
+try:
+    from grpc._utilities import first_version_is_lower
+    _version_not_supported = first_version_is_lower(GRPC_VERSION, GRPC_GENERATED_VERSION)
+except ImportError:
+    _version_not_supported = True
+
+if _version_not_supported:
+    raise RuntimeError(
+        f'The grpc package installed is at version {GRPC_VERSION},'
+        + ' but the generated code in internal/adapters/grpc/generated/v1_pb2_grpc.py depends on'
+        + f' grpcio>={GRPC_GENERATED_VERSION}.'
+        + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
+        + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
+    )
+
+
+class OrdersServiceStub:
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.GetUserOrders = channel.unary_unary(
+                '/orders.orders.v1.OrdersService/GetUserOrders',
+                request_serializer=backend_dot_proto_dot_v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2.UserOrdersRequest.SerializeToString,
+                response_deserializer=backend_dot_proto_dot_v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2.UserOrdersResponse.FromString,
+                _registered_method=True)
+
+
+class OrdersServiceServicer:
+    """Missing associated documentation comment in .proto file."""
+
+    def GetUserOrders(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_OrdersServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'GetUserOrders': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetUserOrders,
+                    request_deserializer=backend_dot_proto_dot_v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2.UserOrdersRequest.FromString,
+                    response_serializer=backend_dot_proto_dot_v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2.UserOrdersResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'orders.orders.v1.OrdersService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('orders.orders.v1.OrdersService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class OrdersService:
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def GetUserOrders(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/orders.orders.v1.OrdersService/GetUserOrders',
+            backend_dot_proto_dot_v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2.UserOrdersRequest.SerializeToString,
+            backend_dot_proto_dot_v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2.UserOrdersResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+</file>
+
+<file path="backend/profile/internal/adapters/grpc/generated/v1_pb2.py">
+# -*- coding: utf-8 -*-
+# Generated by the protocol buffer compiler.  DO NOT EDIT!
+# NO CHECKED-IN PROTOBUF GENCODE
+# source: backend/proto/v1/orders/orders.orders.v1.proto
+# Protobuf Python Version: 7.35.1
+"""Generated protocol buffer code."""
+from google.protobuf import descriptor as _descriptor
+from google.protobuf import descriptor_pool as _descriptor_pool
+from google.protobuf import runtime_version as _runtime_version
+from google.protobuf import symbol_database as _symbol_database
+from google.protobuf.internal import builder as _builder
+_runtime_version.ValidateProtobufRuntimeVersion(
+    _runtime_version.Domain.PUBLIC,
+    7,
+    35,
+    1,
+    '',
+    'backend/proto/v1/orders/orders.orders.v1.proto'
+)
+# @@protoc_insertion_point(imports)
+
+_sym_db = _symbol_database.Default()
+
+
+from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
+
+
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n.backend/proto/v1/orders/orders.orders.v1.proto\x12\x10orders.orders.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"$\n\x11UserOrdersRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\"I\n\x12UserOrdersResponse\x12\x33\n\x06orders\x18\x01 \x03(\x0b\x32#.orders.orders.v1.UserOrderResponse\"\x80\x02\n\x11UserOrderResponse\x12\x10\n\x08order_id\x18\x01 \x01(\t\x12\x12\n\nproduct_id\x18\x02 \x01(\t\x12\x0f\n\x07user_id\x18\x03 \x01(\t\x12\x10\n\x08quantity\x18\x04 \x01(\x03\x12\x13\n\x0btotal_price\x18\x05 \x01(\x03\x12-\n\x06status\x18\x06 \x01(\x0e\x32\x1d.orders.orders.v1.OrderStatus\x12.\n\ncreated_at\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nupdated_at\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp*5\n\x0bOrderStatus\x12\x0b\n\x07\x43REATED\x10\x00\x12\n\n\x06\x46\x41ILED\x10\x01\x12\r\n\tCANCELLED\x10\x02\x32k\n\rOrdersService\x12Z\n\rGetUserOrders\x12#.orders.orders.v1.UserOrdersRequest\x1a$.orders.orders.v1.UserOrdersResponseBYZWgithub.com/identicalaffiliation/web-go-project/backend/orders/gen/pb/orders/v1;ordersv1b\x06proto3')
+
+_globals = globals()
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'backend.proto.v1.orders.orders.orders.v1_pb2', _globals)
+if not _descriptor._USE_C_DESCRIPTORS:
+  _globals['DESCRIPTOR']._loaded_options = None
+  _globals['DESCRIPTOR']._serialized_options = b'ZWgithub.com/identicalaffiliation/web-go-project/backend/orders/gen/pb/orders/v1;ordersv1'
+  _globals['_ORDERSTATUS']._serialized_start=473
+  _globals['_ORDERSTATUS']._serialized_end=526
+  _globals['_USERORDERSREQUEST']._serialized_start=101
+  _globals['_USERORDERSREQUEST']._serialized_end=137
+  _globals['_USERORDERSRESPONSE']._serialized_start=139
+  _globals['_USERORDERSRESPONSE']._serialized_end=212
+  _globals['_USERORDERRESPONSE']._serialized_start=215
+  _globals['_USERORDERRESPONSE']._serialized_end=471
+  _globals['_ORDERSSERVICE']._serialized_start=528
+  _globals['_ORDERSSERVICE']._serialized_end=635
+# @@protoc_insertion_point(module_scope)
+</file>
+
+<file path="backend/profile/internal/adapters/http/dependencies.py">
+import uuid
+
+from fastapi import Header, HTTPException
+
+
+def get_current_user_id(x_user_id: str = Header(..., alias="X-User-Id")) -> uuid.UUID:
+    """
+    Извлекает ID пользователя из заголовка X-User-Id,
+    который прокидывает API-шлюз после успешной авторизации.
+    """
+    try:
+        return uuid.UUID(x_user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400, detail="Invalid X-User-Id format"
+        ) from None
+
+
+# Заглушка для получения бизнес-логики (переопределяется в main.py)
+async def get_profile_service():
+    raise NotImplementedError("This dependency should be overridden in main.py")
+</file>
+
+<file path="backend/profile/internal/adapters/http/profiles.py">
+import logging
+import uuid
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from internal.adapters.http.dependencies import get_current_user_id, get_profile_service
+from internal.adapters.http.schemas import (
+    BalanceResponse,
+    CreateBusinessProfileRequest,
+    OrderResponse,
+    ProfileResponse,
+    ProfileUpdateRequest,
+)
+from internal.app.service import ProfileService
+from internal.domain.exceptions import ProfileAlreadyExistsError, ProfileNotFoundError
+
+router = APIRouter(prefix="/profiles", tags=["Profiles"])
+
+UserIdDep = Annotated[uuid.UUID, Depends(get_current_user_id)]
+ProfileServiceDep = Annotated[ProfileService, Depends(get_profile_service)]
+
+logger = logging.getLogger(__name__)
+
+
+@router.get("/me", response_model=list[ProfileResponse])
+async def get_my_profiles(user_id: UserIdDep, profile_service: ProfileServiceDep):
+    """
+    Получить все профили (CUSTOMER и/или BUSINESS) текущего пользователя.
+    user_id берется безопасно из JWT токена.
+    """
+    profiles = await profile_service.get_profiles_by_user(user_id)
+    return profiles
+
+
+@router.patch("/me/{profile_id}", response_model=ProfileResponse)
+async def update_my_profile(
+    profile_id: uuid.UUID,
+    update_data: ProfileUpdateRequest,
+    user_id: UserIdDep,
+    profile_service: ProfileServiceDep,
+):
+    """
+    Обновить данные конкретного профиля.
+    """
+    try:
+        updated_profile = await profile_service.update_profile(
+            profile_id=profile_id,
+            user_id=user_id,
+            update_data=update_data.model_dump(exclude_unset=True),
+        )
+        return updated_profile
+
+    except ProfileNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile not found or access denied",
+        ) from None
+    except Exception:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        ) from None
+
+
+@router.get("/orders", response_model=list[OrderResponse])
+async def get_my_orders(user_id: UserIdDep, profile_service: ProfileServiceDep):
+    """Получить историю заказов текущего пользователя."""
+    orders = await profile_service.get_orders(user_id)
+    return orders
+
+
+@router.get("/balance", response_model=BalanceResponse)
+async def get_my_balance(user_id: UserIdDep, profile_service: ProfileServiceDep):
+    """Получить баланс текущего пользователя."""
+    balance = await profile_service.get_balance(user_id)
+    return balance
+
+
+@router.post(
+    "/business",
+    response_model=ProfileResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Создать бизнес-профиль",
+    description="Создает профиль продавца (BUSINESS) для текущего пользователя.",
+)
+async def create_business_profile_endpoint(
+    request_data: CreateBusinessProfileRequest,
+    user_id: Annotated[uuid.UUID, Depends(get_current_user_id)],
+    profile_service: Annotated[ProfileService, Depends(get_profile_service)],
+):
+    try:
+        created_profile = await profile_service.create_business_profile(
+            user_id=user_id, data=request_data
+        )
+        return created_profile
+
+    except ProfileAlreadyExistsError as e:
+        logger.warning(f"Conflict: business profile for user {user_id} already exists.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(e)
+        ) from None
+
+    except Exception:
+        logger.exception(
+            f"Unexpected error while creating business profile for user {user_id}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal Server Error",
+        ) from None
+</file>
+
+<file path="backend/profile/internal/adapters/http/schemas.py">
+import uuid
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from internal.domain.models import ProfileType
+
+
+class ProfileResponse(BaseModel):
+    """Схема для отправки данных профиля фронтенду."""
+
+    id: uuid.UUID
+    user_id: uuid.UUID
+    profile_type: ProfileType
+    first_name: str | None
+    last_name: str | None
+    phone: str | None
+    company_name: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProfileUpdateRequest(BaseModel):
+    """Схема для обновления профиля. Все поля опциональны (PATCH-запрос)."""
+
+    first_name: str | None = Field(default=None, min_length=1, max_length=100)
+    last_name: str | None = Field(default=None, min_length=3, max_length=100)
+    phone: str | None = Field(default=None, pattern=r"^(\+7|8|7)\d{10}$")
+    company_name: str | None = None
+
+
+class OrderResponse(BaseModel):
+    id: str
+    product_id: str
+    price: float
+    status: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BalanceResponse(BaseModel):
+    amount: float
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CreateBusinessProfileRequest(BaseModel):
+    company_name: str = Field(
+        ..., min_length=1, max_length=255, description="Название компании или ИП"
+    )
+    phone: str | None = Field(
+        default=None,
+        pattern=r"^\+?[1-9]\d{1,14}$",
+        description="Контактный номер телефона (международный формат)",
+    )
+</file>
+
+<file path="backend/profile/internal/adapters/kafka/consumer.py">
+import asyncio
+import json
+import logging
+from collections.abc import Awaitable, Callable
+from typing import Any
+
+from aiokafka import AIOKafkaConsumer
+
+from internal.ports.message_broker import IEventConsumer
+
+logger = logging.getLogger(__name__)
+
+
+class KafkaUserRegisteredConsumer(IEventConsumer):
+    def __init__(
+        self,
+        bootstrap_servers: str,
+        group_id: str,
+        topic: str,
+        process_callback: Callable[[dict[str, Any]], Awaitable[None]],
+    ):
+        self.bootstrap_servers = bootstrap_servers
+        self.group_id = group_id
+        self.topic = topic
+        self.process_callback = process_callback
+        self.consumer: AIOKafkaConsumer | None = None
+        self._consume_task: asyncio.Task | None = None
+
+    async def start(self) -> None:
+        self.consumer = AIOKafkaConsumer(
+            self.topic,
+            bootstrap_servers=self.bootstrap_servers,
+            group_id=self.group_id,
+            value_deserializer=lambda m: json.loads(m.decode("utf-8")),
+            auto_offset_reset="earliest",
+            enable_auto_commit=False,
+        )
+        await self.consumer.start()
+
+        self._consume_task = asyncio.create_task(self._consume_loop())
+        logger.info(f"Kafka Consumer started listening to topic: {self.topic}")
+
+    async def stop(self) -> None:
+        if self._consume_task:
+            self._consume_task.cancel()
+            try:
+                await self._consume_task
+            except asyncio.CancelledError:
+                pass
+
+        if self.consumer:
+            await self.consumer.stop()
+            logger.info("Kafka Consumer stopped.")
+
+    async def _consume_loop(self) -> None:
+        try:
+            async for msg in self.consumer:
+                try:
+                    await self.process_callback(msg.value)
+                    await self.consumer.commit()
+
+                except Exception as e:
+                    logger.error(f"Error processing Kafka message {msg.value}: {e}")
+
+        except asyncio.CancelledError:
+            logger.info("Kafka consume loop cancelled (shutdown signal received).")
+</file>
+
+<file path="backend/profile/internal/adapters/postgres/database.py">
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from internal.config.config import settings
+
+engine = create_async_engine(
+    settings.database_url,
+    echo=False,
+    future=True,
+    pool_size=10,
+    max_overflow=20,
+)
+
+async_session_maker = async_sessionmaker(
+    engine, class_=AsyncSession, expire_on_commit=False
+)
+</file>
+
+<file path="backend/profile/internal/adapters/postgres/models.py">
+import uuid
+from datetime import datetime
+
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import String, UniqueConstraint, func
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from internal.domain.models import ProfileType
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class ProfileModel(Base):
+    __tablename__ = "profiles"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), index=True, nullable=False
+    )
+
+    profile_type: Mapped[ProfileType] = mapped_column(
+        SQLEnum(
+            ProfileType,
+            name="profile_type",
+            values_callable=lambda obj: [e.value for e in obj],
+        )
+    )
+
+    first_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    company_name: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    idempotency_key: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), unique=True, nullable=False
+    )
+
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "profile_type", name="uq_user_profile_type"),
+    )
+</file>
+
+<file path="backend/profile/internal/adapters/postgres/repository.py">
+import uuid
+
+from sqlalchemy import select, update
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from internal.adapters.postgres.models import ProfileModel
+from internal.domain.exceptions import ProfileNotFoundError
+from internal.domain.models import Profile, ProfileType
+from internal.ports.repository import IProfileRepository
+
+
+class SqlAlchemyProfileRepository(IProfileRepository):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    def _to_domain(self, model: ProfileModel) -> Profile:
+        """Вспомогательный метод для маппинга ORM модели в чистую Доменную модель"""
+        return Profile(
+            id=model.id,
+            user_id=model.user_id,
+            profile_type=model.profile_type,
+            first_name=model.first_name,
+            last_name=model.last_name,
+            phone=model.phone,
+            company_name=model.company_name,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
+
+    async def create(
+        self, profile: Profile, idempotency_key: uuid.UUID | None = None
+    ) -> Profile | None:
+        stmt = (
+            insert(ProfileModel)
+            .values(
+                id=profile.id,
+                user_id=profile.user_id,
+                profile_type=profile.profile_type,
+                first_name=profile.first_name,
+                last_name=profile.last_name,
+                phone=profile.phone,
+                company_name=profile.company_name,
+                idempotency_key=idempotency_key,
+            )
+            .on_conflict_do_nothing(index_elements=["idempotency_key"])
+            .returning(ProfileModel)
+        )
+
+        result = await self.session.execute(stmt)
+        model = result.scalar_one_or_none()
+
+        if model is None:
+            return None
+
+        return self._to_domain(model)
+
+    async def get_by_user_id(self, user_id: uuid.UUID) -> list[Profile]:
+        stmt = select(ProfileModel).where(ProfileModel.user_id == user_id)
+        result = await self.session.execute(stmt)
+        models = result.scalars().all()
+        return [self._to_domain(m) for m in models]
+
+    async def get_by_user_id_and_type(
+        self, user_id: uuid.UUID, profile_type: ProfileType
+    ) -> Profile | None:
+        stmt = select(ProfileModel).where(
+            ProfileModel.user_id == user_id, ProfileModel.profile_type == profile_type
+        )
+        result = await self.session.execute(stmt)
+        model = result.scalar_one_or_none()
+        return self._to_domain(model) if model else None
+
+    async def update(self, profile: Profile) -> Profile:
+        stmt = (
+            update(ProfileModel)
+            .where(ProfileModel.id == profile.id)
+            .values(
+                first_name=profile.first_name,
+                last_name=profile.last_name,
+                phone=profile.phone,
+                company_name=profile.company_name,
+            )
+            .returning(ProfileModel)
+        )
+
+        result = await self.session.execute(stmt)
+        updated_model = result.scalar_one_or_none()
+
+        if not updated_model:
+            raise ProfileNotFoundError(profile_id=str(profile.id))
+
+        return self._to_domain(updated_model)
+</file>
+
+<file path="backend/profile/internal/adapters/postgres/uow.py">
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from internal.ports.uow import IUnitOfWork
+
+
+class SqlAlchemyUnitOfWork(IUnitOfWork):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def commit(self) -> None:
+        await self.session.commit()
+
+    async def rollback(self) -> None:
+        await self.session.rollback()
+</file>
+
+<file path="backend/profile/internal/adapters/rpc/grpc_clients.py">
+import uuid
+
+import grpc
+
+from internal.adapters.grpc.generated import (
+    payments_pb2,
+    payments_pb2_grpc,
+)
+from internal.adapters.grpc.generated import (
+    v1_pb2 as orders_pb2,
+)
+from internal.adapters.grpc.generated import (
+    v1_pb2_grpc as orders_pb2_grpc,
+)
+from internal.domain.models import BalanceDTO, OrderDTO
+from internal.ports.rpc_clients import IOrdersClient, IPaymentsClient
+
+
+class GrpcOrdersClient(IOrdersClient):
+    def __init__(self, channel: grpc.aio.Channel):
+        self.stub = orders_pb2_grpc.OrdersServiceStub(channel)
+
+    async def get_user_orders(self, user_id: uuid.UUID) -> list[OrderDTO]:
+        request = orders_pb2.UserOrdersRequest(user_id=str(user_id))
+        try:
+            response = await self.stub.GetUserOrders(request)
+
+            return [
+                OrderDTO(
+                    id=order.order_id,
+                    product_id=order.product_id,
+                    price=float(order.total_price),
+                    status=orders_pb2.OrderStatus.Name(order.status),
+                    created_at=order.created_at.ToDatetime(),
+                )
+                for order in response.orders
+            ]
+        except grpc.aio.AioRpcError as e:
+            raise Exception(f"Orders service error: {e.details()}") from None
+
+
+class GrpcPaymentsClient(IPaymentsClient):
+    def __init__(self, channel: grpc.aio.Channel):
+        self.stub = payments_pb2_grpc.PaymentsServiceStub(channel)
+
+    async def get_user_balance(self, user_id: uuid.UUID) -> BalanceDTO:
+        request = payments_pb2.GetBalanceRequest(user_id=str(user_id))
+        try:
+            response = await self.stub.GetBalanceByUser(request)
+            return BalanceDTO(amount=response.amount)
+        except grpc.aio.AioRpcError as e:
+            raise Exception(f"Payments service error: {e.details()}") from None
+</file>
+
+<file path="backend/profile/internal/app/service.py">
+import logging
+import uuid
+from typing import Any
+
+from internal.adapters.http.schemas import CreateBusinessProfileRequest
+from internal.domain.exceptions import ProfileAlreadyExistsError, ProfileNotFoundError
+from internal.domain.models import BalanceDTO, OrderDTO, Profile, ProfileType
+from internal.ports.repository import IProfileRepository
+from internal.ports.rpc_clients import IOrdersClient, IPaymentsClient
+from internal.ports.uow import IUnitOfWork
+
+logger = logging.getLogger(__name__)
+
+
+class ProfileService:
+    """
+    Слой Use Case (Бизнес-логика).
+    Оркестрирует доменные модели, репозиторий и управление транзакциями.
+    """
+
+    def __init__(
+        self,
+        repo: IProfileRepository,
+        uow: IUnitOfWork,
+        orders_client: IOrdersClient,
+        payments_client: IPaymentsClient,
+    ):
+        self.repo = repo
+        self.uow = uow
+        self.orders_client = orders_client
+        self.payments_client = payments_client
+
+    async def process_registration_event(self, event_data: dict[str, Any]) -> None:
+        """
+        Обрабатывает событие из Kafka (например, auth.user.registered).
+        """
+        user_id_str = event_data.get("user_id")
+        event_id_str = event_data.get("event_id")
+
+        if not user_id_str or not event_id_str:
+            logger.error(f"Invalid event data received from Kafka: {event_data}")
+            return
+
+        user_id = uuid.UUID(user_id_str)
+        idempotency_key = uuid.UUID(event_id_str)
+
+        new_profile = Profile(
+            id=uuid.uuid4(), user_id=user_id, profile_type=ProfileType.CUSTOMER
+        )
+
+        try:
+            created_profile = await self.repo.create(new_profile, idempotency_key)
+
+            if created_profile:
+                await self.uow.commit()
+                logger.info(f"Successfully created CUSTOMER profile for user {user_id}")
+            else:
+                await self.uow.rollback()
+                logger.info(
+                    f"Event {idempotency_key} already processed (Idempotency). Skipping."
+                )
+
+        except Exception:
+            await self.uow.rollback()
+            logger.exception(f"Failed to create profile for user {user_id}")
+            raise
+
+    async def get_profiles_by_user(self, user_id: uuid.UUID) -> list[Profile]:
+        """
+        Получить все профили пользователя.
+        """
+        return await self.repo.get_by_user_id(user_id)
+
+    async def update_profile(
+        self, profile_id: uuid.UUID, user_id: uuid.UUID, update_data: dict[str, Any]
+    ) -> Profile:
+        """
+        Обновляет данные профиля, предварительно проверяя права доступа.
+        """
+        user_profiles = await self.repo.get_by_user_id(user_id)
+
+        target_profile = next((p for p in user_profiles if p.id == profile_id), None)
+
+        if not target_profile:
+            raise ProfileNotFoundError(str(profile_id))
+
+        if "first_name" in update_data:
+            target_profile.first_name = update_data["first_name"]
+        if "last_name" in update_data:
+            target_profile.last_name = update_data["last_name"]
+        if "phone" in update_data:
+            target_profile.phone = update_data["phone"]
+        if "company_name" in update_data:
+            target_profile.company_name = update_data["company_name"]
+
+        try:
+            updated_profile = await self.repo.update(target_profile)
+            await self.uow.commit()
+            return updated_profile
+
+        except Exception:
+            await self.uow.rollback()
+            raise
+
+    async def get_orders(self, user_id: uuid.UUID) -> list[OrderDTO]:
+        """Получить историю заказов пользователя из внешнего сервиса."""
+        return await self.orders_client.get_user_orders(user_id)
+
+    async def get_balance(self, user_id: uuid.UUID) -> BalanceDTO:
+        """Получить баланс пользователя из внешнего сервиса."""
+        return await self.payments_client.get_user_balance(user_id)
+
+    async def create_business_profile(
+        self, user_id: uuid.UUID, data: CreateBusinessProfileRequest
+    ) -> Profile:
+        """
+        Создает дополнительный профиль типа BUSINESS для существующего пользователя.
+        """
+
+        existing_profile = await self.repo.get_by_user_id_and_type(
+            user_id=user_id, profile_type=ProfileType.BUSINESS
+        )
+        if existing_profile:
+            logger.warning(f"Business profile already exists for user {user_id}")
+            raise ProfileAlreadyExistsError(
+                "У данного пользователя уже есть бизнес-профиль"
+            )
+
+        new_profile = Profile(
+            id=uuid.uuid4(),
+            user_id=user_id,
+            profile_type=ProfileType.BUSINESS,
+            first_name=None,
+            last_name=None,
+            company_name=data.company_name,
+            phone=data.phone,
+        )
+
+        try:
+            created_profile = await self.repo.create(new_profile)
+
+            if created_profile:
+                await self.uow.commit()
+                logger.info(f"Successfully created BUSINESS profile for user {user_id}")
+                return created_profile
+            else:
+                await self.uow.rollback()
+                raise RuntimeError(
+                    "Failed to create business profile (repository returned None)"
+                )
+
+        except Exception as e:
+            await self.uow.rollback()
+            logger.exception(f"Error creating business profile for user {user_id}")
+            raise e
+</file>
+
+<file path="backend/profile/internal/config/config.py">
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_HOST: str
+    POSTGRES_PORT: int
+    POSTGRES_DB: str
+
+    KAFKA_BOOTSTRAP_SERVERS: str
+    KAFKA_CONSUMER_GROUP: str = "profile_service_group"
+    KAFKA_USER_REGISTERED_TOPIC: str = "users.created"
+
+    ORDERS_GRPC_HOST: str = "localhost:50051"
+    PAYMENTS_GRPC_HOST: str = "localhost:50052"
+
+    @property
+    def database_url(self) -> str:
+        return (
+            f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+            f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        )
+
+    model_config = SettingsConfigDict(
+        env_file="configs/.env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+
+settings = Settings()
+</file>
+
+<file path="backend/profile/internal/domain/exceptions.py">
+# internal/domain/exceptions.py
+
+
+class ProfileNotFoundError(Exception):
+    """Выбрасывается, когда профиль не найден в базе."""
+
+    def __init__(self, profile_id: str):
+        self.profile_id = profile_id
+        super().__init__(f"Profile with ID {profile_id} not found.")
+
+
+class ProfileAlreadyExistsError(Exception):
+    """Выбрасывается, если нарушено бизнес-правило уникальности."""
+</file>
+
+<file path="backend/profile/internal/domain/models.py">
+import uuid
+from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum
+
+
+class ProfileType(str, Enum):
+    CUSTOMER = "customer"
+    BUSINESS = "business"
+
+
+@dataclass
+class Profile:
+    id: uuid.UUID
+    user_id: uuid.UUID
+    profile_type: ProfileType
+
+    first_name: str | None = None
+    last_name: str | None = None
+    phone: str | None = None
+    company_name: str | None = None
+
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+@dataclass
+class OrderDTO:
+    id: str
+    product_id: str
+    price: float
+    status: str
+    created_at: datetime
+
+
+@dataclass
+class BalanceDTO:
+    amount: float
+
+
+@dataclass
+class WishlistItemDTO:
+    product_id: str
+    added_at: datetime
+</file>
+
+<file path="backend/profile/internal/ports/message_broker.py">
+from abc import ABC, abstractmethod
+
+
+class IEventConsumer(ABC):
+    """
+    Интерфейс (порт) консьюмера событий.
+    Абстрагирует работу с брокером сообщений (Kafka).
+    """
+
+    @abstractmethod
+    async def start(self) -> None:
+        """
+        Устанавливает соединение с брокером и запускает бесконечный цикл
+        чтения сообщений в фоновом режиме.
+        """
+
+    @abstractmethod
+    async def stop(self) -> None:
+        """
+        Корректно завершает работу консьюмера, отписывается от топиков
+        и закрывает сетевые соединения.
+        """
+</file>
+
+<file path="backend/profile/internal/ports/repository.py">
+import uuid
+from abc import ABC, abstractmethod
+
+from internal.domain.models import Profile, ProfileType
+
+
+class IProfileRepository(ABC):
+    """
+    Интерфейс (порт) для работы с хранилищем профилей.
+    Любой класс, который будет работать с БД, обязан реализовать эти методы.
+    """
+
+    @abstractmethod
+    async def create(
+        self, profile: Profile, idempotency_key: uuid.UUID | None = None
+    ) -> Profile | None:
+        """
+        Создает новый профиль в БД.
+
+        :param profile: Доменная модель профиля для сохранения.
+        :param idempotency_key: ID сообщения из Kafka для защиты от дублей.
+        :return: Созданный профиль или None, если такой idempotency_key уже был (дубль).
+        """
+
+    @abstractmethod
+    async def get_by_user_id(self, user_id: uuid.UUID) -> list[Profile]:
+        """
+        Возвращает все профили конкретного пользователя.
+        У одного пользователя может быть список из 1-2 профилей (CUSTOMER, BUSINESS).
+        """
+
+    @abstractmethod
+    async def get_by_user_id_and_type(
+        self, user_id: uuid.UUID, profile_type: ProfileType
+    ) -> Profile | None:
+        """
+        Возвращает конкретный профиль пользователя по его типу.
+        """
+
+    @abstractmethod
+    async def update(self, profile: Profile) -> Profile:
+        """
+        Обновляет данные существующего профиля.
+        """
+</file>
+
+<file path="backend/profile/internal/ports/rpc_clients.py">
+import uuid
+from abc import ABC, abstractmethod
+
+from internal.domain.models import BalanceDTO, OrderDTO
+
+
+class IOrdersClient(ABC):
+    """Порт для получения данных из сервиса заказов."""
+
+    @abstractmethod
+    async def get_user_orders(self, user_id: uuid.UUID) -> list[OrderDTO]:
+        pass
+
+
+class IPaymentsClient(ABC):
+    """Порт для получения данных из сервиса платежей."""
+
+    @abstractmethod
+    async def get_user_balance(self, user_id: uuid.UUID) -> BalanceDTO:
+        pass
+</file>
+
+<file path="backend/profile/internal/ports/uow.py">
+from abc import ABC, abstractmethod
+
+
+class IUnitOfWork(ABC):
+    """
+    Паттерн Unit of Work.
+    Обеспечивает атомарность бизнес-операций (все изменения сохраняются вместе или откатываются).
+    """
+
+    @abstractmethod
+    async def commit(self) -> None:
+        pass
+
+    @abstractmethod
+    async def rollback(self) -> None:
+        pass
+</file>
+
+<file path="backend/profile/.dockerignore">
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.env
+.git/
+.idea/
+.vscode/
+</file>
+
+<file path="backend/profile/Dockerfile">
+# Используем легковесный официальный образ Python
+# (В вашем pyproject.toml указан target-version = "py314", 
+# но так как стабильной версии 3.14 еще нет, используем актуальную 3.12 или 3.13)
+FROM python:3.14-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+COPY requirements.txt .
+
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8000
+
+
+CMD ["uvicorn", "cmd.profile.main:app", "--host", "0.0.0.0", "--port", "8000"]
+</file>
+
+<file path="backend/profile/openapi.json">
+{"openapi":"3.1.0","info":{"title":"Profile Service","description":"Микросервис управления профилями","version":"1.0.0"},"paths":{"/api/v1/profiles/me":{"get":{"tags":["Profiles"],"summary":"Get My Profiles","description":"Получить все профили (CUSTOMER и/или BUSINESS) текущего пользователя.\nuser_id берется безопасно из JWT токена.","operationId":"get_my_profiles_api_v1_profiles_me_get","parameters":[{"name":"X-User-Id","in":"header","required":true,"schema":{"type":"string","title":"X-User-Id"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/ProfileResponse"},"title":"Response Get My Profiles Api V1 Profiles Me Get"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/profiles/me/{profile_id}":{"patch":{"tags":["Profiles"],"summary":"Update My Profile","description":"Обновить данные конкретного профиля.","operationId":"update_my_profile_api_v1_profiles_me__profile_id__patch","parameters":[{"name":"profile_id","in":"path","required":true,"schema":{"type":"string","format":"uuid","title":"Profile Id"}},{"name":"X-User-Id","in":"header","required":true,"schema":{"type":"string","title":"X-User-Id"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProfileUpdateRequest"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProfileResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/profiles/orders":{"get":{"tags":["Profiles"],"summary":"Get My Orders","description":"Получить историю заказов текущего пользователя.","operationId":"get_my_orders_api_v1_profiles_orders_get","parameters":[{"name":"X-User-Id","in":"header","required":true,"schema":{"type":"string","title":"X-User-Id"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/OrderResponse"},"title":"Response Get My Orders Api V1 Profiles Orders Get"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/profiles/balance":{"get":{"tags":["Profiles"],"summary":"Get My Balance","description":"Получить баланс текущего пользователя.","operationId":"get_my_balance_api_v1_profiles_balance_get","parameters":[{"name":"X-User-Id","in":"header","required":true,"schema":{"type":"string","title":"X-User-Id"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/BalanceResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/profiles/business":{"post":{"tags":["Profiles"],"summary":"Создать бизнес-профиль","description":"Создает профиль продавца (BUSINESS) для текущего пользователя.","operationId":"create_business_profile_endpoint_api_v1_profiles_business_post","parameters":[{"name":"X-User-Id","in":"header","required":true,"schema":{"type":"string","title":"X-User-Id"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CreateBusinessProfileRequest"}}}},"responses":{"201":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProfileResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}}},"components":{"schemas":{"BalanceResponse":{"properties":{"amount":{"type":"number","title":"Amount"}},"type":"object","required":["amount"],"title":"BalanceResponse"},"CreateBusinessProfileRequest":{"properties":{"company_name":{"type":"string","maxLength":255,"minLength":1,"title":"Company Name","description":"Название компании или ИП"},"phone":{"anyOf":[{"type":"string","pattern":"^\\+?[1-9]\\d{1,14}$"},{"type":"null"}],"title":"Phone","description":"Контактный номер телефона (международный формат)"}},"type":"object","required":["company_name"],"title":"CreateBusinessProfileRequest"},"HTTPValidationError":{"properties":{"detail":{"items":{"$ref":"#/components/schemas/ValidationError"},"type":"array","title":"Detail"}},"type":"object","title":"HTTPValidationError"},"OrderResponse":{"properties":{"id":{"type":"string","title":"Id"},"product_id":{"type":"string","title":"Product Id"},"price":{"type":"number","title":"Price"},"status":{"type":"string","title":"Status"},"created_at":{"type":"string","format":"date-time","title":"Created At"}},"type":"object","required":["id","product_id","price","status","created_at"],"title":"OrderResponse"},"ProfileResponse":{"properties":{"id":{"type":"string","format":"uuid","title":"Id"},"user_id":{"type":"string","format":"uuid","title":"User Id"},"profile_type":{"$ref":"#/components/schemas/ProfileType"},"first_name":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"First Name"},"last_name":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Last Name"},"phone":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Phone"},"company_name":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Company Name"},"created_at":{"type":"string","format":"date-time","title":"Created At"},"updated_at":{"type":"string","format":"date-time","title":"Updated At"}},"type":"object","required":["id","user_id","profile_type","first_name","last_name","phone","company_name","created_at","updated_at"],"title":"ProfileResponse","description":"Схема для отправки данных профиля фронтенду."},"ProfileType":{"type":"string","enum":["customer","business"],"title":"ProfileType"},"ProfileUpdateRequest":{"properties":{"first_name":{"anyOf":[{"type":"string","maxLength":100,"minLength":1},{"type":"null"}],"title":"First Name"},"last_name":{"anyOf":[{"type":"string","maxLength":100,"minLength":3},{"type":"null"}],"title":"Last Name"},"phone":{"anyOf":[{"type":"string","pattern":"^(\\+7|8|7)\\d{10}$"},{"type":"null"}],"title":"Phone"},"company_name":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Company Name"}},"type":"object","title":"ProfileUpdateRequest","description":"Схема для обновления профиля. Все поля опциональны (PATCH-запрос)."},"ValidationError":{"properties":{"loc":{"items":{"anyOf":[{"type":"string"},{"type":"integer"}]},"type":"array","title":"Location"},"msg":{"type":"string","title":"Message"},"type":{"type":"string","title":"Error Type"},"input":{"title":"Input"},"ctx":{"type":"object","title":"Context"}},"type":"object","required":["loc","msg","type"],"title":"ValidationError"}}}}
+</file>
+
+<file path="backend/profile/pyproject.toml">
+[tool.ruff]
+line-length = 88
+target-version = "py314"
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "alembic",
+    "internal/adapters/grpc/generated" 
+]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+</file>
+
+<file path="backend/profile/requirements.in">
+fastapi
+uvicorn[standard]
+sqlalchemy[asyncio]
+asyncpg
+grpcio
+grpcio-tools
+aiokafka
+pydantic-settings
+python-dotenv
+</file>
+
+<file path="backend/profile/requirements.txt">
+#
+# This file is autogenerated by pip-compile with Python 3.14
+# by the following command:
+#
+#    pip-compile requirements.in
+#
+aiokafka==0.14.0
+    # via -r requirements.in
+annotated-doc==0.0.5
+    # via fastapi
+annotated-types==0.8.0
+    # via pydantic
+anyio==4.15.1
+    # via
+    #   starlette
+    #   watchfiles
+async-timeout==5.0.1
+    # via aiokafka
+asyncpg==0.32.0
+    # via -r requirements.in
+click==8.5.0
+    # via uvicorn
+fastapi==0.143.0
+    # via -r requirements.in
+greenlet==3.5.6
+    # via sqlalchemy
+grpcio==1.84.0
+    # via
+    #   -r requirements.in
+    #   grpcio-tools
+grpcio-tools==1.84.0
+    # via -r requirements.in
+h11==0.16.0
+    # via uvicorn
+httptools==0.9.0
+    # via uvicorn
+idna==3.20
+    # via anyio
+opentelemetry-api==1.45.1
+    # via fastapi
+packaging==26.3
+    # via aiokafka
+protobuf==7.36.2
+    # via grpcio-tools
+pydantic==2.14.0
+    # via
+    #   fastapi
+    #   pydantic-settings
+pydantic-core==2.50.0
+    # via pydantic
+pydantic-settings==2.15.0
+    # via -r requirements.in
+python-dotenv==1.2.4
+    # via
+    #   -r requirements.in
+    #   pydantic-settings
+    #   uvicorn
+pyyaml==6.0.3
+    # via uvicorn
+sqlalchemy[asyncio]==2.1.4
+    # via -r requirements.in
+starlette==1.7.0
+    # via fastapi
+typing-extensions==4.16.0
+    # via
+    #   aiokafka
+    #   anyio
+    #   fastapi
+    #   grpcio
+    #   opentelemetry-api
+    #   pydantic
+    #   pydantic-core
+    #   sqlalchemy
+    #   typing-inspection
+typing-inspection==0.4.4
+    # via
+    #   fastapi
+    #   pydantic
+    #   pydantic-settings
+uvicorn[standard]==0.54.0
+    # via -r requirements.in
+watchfiles==1.3.0
+    # via uvicorn
+websockets==17.2
+    # via uvicorn
+
+# The following packages are considered to be unsafe in a requirements file:
+# setuptools
+</file>
+
+<file path="backend/profile/template.txt">
+profile
+├── cmd/profile/main.py
+├── internal/
+│   ├── domain/
+│   ├── ports/
+│   ├── app/
+│   ├── adapters/{postgres,grpc}/
+│   ├── config/
+│   └── pkg/{jwt,hasher}/
+├── migrations/
+├── configs/
+└── Dockerfile
+</file>
+
+<file path="backend/proto/v1/catalog/catalog.price.v1.proto">
+syntax = "proto3";
+
+package catalog.price.v1;
+
+option go_package = "github.com/identicalaffiliation/web-go-project/backend/catalog/gen/pb/price/v1;pricev1";
+
+service PriceService {
+  rpc GetPriceByProductId (PriceRequest) returns (PriceResponse);
+}
+
+message PriceRequest {
+  string product_id = 1; // uuid product id
+}
+
+message PriceResponse {
+  string product_id = 1;
+  int64 price = 2; // price of 1 product
+}
+</file>
+
+<file path="backend/proto/v1/orders/orders.orders.v1.proto">
+syntax = "proto3";
+
+package orders.orders.v1;
+
+option go_package = "github.com/identicalaffiliation/web-go-project/backend/orders/gen/pb/orders/v1;ordersv1";
+
+import "google/protobuf/timestamp.proto";
+
+service OrdersService {
+  rpc GetUserOrders(UserOrdersRequest) returns (UserOrdersResponse);
+}
+
+message UserOrdersRequest {
+  string user_id = 1;
+}
+
+enum OrderStatus {
+  CREATED = 0;
+  FAILED = 1;
+  CANCELLED = 2;
+}
+
+message UserOrdersResponse {
+  repeated UserOrderResponse orders = 1;
+}
+
+message UserOrderResponse {
+  string order_id = 1;
+  string product_id = 2;
+  string user_id = 3;
+  int64 quantity = 4;
+  int64 total_price = 5;
+  OrderStatus status = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+</file>
+
+<file path="backend/proto/payments.proto">
+syntax = "proto3";
+
+package payments;
+
+service PaymentsService {
+  rpc GetBalanceByUser (GetBalanceRequest) returns (GetBalanceResponse);
+}
+
+message GetBalanceRequest {
+  string user_id = 1;
+}
+
+message GetBalanceResponse {
+  string user_id = 1;
+  float amount = 2; 
+}
+</file>
+
+<file path="compose.yml">
+services:
+
+  # INFRASTRUCTURE
+  shop-redis:
+    image: redis:8-alpine
+
+    # secure redis server
+    command: [ "redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}" ]
+
+    volumes:
+      - redis_data:/data
+
+    # external connect: localhost:6379, internal connect: shop-redis:6379
+    ports:
+      - "6379:6379"
+
+    healthcheck:
+      test: [ "CMD-SHELL", "redis-cli", "ping" ]
+      interval: 5s
+      retries: 5
+      timeout: 10s
+
+  shop-minio:
+    # minio fork
+    image: netvark/minio:latest
+    container_name: shop-minio
+
+    # web console connection: localhost:9001
+    command: server /data --console-address ":9001"
+
+    # basics environment
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+
+    volumes:
+      - minio_data:/data
+
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth-postgres:
+    container_name: auth-postgres
+    image: postgres:16-alpine
+
+    # basics environments
+    environment:
+      POSTGRES_DB: auth-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    # external connection: localhost:5430
+    ports:
+      - "5430:5432"
+
+    volumes:
+      - auth_postgres_data:/var/lib/postgresql
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d auth-db"]
+      retries: 5
+      timeout: 10s
+      interval: 10s
+
+  profile-postgres:
+    container_name: profile-postgres
+    image: postgres:16-alpine
+
+    # basics environments
+    environment:
+      POSTGRES_DB: profile-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    # external connection: localhost:5431
+    ports:
+      - "5431:5432"
+
+    volumes:
+      - profile_postgres_data:/var/lib/postgresql
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d profile-db" ]
+      retries: 5
+      timeout: 10s
+      interval: 10s
+
+  catalog-master-postgres:
+    build:
+      context: ./scripts/postgres/catalog/master
+      dockerfile: Dockerfile
+
+    container_name: catalog-master-postgres
+    image: catalog-master-postgres:1
+
+    # basics environments
+    environment:
+      POSTGRES_DB: catalog-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    # external connection: localhost:5432
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - catalog_master_postgres_data:/var/lib/postgresql
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d catalog-db" ]
+      retries: 5
+      timeout: 10s
+      interval: 10s
+
+  inventory-master-postgres:
+    container_name: inventory-master-postgres
+    image: postgres:16-alpine
+
+    # basics environments
+    environment:
+      POSTGRES_DB: inventory-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    # external connection: localhost:5434
+    ports:
+      - "5434:5432"
+
+    volumes:
+      - inventory_master_postgres_data:/var/lib/postgresql
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d inventory-db" ]
+      retries: 5
+      timeout: 10s
+      interval: 10s
+
+  catalog-replica-postgres:
+    build:
+      context: ./scripts/postgres/catalog/replica
+      dockerfile: Dockerfile
+
+    container_name: catalog-replica-postgres
+    image: catalog-replica-postgres:1
+
+    # basics environments
+    environment:
+      POSTGRES_DB: catalog-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    # external connection: localhost:5433
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - catalog_replica_postgres_data:/var/lib/postgresql
+
+    depends_on:
+      catalog-master-postgres:
+        condition: service_healthy
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d catalog-db" ]
+      retries: 5
+      timeout: 10s
+      interval: 10s
+
+  orders-master-postgres:
+    build:
+      context: ./scripts/postgres/orders/master
+      dockerfile: Dockerfile
+
+    container_name: orders-master-postgres
+    image: catalog-master-postgres:1
+
+    # basics environments
+    environment:
+      POSTGRES_DB: orders-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    # external connection: localhost:5436
+    ports:
+      - "5436:5432"
+
+    volumes:
+      - orders_master_postgres_data:/var/lib/postgresql
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d orders-db" ]
+      retries: 5
+      timeout: 10s
+      interval: 10s
+
+  orders-replica-postgres:
+    build:
+      context: ./scripts/postgres/orders/replica
+      dockerfile: Dockerfile
+
+    container_name: orders-replica-postgres
+    image: orders-replica-postgres:1
+
+    # basics environments
+    environment:
+      POSTGRES_DB: orders-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    # external connection: localhost:5437
+    ports:
+      - "5437:5432"
+
+    volumes:
+      - orders_replica_postgres_data:/var/lib/postgresql
+
+    depends_on:
+      orders-master-postgres:
+        condition: service_healthy
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d orders-db" ]
+      retries: 5
+      timeout: 10s
+      interval: 10s
+
+  shop-zookeeper:
+    image: confluentinc/cp-zookeeper:7.7.8
+
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+    ports:
+      - "2181:2181"
+
+    healthcheck:
+      test: [ "CMD-SHELL", "bash -c '</dev/tcp/localhost/2181'" ]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  shop-kafka:
+    image: confluentinc/cp-kafka:7.7.8
+
+    # basics environments
+    environment:
+
+      # unique broker id of kafka cluster
+      KAFKA_BROKER_ID: 1
+
+      # zookeeper cluster coordinator connection
+      KAFKA_ZOOKEEPER_CONNECT: shop-zookeeper:2181
+
+      # address for connect clients
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://shop-kafka:9092
+
+      # address for get connections (all interfaces)
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+
+      # no auth protocol for listeners
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+
+      # between brokers in cluster - no auth
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      # basic replication factor of topic - 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+    # external connection: localhost:9092
+    ports:
+      - "9092:9092"
+
+    healthcheck:
+      test: [ "CMD-SHELL", "bash -c '</dev/tcp/localhost/9092'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    # start after zookeeper is healthy
+    depends_on:
+      shop-zookeeper:
+        condition: service_healthy
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+
+    # basics environments of kafka UI
+    environment:
+
+      # broker's cluster name
+      KAFKA_CLUSTERS_0_NAME: shop
+
+      # brokers for kafka UI connect
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: shop-kafka:9092
+
+      # zookeeper of cluster connect
+      KAFKA_CLUSTERS_0_ZOOKEEPER: shop-zookeeper:2181
+
+      # external connection: http://localhost:4200
+    ports:
+      - "4200:8080"
+
+    # start after zookeeper and broker healthy
+    depends_on:
+      shop-zookeeper:
+        condition: service_healthy
+      shop-kafka:
+        condition: service_healthy
+
+  temporal-postgres:
+    container_name: temporal-postgres
+    image: postgres:16-alpine
+
+    # basics environments
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+
+    # external connection: localhost:5435
+    ports:
+      - "5435:5432"
+
+    volumes:
+      - temporal_postgres_data:/var/lib/postgresql
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U temporal" ]
+      retries: 5
+      timeout: 10s
+      interval: 10s
+
+  shop-temporal:
+    container_name: shop-temporal
+    # auto-setup: сам накатывает схемы temporal в бд и создает namespace default
+    image: temporalio/auto-setup:1.29.7
+
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_SEEDS: temporal-postgres
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      DEFAULT_NAMESPACE: default
+
+    # external connection (grpc): localhost:7233
+    ports:
+      - "7233:7233"
+
+    healthcheck:
+      test: [ "CMD-SHELL", "temporal operator namespace describe -n default --address $$(hostname -i):7233" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+    depends_on:
+      temporal-postgres:
+        condition: service_healthy
+
+  temporal-ui:
+    container_name: temporal-ui
+    image: temporalio/ui:2.57.0
+
+    environment:
+      TEMPORAL_ADDRESS: shop-temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:8233
+
+    # external connection: http://localhost:8233
+    ports:
+      - "8233:8080"
+
+    depends_on:
+      shop-temporal:
+        condition: service_healthy
+
+  # MIGRATIONS AND TOPICS INITIALIZE
+  auth-migrator:
+    build:
+      context: ./migrator
+    environment:
+      MIGRATIONS_PATH: ./migrations/auth
+      DB_URL: postgres://postgres:postgres@auth-postgres:5432/auth-db?sslmode=disable
+    depends_on:
+      auth-postgres:
+        condition: service_healthy
+
+  inventory-migrator:
+    build:
+      context: ./migrator
+    environment:
+      MIGRATIONS_PATH: ./migrations/inventory
+      DB_URL: postgres://postgres:postgres@inventory-master-postgres:5432/inventory-db?sslmode=disable
+    depends_on:
+      inventory-master-postgres:
+        condition: service_healthy
+
+  profile-migrator:
+    build:
+      context: ./migrator
+    environment:
+      MIGRATIONS_PATH: ./migrations/profile
+      DB_URL: postgres://postgres:postgres@profile-postgres:5432/profile-db?sslmode=disable
+    depends_on:
+      profile-postgres:
+        condition: service_healthy
+
+  catalog-migrator:
+    build:
+      context: ./migrator
+    environment:
+      MIGRATIONS_PATH: ./migrations/catalog
+      DB_URL: postgres://postgres:postgres@catalog-master-postgres:5432/catalog-db?sslmode=disable
+    depends_on:
+      catalog-master-postgres:
+        condition: service_healthy
+
+  orders-migrator:
+    build:
+      context: ./migrator
+    environment:
+      MIGRATIONS_PATH: ./migrations/orders
+      DB_URL: postgres://postgres:postgres@orders-master-postgres:5432/orders-db?sslmode=disable
+    depends_on:
+      catalog-master-postgres:
+        condition: service_healthy
+
+  init-kafka:
+    image: confluentinc/cp-kafka:7.7.8
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      "
+      # blocks until kafka is reachable
+      kafka-topics --bootstrap-server shop-kafka:9092 --list
+
+      echo -e 'Creating kafka topics'
+      kafka-topics --bootstrap-server shop-kafka:9092 --create --if-not-exists --topic users.created --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server shop-kafka:9092 --create --if-not-exists --topic stock.created --replication-factor 1 --partitions 3
+
+      echo -e 'Successfully created the following topics:'
+      kafka-topics --bootstrap-server shop-kafka:9092 --list
+      "
+    depends_on:
+      shop-kafka:
+        condition: service_healthy
+
+  orders-service:
+    container_name: orders-service
+
+    build:
+      context: ./backend/orders
+      dockerfile: Dockerfile
+
+    environment:
+      MASTER_DSN: ${MASTER_ORDERS_POSTGRES_DSN}
+      REPLICA_DSN: ${REPLICA_ORDERS_POSTGRES_DSN}
+
+    ports:
+      - "50051:50052"
+
+    volumes:
+      - ./backend/orders/configs/orders.yml:/app/config.yml:ro
+
+    depends_on:
+      orders-master-postgres:
+        condition: service_healthy
+
+  catalog-service:
+    container_name: catalog-service
+
+    build:
+      context: ./backend/catalog
+      dockerfile: Dockerfile
+
+    environment:
+      MASTER_DSN: ${MASTER_CATALOG_POSTGRES_DSN}
+      REPLICA_DSN: ${REPLICA_CATALOG_POSTGRES_DSN}
+      MINIO_USER: ${MINIO_USER}
+      MINIO_PASSWORD: ${MINIO_PASSWORD}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+    volumes:
+      - ./backend/catalog/configs/catalog.yml:/app/config.yml:ro
+
+    depends_on:
+      catalog-master-postgres:
+        condition: service_healthy
+      shop-zookeeper:
+        condition: service_healthy
+      shop-kafka:
+        condition: service_healthy
+      shop-minio:
+        condition: service_healthy
+      shop-redis:
+        condition: service_healthy
+
+  auth-service:
+    container_name: auth-service
+
+    build:
+      context: ./backend/auth
+      dockerfile: Dockerfile
+
+    environment:
+      MASTER_DSN: ${MASTER_AUTH_POSTGRES_DSN}
+      PRIVATE_KEY_PATH: /app/keys/private.pem
+      PUBLIC_KEY_PATH: /app/keys/public.pem
+      AUTH_JWT_KEY_ID: auth-2024-01
+      AUTH_JWT_ISSUER: auth.example.com
+
+    volumes:
+      - ./secrets/jwt:/app/keys:ro
+      - ./backend/auth/configs/auth.yml:/app/config.yml:ro
+
+    depends_on:
+      auth-postgres:
+        condition: service_healthy
+      shop-zookeeper:
+        condition: service_healthy
+
+  profile-service:
+    container_name: profile-service
+    build:
+      context: ./backend/profile
+      dockerfile: Dockerfile
+
+    environment:
+      POSTGRES_HOST: profile-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: profile-db
+
+      KAFKA_BOOTSTRAP_SERVERS: shop-kafka:9092
+      KAFKA_USER_REGISTERED_TOPIC: users.created
+
+      ORDERS_GRPC_HOST: catalog-service:50051
+      PAYMENTS_GRPC_HOST: payments-service:50052
+
+    # Для тестов расскомментировать, чтобы был доступ к сервису снаружи:
+    # ports:
+    #   - "8000:8000"
+
+    depends_on:
+      profile-postgres:
+        condition: service_healthy
+      shop-kafka:
+        condition: service_healthy
+
+  inventory-service:
+    container_name: inventory-service
+    build:
+      context: ./backend/inventory
+      dockerfile: Dockerfile
+
+    volumes:
+      - ./backend/inventory/configs/inventory.yml:/app/config.yml:ro
+
+    environment:
+      MASTER_DSN: postgres://postgres:postgres@inventory-master-postgres:5432/inventory-db?sslmode=disable
+
+    depends_on:
+      shop-kafka:
+        condition: service_healthy
+      shop-zookeeper:
+        condition: service_healthy
+      inventory-master-postgres:
+        condition: service_healthy
+      shop-temporal:
+        condition: service_healthy
+
+  # API GATEWAY
+  gateway:
+    container_name: gateway
+    image: nginx:1.27-alpine
+
+    # external connection: http://localhost:80
+    ports:
+      - "80:80"
+
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost/healthz || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    depends_on:
+      - auth-service
+      - catalog-service
+      - profile-service
+
+volumes:
+  auth_postgres_data:
+  profile_postgres_data:
+  catalog_master_postgres_data:
+  inventory_master_postgres_data:
+  temporal_postgres_data:
+  catalog_replica_postgres_data:
+  orders_master_postgres_data:
+  orders_replica_postgres_data:
+  minio_data:
+  redis_data:
+</file>
+
+</files>
