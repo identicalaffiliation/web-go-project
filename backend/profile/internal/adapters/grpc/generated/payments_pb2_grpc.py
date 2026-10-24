@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from internal.adapters.grpc.generated import payments_pb2 as backend_dot_proto_dot_payments__pb2
+from internal.adapters.grpc.generated import payments_pb2 as payments__pb2
 
 GRPC_GENERATED_VERSION = '1.84.0'
 GRPC_VERSION = grpc.__version__
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in internal/adapters/grpc/generated/payments_pb2_grpc.py depends on'
+        + ' but the generated code in payments_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -36,8 +36,8 @@ class PaymentsServiceStub:
         """
         self.GetBalanceByUser = channel.unary_unary(
                 '/payments.PaymentsService/GetBalanceByUser',
-                request_serializer=backend_dot_proto_dot_payments__pb2.GetBalanceRequest.SerializeToString,
-                response_deserializer=backend_dot_proto_dot_payments__pb2.GetBalanceResponse.FromString,
+                request_serializer=payments__pb2.GetBalanceRequest.SerializeToString,
+                response_deserializer=payments__pb2.GetBalanceResponse.FromString,
                 _registered_method=True)
 
 
@@ -55,8 +55,8 @@ def add_PaymentsServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'GetBalanceByUser': grpc.unary_unary_rpc_method_handler(
                     servicer.GetBalanceByUser,
-                    request_deserializer=backend_dot_proto_dot_payments__pb2.GetBalanceRequest.FromString,
-                    response_serializer=backend_dot_proto_dot_payments__pb2.GetBalanceResponse.SerializeToString,
+                    request_deserializer=payments__pb2.GetBalanceRequest.FromString,
+                    response_serializer=payments__pb2.GetBalanceResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -84,8 +84,8 @@ class PaymentsService:
             request,
             target,
             '/payments.PaymentsService/GetBalanceByUser',
-            backend_dot_proto_dot_payments__pb2.GetBalanceRequest.SerializeToString,
-            backend_dot_proto_dot_payments__pb2.GetBalanceResponse.FromString,
+            payments__pb2.GetBalanceRequest.SerializeToString,
+            payments__pb2.GetBalanceResponse.FromString,
             options,
             channel_credentials,
             insecure,

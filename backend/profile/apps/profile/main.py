@@ -20,6 +20,12 @@ logger = logging.getLogger(__name__)
 
 kafka_consumer: KafkaUserRegisteredConsumer | None = None
 
+orders_channel = grpc.aio.insecure_channel(settings.ORDERS_GRPC_HOST)
+payments_channel = grpc.aio.insecure_channel(settings.PAYMENTS_GRPC_HOST)
+
+grpc_orders_client = GrpcOrdersClient(orders_channel)
+grpc_payments_client = GrpcPaymentsClient(payments_channel)
+
 
 async def build_profile_service() -> AsyncGenerator[ProfileService, None]:
     async with async_session_maker() as session:
@@ -54,19 +60,9 @@ async def process_kafka_message(msg_data: dict) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global \
-        kafka_consumer, \
-        orders_channel, \
-        payments_channel, \
-        grpc_orders_client, \
-        grpc_payments_client
+    global kafka_consumer
 
     logger.info("Starting Profile Service...")
-
-    orders_channel = grpc.aio.insecure_channel(settings.ORDERS_GRPC_HOST)
-    payments_channel = grpc.aio.insecure_channel(settings.PAYMENTS_GRPC_HOST)
-    grpc_orders_client = GrpcOrdersClient(orders_channel)
-    grpc_payments_client = GrpcPaymentsClient(payments_channel)
 
     kafka_consumer = KafkaUserRegisteredConsumer(
         bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
@@ -86,10 +82,8 @@ async def lifespan(app: FastAPI):
 
     await engine.dispose()
 
-    if orders_channel:
-        await orders_channel.close()
-    if payments_channel:
-        await payments_channel.close()
+    await orders_channel.close()
+    await payments_channel.close()
 
 
 app = FastAPI(

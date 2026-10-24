@@ -179,7 +179,7 @@ services:
       dockerfile: Dockerfile
 
     container_name: orders-master-postgres
-    image: orders-master-postgres:1
+    image: catalog-master-postgres:1
 
     # basics environments
     environment:
@@ -617,7 +617,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: shop-kafka:9092
       KAFKA_USER_REGISTERED_TOPIC: users.created
 
-      ORDERS_GRPC_HOST: orders-service:50052
+      ORDERS_GRPC_HOST: catalog-service:50051
       PAYMENTS_GRPC_HOST: payments-service:50052
 
     # Для тестов расскомментировать, чтобы был доступ к сервису снаружи:
