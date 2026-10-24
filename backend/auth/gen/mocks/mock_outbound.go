@@ -101,6 +101,44 @@ func (mr *MockUserRepositoryMockRecorder) GetByID(ctx, id any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockUserRepository)(nil).GetByID), ctx, id)
 }
 
+// MockUserRoleUpdater is a mock of UserRoleUpdater interface.
+type MockUserRoleUpdater struct {
+	ctrl     *gomock.Controller
+	recorder *MockUserRoleUpdaterMockRecorder
+	isgomock struct{}
+}
+
+// MockUserRoleUpdaterMockRecorder is the mock recorder for MockUserRoleUpdater.
+type MockUserRoleUpdaterMockRecorder struct {
+	mock *MockUserRoleUpdater
+}
+
+// NewMockUserRoleUpdater creates a new mock instance.
+func NewMockUserRoleUpdater(ctrl *gomock.Controller) *MockUserRoleUpdater {
+	mock := &MockUserRoleUpdater{ctrl: ctrl}
+	mock.recorder = &MockUserRoleUpdaterMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockUserRoleUpdater) EXPECT() *MockUserRoleUpdaterMockRecorder {
+	return m.recorder
+}
+
+// UpdateRole mocks base method.
+func (m *MockUserRoleUpdater) UpdateRole(ctx context.Context, id uuid.UUID, role domain.Role) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateRole", ctx, id, role)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateRole indicates an expected call of UpdateRole.
+func (mr *MockUserRoleUpdaterMockRecorder) UpdateRole(ctx, id, role any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRole", reflect.TypeOf((*MockUserRoleUpdater)(nil).UpdateRole), ctx, id, role)
+}
+
 // MockRefreshTokenRepository is a mock of RefreshTokenRepository interface.
 type MockRefreshTokenRepository struct {
 	ctrl     *gomock.Controller

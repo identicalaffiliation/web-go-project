@@ -31,3 +31,10 @@ outbox:
   batch_size: 100              # AUTH_OUTBOX_BATCH_SIZE
   publish_timeout: 10s         # AUTH_OUTBOX_PUBLISH_TIMEOUT
   max_attempts: 5              # AUTH_OUTBOX_MAX_ATTEMPTS
+
+role_consumer:
+  topic: profiles.business.created # AUTH_ROLE_CONSUMER_TOPIC, контракт ждёт подтверждения Profile
+  group_id: auth-service       # AUTH_ROLE_CONSUMER_GROUP_ID
+  retry_backoff: 2s            # AUTH_ROLE_CONSUMER_RETRY_BACKOFF, пауза перед повтором при сбое БД/Kafka
+  commit_timeout: 5s           # AUTH_ROLE_CONSUMER_COMMIT_TIMEOUT
+  max_wait: 500ms              # AUTH_ROLE_CONSUMER_MAX_WAIT
