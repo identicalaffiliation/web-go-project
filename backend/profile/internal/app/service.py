@@ -137,7 +137,9 @@ class ProfileService:
         )
 
         try:
-            created_profile = await self.repo.create(new_profile)
+            created_profile = await self.repo.create(
+                new_profile, idempotency_key=uuid.uuid4()
+            )
 
             if created_profile:
                 await self.uow.commit()
