@@ -1,0 +1,112 @@
+basePath: /
+definitions:
+  domain.Order:
+    properties:
+      createdAt:
+        type: string
+      id:
+        type: string
+      productId:
+        type: string
+      quantity:
+        type: integer
+      status:
+        $ref: '#/definitions/domain.Status'
+      totalPrice:
+        type: integer
+      updatedAt:
+        type: string
+      userId:
+        type: string
+    type: object
+  domain.Status:
+    enum:
+    - created
+    - paid
+    - failed
+    type: string
+    x-enum-varnames:
+    - Created
+    - Paid
+    - Failed
+  dto.CreateRequest:
+    properties:
+      operationId:
+        example: 01a16a84-ff25-7774-b48f-bc656eaf370f
+        format: uuid
+        type: string
+      productId:
+        example: 01a16a84-ff25-7770-9542-0ca3281bb16c
+        format: uuid
+        type: string
+      quantity:
+        example: 1
+        maximum: 99
+        minimum: 1
+        type: integer
+    required:
+    - operationId
+    - productId
+    - quantity
+    type: object
+  dto.OrderResponse:
+    properties:
+      order:
+        $ref: '#/definitions/domain.Order'
+    type: object
+info:
+  contact: {}
+  description: Creating customer orders. Order saga (stock reservation) runs asynchronously
+    in temporal.
+  title: Orders Service API
+  version: "1.0"
+paths:
+  /orders:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Creates an order with status "created" and starts the order saga asynchronously.
+        Final status (paid/failed) is available via GetUserOrders.
+        operationId is an idempotency key: a repeated request with the same key is rejected with 409.
+        X-User-Id and X-User-Role headers are set by the gateway from the JWT.
+      parameters:
+      - description: User ID (uuid)
+        in: header
+        name: X-User-Id
+        required: true
+        type: string
+      - description: User role
+        enum:
+        - customer
+        in: header
+        name: X-User-Role
+        required: true
+        type: string
+      - description: Order payload
+        in: body
+        name: order
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.OrderResponse'
+        "400":
+          description: Invalid payload or X-User-Id
+        "401":
+          description: No X-User-Role
+        "403":
+          description: Role is not allowed
+        "409":
+          description: Order with this operationId already exists
+        "500":
+          description: Internal Server Error
+      summary: Create order
+      tags:
+      - orders
+swagger: "2.0"

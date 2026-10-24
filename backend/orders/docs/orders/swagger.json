@@ -1,0 +1,156 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Creating customer orders. Order saga (stock reservation) runs asynchronously in temporal.",
+        "title": "Orders Service API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "basePath": "/",
+    "paths": {
+        "/orders": {
+            "post": {
+                "description": "Creates an order with status \"created\" and starts the order saga asynchronously.\nFinal status (paid/failed) is available via GetUserOrders.\noperationId is an idempotency key: a repeated request with the same key is rejected with 409.\nX-User-Id and X-User-Role headers are set by the gateway from the JWT.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "orders"
+                ],
+                "summary": "Create order",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID (uuid)",
+                        "name": "X-User-Id",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "customer"
+                        ],
+                        "type": "string",
+                        "description": "User role",
+                        "name": "X-User-Role",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Order payload",
+                        "name": "order",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.OrderResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid payload or X-User-Id"
+                    },
+                    "401": {
+                        "description": "No X-User-Role"
+                    },
+                    "403": {
+                        "description": "Role is not allowed"
+                    },
+                    "409": {
+                        "description": "Order with this operationId already exists"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "domain.Order": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "productId": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer"
+                },
+                "status": {
+                    "$ref": "#/definitions/domain.Status"
+                },
+                "totalPrice": {
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "type": "string"
+                },
+                "userId": {
+                    "type": "string"
+                }
+            }
+        },
+        "domain.Status": {
+            "type": "string",
+            "enum": [
+                "created",
+                "paid",
+                "failed"
+            ],
+            "x-enum-varnames": [
+                "Created",
+                "Paid",
+                "Failed"
+            ]
+        },
+        "dto.CreateRequest": {
+            "type": "object",
+            "required": [
+                "operationId",
+                "productId",
+                "quantity"
+            ],
+            "properties": {
+                "operationId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "01a16a84-ff25-7774-b48f-bc656eaf370f"
+                },
+                "productId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "01a16a84-ff25-7770-9542-0ca3281bb16c"
+                },
+                "quantity": {
+                    "type": "integer",
+                    "maximum": 99,
+                    "minimum": 1,
+                    "example": 1
+                }
+            }
+        },
+        "dto.OrderResponse": {
+            "type": "object",
+            "properties": {
+                "order": {
+                    "$ref": "#/definitions/domain.Order"
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,23 @@
+grpc:
+  host: 0.0.0.0
+  port: 50052
+
+kafka:
+  brokers: [shop-kafka:9092]
+  consume_topic: users.created
+  group_id: payments-service
+  queue_capacity: 50
+  read_batch_timeout: 500ms
+  workers: 1
+  retry_backoff: 1s
+
+temporal:
+  host_port: shop-temporal:7233
+  namespace: default
+  task_queue: payments
+  max_concurrent_activities: 50
+
+# стартовый баланс нового пользователя
+initial_balance: 1000000
+
+operation_duration: 30s

@@ -99,8 +99,10 @@ func run(configPath string) error {
 	// ключами при ротации; сейчас конфиг даёт ровно один.
 	verifier := jwt.NewVerifier(map[string]*rsa.PublicKey{cfg.JWT.KeyID: publicKey}, cfg.JWT.Issuer)
 
+	users := postgres.NewUserRepository(pool)
+
 	service := app.NewService(
-		postgres.NewUserRepository(pool),
+		users,
 		postgres.NewRefreshTokenRepository(pool),
 		hasher.New(),
 		issuer,
@@ -127,6 +129,22 @@ func run(configPath string) error {
 		MaxAttempts:    cfg.Outbox.MaxAttempts,
 	})
 
+	roleConsumer := kafka.NewConsumer(kafka.ConsumerConfig{
+		Brokers:       cfg.Kafka.Brokers,
+		Topic:         cfg.RoleConsumer.Topic,
+		GroupID:       cfg.RoleConsumer.GroupID,
+		MaxWait:       cfg.RoleConsumer.MaxWait,
+		RetryBackoff:  cfg.RoleConsumer.RetryBackoff,
+		CommitTimeout: cfg.RoleConsumer.CommitTimeout,
+	}, app.NewBusinessRoleHandler(users), log)
+	// Объявлен после defer pool.Close(), поэтому закроется раньше пула: к этому
+	// моменту g.Wait уже дождался консьюмера, и он больше не пишет в базу.
+	defer func() {
+		if err := roleConsumer.Close(); err != nil {
+			log.WithError(err).Error("close role consumer")
+		}
+	}()
+
 	e := serverSetup(cfg, service, verifier, log)
 
 	// errgroup запускает горутины и ждёт их все. Контекст gctx отменяется при
@@ -136,6 +154,10 @@ func run(configPath string) error {
 
 	g.Go(func() error {
 		return worker.Run(gctx)
+	})
+
+	g.Go(func() error {
+		return roleConsumer.Run(gctx)
 	})
 
 	// Start блокирует до остановки сервера, поэтому ему нужна своя горутина.

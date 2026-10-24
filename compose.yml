@@ -231,6 +231,64 @@ services:
       timeout: 10s
       interval: 10s
 
+  payments-master-postgres:
+    build:
+      context: ./scripts/postgres/payments/master
+      dockerfile: Dockerfile
+
+    container_name: payments-master-postgres
+    image: payments-master-postgres:1
+
+    # basics environments
+    environment:
+      POSTGRES_DB: payments-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    # external connection: localhost:5438
+    ports:
+      - "5438:5432"
+
+    volumes:
+      - payments_master_postgres_data:/var/lib/postgresql
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d payments-db" ]
+      retries: 5
+      timeout: 10s
+      interval: 10s
+
+  payments-replica-postgres:
+    build:
+      context: ./scripts/postgres/payments/replica
+      dockerfile: Dockerfile
+
+    container_name: payments-replica-postgres
+    image: payments-replica-postgres:1
+
+    # basics environments
+    environment:
+      POSTGRES_DB: payments-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    # external connection: localhost:5439
+    ports:
+      - "5439:5432"
+
+    volumes:
+      - payments_replica_postgres_data:/var/lib/postgresql
+
+    depends_on:
+      payments-master-postgres:
+        condition: service_healthy
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d payments-db" ]
+      retries: 5
+      timeout: 10s
+      interval: 10s
+
   shop-zookeeper:
     image: confluentinc/cp-zookeeper:7.7.8
 
@@ -432,6 +490,16 @@ services:
       catalog-master-postgres:
         condition: service_healthy
 
+  payments-migrator:
+    build:
+      context: ./migrator
+    environment:
+      MIGRATIONS_PATH: ./migrations/payments
+      DB_URL: postgres://postgres:postgres@payments-master-postgres:5432/payments-db?sslmode=disable
+    depends_on:
+      payments-master-postgres:
+        condition: service_healthy
+
   init-kafka:
     image: confluentinc/cp-kafka:7.7.8
     entrypoint: [ '/bin/sh', '-c' ]
@@ -462,7 +530,9 @@ services:
       MASTER_DSN: ${MASTER_ORDERS_POSTGRES_DSN}
       REPLICA_DSN: ${REPLICA_ORDERS_POSTGRES_DSN}
 
+    # external connection: http://localhost:8080 (rest), localhost:50051 (grpc)
     ports:
+      - "8080:8080"
       - "50051:50052"
 
     volumes:
@@ -471,6 +541,12 @@ services:
     depends_on:
       orders-master-postgres:
         condition: service_healthy
+      orders-replica-postgres:
+        condition: service_healthy
+      shop-temporal:
+        condition: service_healthy
+      catalog-service:
+        condition: service_started
 
   catalog-service:
     container_name: catalog-service
@@ -576,6 +652,34 @@ services:
       shop-temporal:
         condition: service_healthy
 
+  payments-service:
+    container_name: payments-service
+
+    build:
+      context: ./backend/payments
+      dockerfile: Dockerfile
+
+    environment:
+      MASTER_DSN: ${MASTER_PAYMENTS_POSTGRES_DSN}
+      REPLICA_DSN: ${REPLICA_PAYMENTS_POSTGRES_DSN}
+
+    # external connection: localhost:50053 (grpc)
+    ports:
+      - "50053:50052"
+
+    volumes:
+      - ./backend/payments/configs/payments.yml:/app/config.yml:ro
+
+    depends_on:
+      payments-master-postgres:
+        condition: service_healthy
+      payments-replica-postgres:
+        condition: service_healthy
+      shop-kafka:
+        condition: service_healthy
+      shop-temporal:
+        condition: service_healthy
+
   # API GATEWAY
   gateway:
     container_name: gateway
@@ -598,6 +702,7 @@ services:
       - auth-service
       - catalog-service
       - profile-service
+      - orders-service
 
 volumes:
   auth_postgres_data:
@@ -608,5 +713,7 @@ volumes:
   catalog_replica_postgres_data:
   orders_master_postgres_data:
   orders_replica_postgres_data:
+  payments_master_postgres_data:
+  payments_replica_postgres_data:
   minio_data:
   redis_data:

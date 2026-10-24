@@ -2,7 +2,9 @@ package ports
 
 import (
 	"context"
+	"uuid"
 
+	"github.com/identicalaffiliation/web-go-project/backend/orders/internal/domain"
 	"go.uber.org/zap"
 )
 
@@ -16,4 +18,12 @@ type Logger interface {
 
 type TxManager interface {
 	Do(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
+type PriceProvider interface {
+	GetPrice(ctx context.Context, productID uuid.UUID) (int64, error)
+}
+
+type WorkflowStarter interface {
+	StartOrderSaga(ctx context.Context, order *domain.Order) error
 }
