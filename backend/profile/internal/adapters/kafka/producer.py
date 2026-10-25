@@ -25,10 +25,6 @@ class KafkaEventProducer:
     async def publish_event(
         self, topic: str, key: str, payload: dict[str, Any]
     ) -> None:
-        """
-        Отправляет событие с ожиданием подтверждения от брокера (ack).
-        Использует user_id в качестве ключа партиционирования.
-        """
         key_bytes = key.encode("utf-8")
         try:
             await self._producer.send_and_wait(
@@ -37,8 +33,8 @@ class KafkaEventProducer:
                 value=payload,
             )
             logger.info(
-                "Published event %s to topic %s for key %s",
-                payload.get("event_type"),
+                "Published event %s to topic %s for user %s",
+                payload.get("event_id"),
                 topic,
                 key,
             )

@@ -27,12 +27,13 @@ class ProfileService:
         uow: IUnitOfWork,
         orders_client: IOrdersClient,
         payments_client: IPaymentsClient,
-        event_producer: KafkaEventProducer | None = None,  # <-- Добавляем зависимость
+        event_producer: KafkaEventProducer | None = None,
     ):
         self.repo = repo
         self.uow = uow
         self.orders_client = orders_client
         self.payments_client = payments_client
+        self.event_producer = event_producer
 
     async def process_registration_event(self, event_data: dict[str, Any]) -> None:
         """
@@ -155,11 +156,8 @@ class ProfileService:
         if self.event_producer:
             event_payload = {
                 "event_id": str(uuid.uuid4()),
-                "event_type": "BUSINESS_PROFILE_CREATED",
                 "user_id": str(user_id),
-                "profile_id": str(created_profile.id),
-                "company_name": created_profile.company_name,
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "occurred_at": datetime.now(timezone.utc).isoformat(),
             }
             try:
                 await self.event_producer.publish_event(
@@ -169,7 +167,7 @@ class ProfileService:
                 )
             except Exception:
                 logger.error(
-                    f"Profile {created_profile.id} created, but failed to notify Kafka!"
+                    f"Failed to publish business creation event for user {user_id}"
                 )
 
         return created_profile

@@ -19,12 +19,14 @@ def mock_service():
     uow = AsyncMock()
     orders_client = AsyncMock()
     payments_client = AsyncMock()
+    event_producer = AsyncMock()
 
     service = ProfileService(
         repo=repo,
         uow=uow,
         orders_client=orders_client,
         payments_client=payments_client,
+        event_producer=event_producer,
     )
     return service, repo, uow
 
