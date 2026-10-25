@@ -179,7 +179,7 @@ services:
       dockerfile: Dockerfile
 
     container_name: orders-master-postgres
-    image: catalog-master-postgres:1
+    image: orders-master-postgres:1
 
     # basics environments
     environment:
