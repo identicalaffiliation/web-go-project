@@ -3,9 +3,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from backend.profile.internal.adapters.kafka.producer import KafkaEventProducer
-
 from internal.adapters.http.schemas import CreateBusinessProfileRequest
+from internal.adapters.kafka.producer import KafkaEventProducer
 from internal.config.config import settings
 from internal.domain.exceptions import ProfileAlreadyExistsError, ProfileNotFoundError
 from internal.domain.models import BalanceDTO, OrderDTO, Profile, ProfileType
