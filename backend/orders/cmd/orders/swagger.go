@@ -6,4 +6,4 @@ package main
 // @title Orders Service API
 // @version 1.0
 // @description Creating customer orders. Order saga (stock reservation) runs asynchronously in temporal.
-// @BasePath /
+// @BasePath /api/v1
