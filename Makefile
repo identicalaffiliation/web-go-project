@@ -102,6 +102,20 @@ lint: ## линтеры всех сервисов
 	cd backend/profile && ruff format --check .
 	cd backend/profile && python3 -m compileall -q -x 'internal/adapters/grpc/generated' cmd internal
 
+K6_SERVICES := auth catalog orders profile
+RATE        ?= 500
+DURATION    ?= 5m
+BASE_URL    ?= http://localhost
+
+.PHONY: load ## нагрузочное тестирование на все сервисы по очереди
+load:
+	@failed=""; \
+	for s in $(K6_SERVICES); do \
+		echo "==> k6: $$s"; \
+		k6 run -e RATE=$(RATE) -e DURATION=$(DURATION) -e BASE_URL=$(BASE_URL) load/k6/$$s.js || failed="$$failed $$s"; \
+	done; \
+	if [ -n "$$failed" ]; then echo "k6 failed:$$failed"; exit 1; fi
+
 .PHONY: test
 test: unit integrations ## все тесты
 	@cd backend/profile && \
