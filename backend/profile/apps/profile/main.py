@@ -5,6 +5,8 @@ from contextlib import asynccontextmanager
 import grpc
 from fastapi import FastAPI
 
+from internal.adapters.http.dependencies import get_profile_service
+from internal.adapters.http.profiles import router as profiles_router
 from internal.adapters.kafka.consumer import KafkaUserRegisteredConsumer
 from internal.adapters.kafka.producer import KafkaEventProducer
 from internal.adapters.postgres.database import async_session_maker, engine
@@ -90,3 +92,21 @@ async def lifespan(app: FastAPI):
         await engine.dispose()
         await orders_channel.close()
         await payments_channel.close()
+
+
+app = FastAPI(
+    title="Profile Service",
+    description="Микросервис управления профилями",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+app.dependency_overrides[get_profile_service] = build_profile_service
+
+app.include_router(profiles_router, prefix="/api/v1")
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="127.0.0.1", port=8000)
