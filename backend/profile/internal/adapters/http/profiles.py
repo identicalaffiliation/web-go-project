@@ -65,16 +65,26 @@ async def update_my_profile(
 
 @router.get("/orders", response_model=list[OrderResponse])
 async def get_my_orders(user_id: UserIdDep, profile_service: ProfileServiceDep):
-    """Получить историю заказов текущего пользователя."""
-    orders = await profile_service.get_orders(user_id)
-    return orders
+    try:
+        return await profile_service.get_orders(user_id)
+    except RuntimeError:
+        logger.exception("Orders service unavailable")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Orders service unavailable",
+        ) from None
 
 
 @router.get("/balance", response_model=BalanceResponse)
 async def get_my_balance(user_id: UserIdDep, profile_service: ProfileServiceDep):
-    """Получить баланс текущего пользователя."""
-    balance = await profile_service.get_balance(user_id)
-    return balance
+    try:
+        return await profile_service.get_balance(user_id)
+    except RuntimeError:
+        logger.exception("Payments service unavailable")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Payments service unavailable",
+        ) from None
 
 
 @router.post(

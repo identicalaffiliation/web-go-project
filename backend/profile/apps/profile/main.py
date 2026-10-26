@@ -5,8 +5,6 @@ from contextlib import asynccontextmanager
 import grpc
 from fastapi import FastAPI
 
-from internal.adapters.http.dependencies import get_profile_service
-from internal.adapters.http.profiles import router as profiles_router
 from internal.adapters.kafka.consumer import KafkaUserRegisteredConsumer
 from internal.adapters.kafka.producer import KafkaEventProducer
 from internal.adapters.postgres.database import async_session_maker, engine
@@ -20,6 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 kafka_consumer: KafkaUserRegisteredConsumer | None = None
+kafka_producer: KafkaEventProducer | None = None
 orders_channel: grpc.aio.Channel | None = None
 payments_channel: grpc.aio.Channel | None = None
 grpc_orders_client: GrpcOrdersClient | None = None
@@ -59,7 +58,7 @@ async def process_kafka_message(msg_data: dict) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global kafka_consumer, orders_channel, payments_channel
+    global kafka_consumer, kafka_producer, orders_channel, payments_channel
     global grpc_orders_client, grpc_payments_client
 
     logger.info("Starting Profile Service...")
@@ -69,6 +68,9 @@ async def lifespan(app: FastAPI):
     grpc_orders_client = GrpcOrdersClient(orders_channel)
     grpc_payments_client = GrpcPaymentsClient(payments_channel)
 
+    kafka_producer = KafkaEventProducer(settings.KAFKA_BOOTSTRAP_SERVERS)
+    await kafka_producer.start()
+
     kafka_consumer = KafkaUserRegisteredConsumer(
         bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
         group_id=settings.KAFKA_CONSUMER_GROUP,
@@ -77,16 +79,14 @@ async def lifespan(app: FastAPI):
     )
     await kafka_consumer.start()
 
-    yield
-
-    logger.info("Shutting down Profile Service...")
-    if kafka_consumer:
-        await kafka_consumer.stop()
-    await engine.dispose()
-    await orders_channel.close()
-    await payments_channel.close()
-
-
-app = FastAPI(lifespan=lifespan)
-app.dependency_overrides[get_profile_service] = build_profile_service
-app.include_router(profiles_router, prefix="/api/v1")
+    try:
+        yield
+    finally:
+        logger.info("Shutting down Profile Service...")
+        if kafka_consumer:
+            await kafka_consumer.stop()
+        if kafka_producer:
+            await kafka_producer.stop()
+        await engine.dispose()
+        await orders_channel.close()
+        await payments_channel.close()

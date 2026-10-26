@@ -58,9 +58,11 @@ class KafkaUserRegisteredConsumer(IEventConsumer):
                 try:
                     await self.process_callback(msg.value)
                     await self.consumer.commit()
-
                 except Exception as e:
-                    logger.error(f"Error processing Kafka message {msg.value}: {e}")
-
+                    logger.exception(
+                        "Error processing Kafka message %s: %s", msg.value, e
+                    )
+                    await self.consumer.seek(msg.topic, msg.partition, msg.offset)
+                    await asyncio.sleep(1)
         except asyncio.CancelledError:
             logger.info("Kafka consume loop cancelled (shutdown signal received).")

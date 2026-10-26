@@ -3,6 +3,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from sqlalchemy.exc import IntegrityError
+
 from internal.adapters.http.schemas import CreateBusinessProfileRequest
 from internal.adapters.kafka.producer import KafkaEventProducer
 from internal.config.config import settings
@@ -122,7 +124,6 @@ class ProfileService:
             user_id=user_id, profile_type=ProfileType.BUSINESS
         )
         if existing_profile:
-            logger.warning(f"Business profile already exists for user {user_id}")
             raise ProfileAlreadyExistsError(
                 "У данного пользователя уже есть бизнес-профиль"
             )
@@ -144,10 +145,12 @@ class ProfileService:
             if not created_profile:
                 await self.uow.rollback()
                 raise RuntimeError("Failed to create business profile")
-
             await self.uow.commit()
-            logger.info(f"Successfully created BUSINESS profile for user {user_id}")
-
+        except IntegrityError:
+            await self.uow.rollback()
+            raise ProfileAlreadyExistsError(
+                "У данного пользователя уже есть бизнес-профиль"
+            ) from None
         except Exception as e:
             await self.uow.rollback()
             logger.exception(f"Error creating business profile for user {user_id}")
