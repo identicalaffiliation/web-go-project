@@ -18,7 +18,6 @@ from internal.config.config import settings
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Глобальные ссылки — заполняются в lifespan
 kafka_consumer: KafkaUserRegisteredConsumer | None = None
 orders_channel: grpc.aio.Channel | None = None
 payments_channel: grpc.aio.Channel | None = None
