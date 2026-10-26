@@ -74,7 +74,12 @@ func (s *Service) GetItemsPage(ctx context.Context, cursor *string, limit int64)
 		nextCursor = &c
 	}
 
-	return s.getPage(items, nextCursor), nil
+	urls := make([]string, len(items))
+	for i, item := range items {
+		urls[i] = s.fetchImageURL(ctx, item)
+	}
+
+	return s.getPage(items, urls, nextCursor), nil
 }
 
 func (s *Service) GetItem(ctx context.Context, id string) (*dto.ProductResponse, error) {
@@ -94,7 +99,7 @@ func (s *Service) GetItem(ctx context.Context, id string) (*dto.ProductResponse,
 	}
 
 	if cached != nil {
-		return s.toResponseOne(cached, cached.ImageKey), nil
+		return s.toResponseOne(cached, s.fetchImageURL(ctx, cached)), nil
 	}
 
 	item, err := s.catalog.GetItemByID(ctx, productID)
@@ -117,7 +122,7 @@ func (s *Service) GetItem(ctx context.Context, id string) (*dto.ProductResponse,
 		)
 	}
 
-	return s.toResponseOne(item, item.ImageKey), nil
+	return s.toResponseOne(item, s.fetchImageURL(ctx, item)), nil
 }
 
 func (s *Service) UploadImage(ctx context.Context, id string, format dto.ImageFormat) (*dto.ProductResponse, error) {

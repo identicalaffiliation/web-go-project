@@ -31,6 +31,19 @@ func (c *Client) GetPresignedURL(ctx context.Context, product *domain.Product) (
 	return url.String(), nil
 }
 
+func (c *Client) FetchSignedURL(ctx context.Context, key string) (string, error) {
+	if key == "" {
+		return "", nil
+	}
+
+	url, err := c.external.PresignedGetObject(ctx, c.bucket, key, c.exp, nil)
+	if err != nil {
+		return "", fmt.Errorf("error FetchSignedURL: %w", err)
+	}
+
+	return url.String(), nil
+}
+
 func NewClient(cfg *config.MinioConfig) (*Client, error) {
 	ops := &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.User, cfg.Password, ""),
