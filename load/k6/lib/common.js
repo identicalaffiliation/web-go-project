@@ -6,16 +6,17 @@ import encoding from 'k6/encoding';
 // Адрес gateway. Переопределяется так: k6 run -e BASE_URL=http://host script.js
 export const BASE_URL = __ENV.BASE_URL || 'http://localhost';
 
-// По умолчанию 500 rps на 5 минут.
-export function loadOptions() {
+// rate у каждого скрипта свой (catalog 500, остальные 50), по умолчанию 1 минута.
+// Перебить: k6 run -e RATE=100 -e DURATION=30s script.js
+export function loadOptions(rate) {
   return {
     setupTimeout: '2m', // в setup ждём, пока auth выдаст роль business
     scenarios: {
       load: {
         executor: 'constant-arrival-rate', // держим постоянный rps, не зависящий от скорости ответа
-        rate: Number(__ENV.RATE || 500), // сколько итераций в секунду
+        rate: Number(__ENV.RATE || rate), // сколько итераций в секунду
         timeUnit: '1s',
-        duration: __ENV.DURATION || '5m',
+        duration: __ENV.DURATION || '1m',
         preAllocatedVUs: 100, // сколько виртуальных юзеров создать заранее
         maxVUs: 1000, // если сервис тормозит, k6 добавит юзеров до этого предела
       },

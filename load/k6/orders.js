@@ -6,7 +6,7 @@ import { check } from 'k6';
 import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 import { BASE_URL, authHeaders, createProduct, loadOptions, registerAndLogin, registerBusiness } from './lib/common.js';
 
-export const options = loadOptions();
+export const options = loadOptions(50);
 
 export function setup() {
   const seller = registerBusiness();

@@ -3,7 +3,7 @@ import http from 'k6/http';
 import { check } from 'k6';
 import { BASE_URL, authHeaders, loadOptions, registerAndLogin } from './lib/common.js';
 
-export const options = loadOptions();
+export const options = loadOptions(50);
 
 const PATHS = ['/api/v1/profiles/me', '/api/v1/profiles/balance', '/api/v1/profiles/orders'];
 

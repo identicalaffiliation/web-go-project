@@ -103,16 +103,17 @@ lint: ## линтеры всех сервисов
 	cd backend/profile && python3 -m compileall -q -x 'internal/adapters/grpc/generated' cmd internal
 
 K6_SERVICES := auth catalog orders profile
-RATE        ?= 500
-DURATION    ?= 5m
 BASE_URL    ?= http://localhost
+# RATE и DURATION по умолчанию берутся из скриптов (catalog 500 rps, остальные 50, 1 минута).
+# Перебить для всех: make load RATE=100 DURATION=30s
+K6_ENV      := -e BASE_URL=$(BASE_URL) $(if $(RATE),-e RATE=$(RATE)) $(if $(DURATION),-e DURATION=$(DURATION))
 
 .PHONY: load ## нагрузочное тестирование на все сервисы по очереди
 load:
 	@failed=""; \
 	for s in $(K6_SERVICES); do \
 		echo "==> k6: $$s"; \
-		k6 run -e RATE=$(RATE) -e DURATION=$(DURATION) -e BASE_URL=$(BASE_URL) load/k6/$$s.js || failed="$$failed $$s"; \
+		k6 run $(K6_ENV) load/k6/$$s.js || failed="$$failed $$s"; \
 	done; \
 	if [ -n "$$failed" ]; then echo "k6 failed:$$failed"; exit 1; fi
 

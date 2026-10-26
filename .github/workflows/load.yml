@@ -16,13 +16,13 @@ on:
           - orders
           - profile
       rate:
-        description: Запросов в секунду
+        description: Запросов в секунду (пусто = из скрипта, catalog 500, остальные 50)
         type: string
-        default: "500"
+        default: ""
       duration:
         description: Длительность (например 30s, 5m)
         type: string
-        default: 5m
+        default: 1m
 
 permissions:
   contents: read
