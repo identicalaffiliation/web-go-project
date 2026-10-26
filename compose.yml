@@ -598,8 +598,11 @@ services:
     depends_on:
       auth-postgres:
         condition: service_healthy
-      shop-zookeeper:
+      shop-kafka:
         condition: service_healthy
+      # топики users.created и profiles.business.created создаёт init-kafka
+      init-kafka:
+        condition: service_completed_successfully
 
   profile-service:
     container_name: profile-service
