@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from internal.adapters.grpc.generated import orders_pb2 as orders__pb2
+from internal.adapters.grpc.generated.v1.payments import payments_pb2 as v1_dot_payments_dot_payments_dot_balance_dot_v1__pb2
 
 GRPC_GENERATED_VERSION = '1.84.0'
 GRPC_VERSION = grpc.__version__
@@ -18,14 +18,14 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in orders_pb2_grpc.py depends on'
+        + ' but the generated code in v1/payments/payments.balance.v1_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
     )
 
 
-class OrdersServiceStub:
+class PaymentsServiceStub:
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -34,43 +34,43 @@ class OrdersServiceStub:
         Args:
             channel: A grpc.Channel.
         """
-        self.GetOrdersByUser = channel.unary_unary(
-                '/orders.OrdersService/GetOrdersByUser',
-                request_serializer=orders__pb2.GetOrdersRequest.SerializeToString,
-                response_deserializer=orders__pb2.GetOrdersResponse.FromString,
+        self.GetBalanceByUser = channel.unary_unary(
+                '/payments.balance.v1.PaymentsService/GetBalanceByUser',
+                request_serializer=v1_dot_payments_dot_payments_dot_balance_dot_v1__pb2.GetBalanceRequest.SerializeToString,
+                response_deserializer=v1_dot_payments_dot_payments_dot_balance_dot_v1__pb2.GetBalanceResponse.FromString,
                 _registered_method=True)
 
 
-class OrdersServiceServicer:
+class PaymentsServiceServicer:
     """Missing associated documentation comment in .proto file."""
 
-    def GetOrdersByUser(self, request, context):
+    def GetBalanceByUser(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
 
-def add_OrdersServiceServicer_to_server(servicer, server):
+def add_PaymentsServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'GetOrdersByUser': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetOrdersByUser,
-                    request_deserializer=orders__pb2.GetOrdersRequest.FromString,
-                    response_serializer=orders__pb2.GetOrdersResponse.SerializeToString,
+            'GetBalanceByUser': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetBalanceByUser,
+                    request_deserializer=v1_dot_payments_dot_payments_dot_balance_dot_v1__pb2.GetBalanceRequest.FromString,
+                    response_serializer=v1_dot_payments_dot_payments_dot_balance_dot_v1__pb2.GetBalanceResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'orders.OrdersService', rpc_method_handlers)
+            'payments.balance.v1.PaymentsService', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('orders.OrdersService', rpc_method_handlers)
+    server.add_registered_method_handlers('payments.balance.v1.PaymentsService', rpc_method_handlers)
 
 
  # This class is part of an EXPERIMENTAL API.
-class OrdersService:
+class PaymentsService:
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
-    def GetOrdersByUser(request,
+    def GetBalanceByUser(request,
             target,
             options=(),
             channel_credentials=None,
@@ -83,9 +83,9 @@ class OrdersService:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/orders.OrdersService/GetOrdersByUser',
-            orders__pb2.GetOrdersRequest.SerializeToString,
-            orders__pb2.GetOrdersResponse.FromString,
+            '/payments.balance.v1.PaymentsService/GetBalanceByUser',
+            v1_dot_payments_dot_payments_dot_balance_dot_v1__pb2.GetBalanceRequest.SerializeToString,
+            v1_dot_payments_dot_payments_dot_balance_dot_v1__pb2.GetBalanceResponse.FromString,
             options,
             channel_credentials,
             insecure,

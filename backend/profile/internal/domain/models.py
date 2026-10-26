@@ -28,14 +28,15 @@ class Profile:
 class OrderDTO:
     id: str
     product_id: str
-    price: float
+    quantity: int
+    total_price: int
     status: str
     created_at: datetime
 
 
 @dataclass
 class BalanceDTO:
-    amount: float
+    amount: int
 
 
 @dataclass
