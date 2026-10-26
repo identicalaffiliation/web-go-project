@@ -164,7 +164,7 @@ const docTemplate = `{
         },
         "/register": {
             "post": {
-                "description": "Creates a user with the given role. Password: 8-72 bytes, not blank.",
+                "description": "Creates a user with the customer role (business is granted later via the Profile event). Password: 8-72 bytes, not blank.",
                 "consumes": [
                     "application/json"
                 ],
@@ -194,7 +194,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid body, email, password or role",
+                        "description": "Invalid body, email or password",
                         "schema": {
                             "$ref": "#/definitions/internal_adapters_rest.errorResponse"
                         }
@@ -265,8 +265,7 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "email",
-                "password",
-                "role"
+                "password"
             ],
             "properties": {
                 "email": {
@@ -279,14 +278,6 @@ const docTemplate = `{
                     "maxLength": 72,
                     "minLength": 8,
                     "example": "your-password-here"
-                },
-                "role": {
-                    "type": "string",
-                    "enum": [
-                        "customer",
-                        "business"
-                    ],
-                    "example": "customer"
                 }
             }
         },
