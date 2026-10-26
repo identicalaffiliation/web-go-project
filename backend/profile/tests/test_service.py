@@ -19,19 +19,21 @@ def mock_service():
     uow = AsyncMock()
     orders_client = AsyncMock()
     payments_client = AsyncMock()
+    event_producer = AsyncMock()
 
     service = ProfileService(
         repo=repo,
         uow=uow,
         orders_client=orders_client,
         payments_client=payments_client,
+        event_producer=event_producer,
     )
-    return service, repo, uow
+    return service, repo, uow, event_producer
 
 
 @pytest.mark.asyncio
 async def test_create_business_profile_success(mock_service):
-    service, repo_mock, uow_mock = mock_service
+    service, repo_mock, uow_mock, producer_mock = mock_service
     user_id = uuid.uuid4()
     request_data = CreateBusinessProfileRequest(
         company_name="ООО Ромашка", phone="+79991234567"
@@ -59,10 +61,19 @@ async def test_create_business_profile_success(mock_service):
     repo_mock.create.assert_called_once()
     uow_mock.commit.assert_called_once()
 
+    producer_mock.publish_event.assert_called_once()
+    call_args = producer_mock.publish_event.call_args[1]
+
+    assert call_args["topic"] == "profiles.business.created"
+    assert call_args["key"] == str(user_id)
+    assert call_args["payload"]["user_id"] == str(user_id)
+    assert "event_id" in call_args["payload"]
+    assert "occurred_at" in call_args["payload"]
+
 
 @pytest.mark.asyncio
 async def test_create_business_profile_already_exists_raises_error(mock_service):
-    service, repo_mock, uow_mock = mock_service
+    service, repo_mock, uow_mock, producer_mock = mock_service
     user_id = uuid.uuid4()
     request_data = CreateBusinessProfileRequest(company_name="Новая Компания")
 
@@ -78,6 +89,7 @@ async def test_create_business_profile_already_exists_raises_error(mock_service)
 
     repo_mock.create.assert_not_called()
     uow_mock.commit.assert_not_called()
+    producer_mock.publish_event.assert_not_called()
 
 
 @pytest.fixture
@@ -150,7 +162,7 @@ async def test_create_business_profile_api_conflict(
 
 @pytest.mark.asyncio
 async def test_update_profile_success(mock_service):
-    service, repo_mock, uow_mock = mock_service
+    service, repo_mock, uow_mock, producer_mock = mock_service
     user_id = uuid.uuid4()
     profile_id = uuid.uuid4()
 
@@ -179,11 +191,12 @@ async def test_update_profile_success(mock_service):
     repo_mock.get_by_user_id.assert_called_once_with(user_id)
     repo_mock.update.assert_called_once()
     uow_mock.commit.assert_called_once()
+    producer_mock.publish_event.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_update_profile_not_found(mock_service):
-    service, repo_mock, uow_mock = mock_service
+    service, repo_mock, uow_mock, producer_mock = mock_service
     user_id = uuid.uuid4()
     wrong_profile_id = uuid.uuid4()
 
@@ -200,11 +213,12 @@ async def test_update_profile_not_found(mock_service):
 
     repo_mock.update.assert_not_called()
     uow_mock.commit.assert_not_called()
+    producer_mock.publish_event.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_process_registration_event_success(mock_service):
-    service, repo_mock, uow_mock = mock_service
+    service, repo_mock, uow_mock, producer_mock = mock_service
     user_id = str(uuid.uuid4())
     event_id = str(uuid.uuid4())
     event_data = {"user_id": user_id, "event_id": event_id}
@@ -217,11 +231,12 @@ async def test_process_registration_event_success(mock_service):
 
     repo_mock.create.assert_called_once()
     uow_mock.commit.assert_called_once()
+    producer_mock.publish_event.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_process_registration_event_idempotency_duplicate(mock_service):
-    service, repo_mock, uow_mock = mock_service
+    service, repo_mock, uow_mock, producer_mock = mock_service
     user_id = str(uuid.uuid4())
     event_id = str(uuid.uuid4())
     event_data = {"user_id": user_id, "event_id": event_id}
@@ -233,3 +248,4 @@ async def test_process_registration_event_idempotency_duplicate(mock_service):
     repo_mock.create.assert_called_once()
     uow_mock.commit.assert_not_called()
     uow_mock.rollback.assert_called_once()
+    producer_mock.publish_event.assert_not_called()

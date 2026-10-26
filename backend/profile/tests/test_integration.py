@@ -49,6 +49,7 @@ def override_service_for_e2e(test_db_setup):
                 uow=uow,
                 orders_client=AsyncMock(),
                 payments_client=AsyncMock(),
+                event_producer=AsyncMock(),
             )
             yield service
 

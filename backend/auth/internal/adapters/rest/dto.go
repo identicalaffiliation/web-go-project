@@ -10,7 +10,6 @@ import "time"
 type registerRequest struct {
 	Email    string `json:"email" validate:"required,email" format:"email" example:"user@example.com"`
 	Password string `json:"password" validate:"required" minLength:"8" maxLength:"72" example:"your-password-here"`
-	Role     string `json:"role" validate:"required,oneof=customer business" enums:"customer,business" example:"customer"`
 }
 
 type registerResponse struct {

@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/domain"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/dto"
+	"go.uber.org/zap"
 )
 
 var (
@@ -21,6 +23,21 @@ var (
 func buildImageKey(ext string) string {
 	now := time.Now().UTC()
 	return path.Join("image", strconv.Itoa(now.Year()), now.Month().String(), uuid.New().String()+ext)
+}
+
+// fetchImageURL - метод получения presigned ссылки на скачивание картинки товара из MinIO.
+// При ошибке логирует её и возвращает пустую строку, чтобы товар отдавался без картинки
+func (s *Service) fetchImageURL(ctx context.Context, product *domain.Product) string {
+	url, err := s.minioClient.FetchSignedURL(ctx, product.ImageKey)
+	if err != nil {
+		s.logger.WithError(err).Error(
+			"failed to fetch signed url",
+			zap.String("product id", product.ID.String()),
+		)
+		return ""
+	}
+
+	return url
 }
 
 // toEvent - метод преобразования domain Product структуры в domain Event структуру для дальнейшей
@@ -67,9 +84,9 @@ func (s *Service) toResponseOne(product *domain.Product, url string) *dto.Produc
 	}
 }
 
-func (s *Service) getPage(products []*domain.Product, nextCursor *string) *dto.Page {
+func (s *Service) getPage(products []*domain.Product, urls []string, nextCursor *string) *dto.Page {
 	m := make([]dto.ProductResponse, 0, len(products))
-	for _, v := range products {
+	for i, v := range products {
 		var (
 			d *string
 			u *string
@@ -79,8 +96,8 @@ func (s *Service) getPage(products []*domain.Product, nextCursor *string) *dto.P
 			d = &v.Description
 		}
 
-		if v.ImageKey != "" {
-			u = &v.ImageKey
+		if urls[i] != "" {
+			u = &urls[i]
 		}
 
 		m = append(m, dto.ProductResponse{

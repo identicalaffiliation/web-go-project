@@ -1,4 +1,4 @@
-basePath: /
+basePath: /api/v1
 definitions:
   domain.Order:
     properties:

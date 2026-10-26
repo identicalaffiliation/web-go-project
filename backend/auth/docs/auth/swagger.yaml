@@ -42,16 +42,9 @@ definitions:
         maxLength: 72
         minLength: 8
         type: string
-      role:
-        enum:
-        - customer
-        - business
-        example: customer
-        type: string
     required:
     - email
     - password
-    - role
     type: object
   internal_adapters_rest.registerResponse:
     properties:
@@ -194,8 +187,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: 'Creates a user with the given role. Password: 8-72 bytes, not
-        blank.'
+      description: 'Creates a user with the customer role (business is granted later
+        via the Profile event). Password: 8-72 bytes, not blank.'
       parameters:
       - description: Registration payload
         in: body
@@ -211,7 +204,7 @@ paths:
           schema:
             $ref: '#/definitions/internal_adapters_rest.registerResponse'
         "400":
-          description: Invalid body, email, password or role
+          description: Invalid body, email or password
           schema:
             $ref: '#/definitions/internal_adapters_rest.errorResponse'
         "409":
