@@ -24,7 +24,7 @@ func SetupServer(cfg *config.HTTPConfig, c *catalog.Service) *echo.Echo {
 	e.Use(middleware.Logger())
 
 	baseAPI := e.Group("/api/v1")
-	baseAPI.GET("/swagger/*", echoSwagger.WrapHandler)
+	baseAPI.GET("/catalog/swagger/*", echoSwagger.WrapHandler)
 
 	internal := baseAPI.Group("/catalog")
 	internal.POST("", handlers.AddItemToCatalog(c),
