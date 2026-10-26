@@ -1,0 +1,99 @@
+name: Load tests (k6)
+
+# Запускается только руками: Actions → Load tests (k6) → Run workflow.
+# На push/PR в main не срабатывает.
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: Какой сервис нагружать
+        type: choice
+        default: all
+        options:
+          - all
+          - auth
+          - catalog
+          - orders
+          - profile
+      rate:
+        description: Запросов в секунду (пусто = из скрипта, catalog 500, остальные 50)
+        type: string
+        default: ""
+      duration:
+        description: Длительность (например 30s, 5m)
+        type: string
+        default: 1m
+
+permissions:
+  contents: read
+
+jobs:
+  k6:
+    name: k6 (${{ matrix.service }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+
+    strategy:
+      fail-fast: false
+      # по одному сервису за раз, чтобы прогоны не мешали друг другу
+      max-parallel: 1
+      matrix:
+        service: ${{ inputs.service == 'all' && fromJSON('["auth","catalog","orders","profile"]') || fromJSON(format('["{0}"]', inputs.service)) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/auth/go.mod
+          cache-dependency-path: backend/auth/go.sum
+
+      - name: Prepare env and jwt keys
+        run: |
+          cp .env.example .env
+          make keys
+
+      - name: Start project
+        run: |
+          make up
+          make migrations-up
+          make init-kafka-topics
+          make run
+
+      - name: Wait for gateway
+        run: |
+          # catalog отвечает 200, auth на пустой логин — 400; 502 значит сервис ещё не поднялся
+          for i in $(seq 1 60); do
+            catalog=$(curl -s -o /dev/null -w '%{http_code}' http://localhost/api/v1/catalog || true)
+            auth=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost/api/v1/auth/login || true)
+            if [ "$catalog" = "200" ] && [ "$auth" = "400" ]; then
+              echo "gateway is ready"
+              exit 0
+            fi
+            echo "waiting for gateway (catalog=$catalog auth=$auth)..."
+            sleep 5
+          done
+          docker compose ps
+          exit 1
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Run k6
+        uses: grafana/run-k6-action@v1
+        env:
+          BASE_URL: http://localhost
+          RATE: ${{ inputs.rate }}
+          DURATION: ${{ inputs.duration }}
+        with:
+          path: load/k6/${{ matrix.service }}.js
+
+      - name: Service logs
+        if: failure()
+        run: docker compose logs --tail=200
+
+      - name: Stop project
+        if: always()
+        run: docker compose down -v --remove-orphans

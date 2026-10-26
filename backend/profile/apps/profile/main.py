@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from internal.adapters.http.dependencies import get_profile_service
 from internal.adapters.http.profiles import router as profiles_router
 from internal.adapters.kafka.consumer import KafkaUserRegisteredConsumer
+from internal.adapters.kafka.producer import KafkaEventProducer
 from internal.adapters.postgres.database import async_session_maker, engine
 from internal.adapters.postgres.repository import SqlAlchemyProfileRepository
 from internal.adapters.postgres.uow import SqlAlchemyUnitOfWork
@@ -35,6 +36,7 @@ async def build_profile_service() -> AsyncGenerator[ProfileService, None]:
                 uow=uow,
                 orders_client=grpc_orders_client,
                 payments_client=grpc_payments_client,
+                event_producer=kafka_producer,
             )
             yield service
         finally:
@@ -50,6 +52,7 @@ async def process_kafka_message(msg_data: dict) -> None:
             uow=uow,
             orders_client=grpc_orders_client,
             payments_client=grpc_payments_client,
+            event_producer=kafka_producer,
         )
         await service.process_registration_event(msg_data)
 

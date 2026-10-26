@@ -511,6 +511,7 @@ services:
       echo -e 'Creating kafka topics'
       kafka-topics --bootstrap-server shop-kafka:9092 --create --if-not-exists --topic users.created --replication-factor 1 --partitions 1
       kafka-topics --bootstrap-server shop-kafka:9092 --create --if-not-exists --topic stock.created --replication-factor 1 --partitions 3
+      kafka-topics --bootstrap-server shop-kafka:9092 --create --if-not-exists --topic profiles.business.created --replication-factor 1 --partitions 3
 
       echo -e 'Successfully created the following topics:'
       kafka-topics --bootstrap-server shop-kafka:9092 --list

@@ -1,8 +1,11 @@
 import logging
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from internal.adapters.http.schemas import CreateBusinessProfileRequest
+from internal.adapters.kafka.producer import KafkaEventProducer
+from internal.config.config import settings
 from internal.domain.exceptions import ProfileAlreadyExistsError, ProfileNotFoundError
 from internal.domain.models import BalanceDTO, OrderDTO, Profile, ProfileType
 from internal.ports.repository import IProfileRepository
@@ -24,11 +27,13 @@ class ProfileService:
         uow: IUnitOfWork,
         orders_client: IOrdersClient,
         payments_client: IPaymentsClient,
+        event_producer: KafkaEventProducer | None = None,
     ):
         self.repo = repo
         self.uow = uow
         self.orders_client = orders_client
         self.payments_client = payments_client
+        self.event_producer = event_producer
 
     async def process_registration_event(self, event_data: dict[str, Any]) -> None:
         """
@@ -113,10 +118,6 @@ class ProfileService:
     async def create_business_profile(
         self, user_id: uuid.UUID, data: CreateBusinessProfileRequest
     ) -> Profile:
-        """
-        Создает дополнительный профиль типа BUSINESS для существующего пользователя.
-        """
-
         existing_profile = await self.repo.get_by_user_id_and_type(
             user_id=user_id, profile_type=ProfileType.BUSINESS
         )
@@ -137,19 +138,36 @@ class ProfileService:
         )
 
         try:
-            created_profile = await self.repo.create(new_profile)
-
-            if created_profile:
-                await self.uow.commit()
-                logger.info(f"Successfully created BUSINESS profile for user {user_id}")
-                return created_profile
-            else:
+            created_profile = await self.repo.create(
+                profile=new_profile, idempotency_key=uuid.uuid4()
+            )
+            if not created_profile:
                 await self.uow.rollback()
-                raise RuntimeError(
-                    "Failed to create business profile (repository returned None)"
-                )
+                raise RuntimeError("Failed to create business profile")
+
+            await self.uow.commit()
+            logger.info(f"Successfully created BUSINESS profile for user {user_id}")
 
         except Exception as e:
             await self.uow.rollback()
             logger.exception(f"Error creating business profile for user {user_id}")
             raise e
+
+        if self.event_producer:
+            event_payload = {
+                "event_id": str(uuid.uuid4()),
+                "user_id": str(user_id),
+                "occurred_at": datetime.now(timezone.utc).isoformat(),
+            }
+            try:
+                await self.event_producer.publish_event(
+                    topic=settings.KAFKA_BUSINESS_CREATED_TOPIC,
+                    key=str(user_id),
+                    payload=event_payload,
+                )
+            except Exception:
+                logger.error(
+                    f"Failed to publish business creation event for user {user_id}"
+                )
+
+        return created_profile
