@@ -12,13 +12,13 @@ import (
 
 // RegisterHandler godoc
 // @Summary      Register a new user
-// @Description  Creates a user with the given role. Password: 8-72 bytes, not blank.
+// @Description  Creates a user with the customer role (business is granted later via the Profile event). Password: 8-72 bytes, not blank.
 // @Tags         auth
 // @Accept       json
 // @Produce      json
 // @Param        body  body      registerRequest  true  "Registration payload"
 // @Success      201   {object}  registerResponse
-// @Failure      400   {object}  errorResponse  "Invalid body, email, password or role"
+// @Failure      400   {object}  errorResponse  "Invalid body, email or password"
 // @Failure      409   {object}  errorResponse  "Email already taken"
 // @Failure      500   {object}  errorResponse
 // @Router       /register [post]
@@ -33,7 +33,7 @@ func RegisterHandler(svc ports.AuthService, log ports.Logger) echo.HandlerFunc {
 		}
 
 		user, err := svc.Register(c.Request().Context(), dto.RegisterInput{
-			Email: req.Email, Password: req.Password, Role: req.Role,
+			Email: req.Email, Password: req.Password,
 		})
 		if err != nil {
 			return fail(c, log, err)

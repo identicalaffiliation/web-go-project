@@ -42,6 +42,7 @@ func postJSON(e *echo.Echo, path string, body any) *httptest.ResponseRecorder {
 	return rec
 }
 
+// Поле role из тела запроса игнорируется: клиент не может выбрать себе роль.
 func TestHandler_Register_Success(t *testing.T) {
 	svc := mocks.NewMockAuthService(gomock.NewController(t))
 	svc.EXPECT().Register(gomock.Any(), gomock.Any()).
@@ -68,13 +69,10 @@ func TestHandler_Register_ValidationErrors(t *testing.T) {
 		body    map[string]string
 		wantMsg string
 	}{
-		{"empty email", map[string]string{"email": "", "password": "secret123", "role": "customer"}, "email is required"},
-		{"missing email", map[string]string{"password": "secret123", "role": "customer"}, "email is required"},
-		{"invalid email", map[string]string{"email": "not-an-email", "password": "secret123", "role": "customer"}, "invalid email"},
-		{"empty password", map[string]string{"email": "a@example.com", "password": "", "role": "customer"}, "password is required"},
-		{"missing role", map[string]string{"email": "a@example.com", "password": "secret123"}, "role is required"},
-		{"empty role", map[string]string{"email": "a@example.com", "password": "secret123", "role": ""}, "role is required"},
-		{"admin role", map[string]string{"email": "a@example.com", "password": "secret123", "role": "admin"}, "invalid role"},
+		{"empty email", map[string]string{"email": "", "password": "secret123"}, "email is required"},
+		{"missing email", map[string]string{"password": "secret123"}, "email is required"},
+		{"invalid email", map[string]string{"email": "not-an-email", "password": "secret123"}, "invalid email"},
+		{"empty password", map[string]string{"email": "a@example.com", "password": ""}, "password is required"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -89,7 +87,7 @@ func TestHandler_Register_DomainPasswordError(t *testing.T) {
 	svc := mocks.NewMockAuthService(gomock.NewController(t))
 	svc.EXPECT().Register(gomock.Any(), gomock.Any()).Return(domain.User{}, domain.ErrInvalidPassword)
 	rec := postJSON(newTestEcho(svc), "/api/v1/auth/register",
-		map[string]string{"email": "a@example.com", "password": "short", "role": "customer"})
+		map[string]string{"email": "a@example.com", "password": "short"})
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
@@ -134,7 +132,7 @@ func TestHandler_Register_EmailTaken(t *testing.T) {
 	svc := mocks.NewMockAuthService(gomock.NewController(t))
 	svc.EXPECT().Register(gomock.Any(), gomock.Any()).Return(domain.User{}, domain.ErrEmailTaken)
 	rec := postJSON(newTestEcho(svc), "/api/v1/auth/register",
-		map[string]string{"email": "a@example.com", "password": "secret123", "role": "customer"})
+		map[string]string{"email": "a@example.com", "password": "secret123"})
 
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusConflict)
