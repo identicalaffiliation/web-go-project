@@ -4,12 +4,12 @@
 
 | Скрипт       | Что нагружает                                              |
 |--------------|------------------------------------------------------------|
-| `auth.js`    | `POST /api/v1/auth/login`                                  |
+| `auth.js`    | `POST /api/v1/auth/register` (20 rps), `/login` и `/refresh` (по 50 rps) |
 | `catalog.js` | `GET /api/v1/catalog` и `GET /api/v1/catalog/{id}`         |
 | `orders.js`  | `POST /api/v1/orders` (запускает сагу заказа)              |
 | `profile.js` | `GET /api/v1/profiles/me`, `/balance`, `/orders`           |
 
-По умолчанию 1 минута: catalog 500 rps, остальные 50 rps (`RATE` и `DURATION` перебивают). Порог: меньше 1% ошибок и p95 < 500ms.
+По умолчанию 1 минута: catalog 500 rps, auth — см. таблицу, остальные 50 rps (`RATE` и `DURATION` перебивают; в auth `RATE` ставит один rps на все три сценария, по отдельности — `REGISTER_RATE`, `LOGIN_RATE`, `REFRESH_RATE`). Порог: меньше 1% ошибок и p95 < 500ms.
 
 ## Локальный запуск
 

@@ -59,7 +59,7 @@ export function registerAndLogin() {
 
   const reg = http.post(
     `${BASE_URL}/api/v1/auth/register`,
-    JSON.stringify({ email, password, role: 'customer' }),
+    JSON.stringify({ email, password }),
     { headers: JSON_HEADERS },
   );
   check(reg, { 'register 201': (r) => r.status === 201 });
