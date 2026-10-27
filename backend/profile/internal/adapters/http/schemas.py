@@ -34,7 +34,8 @@ class ProfileUpdateRequest(BaseModel):
 class OrderResponse(BaseModel):
     id: str
     product_id: str
-    price: float
+    quantity: int
+    total_price: int
     status: str
     created_at: datetime
 
@@ -42,7 +43,7 @@ class OrderResponse(BaseModel):
 
 
 class BalanceResponse(BaseModel):
-    amount: float
+    amount: int
 
     model_config = ConfigDict(from_attributes=True)
 

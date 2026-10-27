@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from internal.adapters.grpc.generated import v1_pb2 as backend_dot_proto_dot_v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2
+from internal.adapters.grpc.generated.v1.orders import orders_pb2 as v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2
 
 GRPC_GENERATED_VERSION = '1.84.0'
 GRPC_VERSION = grpc.__version__
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in internal/adapters/grpc/generated/v1_pb2_grpc.py depends on'
+        + ' but the generated code in v1/orders/orders.orders.v1_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -36,8 +36,8 @@ class OrdersServiceStub:
         """
         self.GetUserOrders = channel.unary_unary(
                 '/orders.orders.v1.OrdersService/GetUserOrders',
-                request_serializer=backend_dot_proto_dot_v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2.UserOrdersRequest.SerializeToString,
-                response_deserializer=backend_dot_proto_dot_v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2.UserOrdersResponse.FromString,
+                request_serializer=v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2.UserOrdersRequest.SerializeToString,
+                response_deserializer=v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2.UserOrdersResponse.FromString,
                 _registered_method=True)
 
 
@@ -55,8 +55,8 @@ def add_OrdersServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'GetUserOrders': grpc.unary_unary_rpc_method_handler(
                     servicer.GetUserOrders,
-                    request_deserializer=backend_dot_proto_dot_v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2.UserOrdersRequest.FromString,
-                    response_serializer=backend_dot_proto_dot_v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2.UserOrdersResponse.SerializeToString,
+                    request_deserializer=v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2.UserOrdersRequest.FromString,
+                    response_serializer=v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2.UserOrdersResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -84,8 +84,8 @@ class OrdersService:
             request,
             target,
             '/orders.orders.v1.OrdersService/GetUserOrders',
-            backend_dot_proto_dot_v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2.UserOrdersRequest.SerializeToString,
-            backend_dot_proto_dot_v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2.UserOrdersResponse.FromString,
+            v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2.UserOrdersRequest.SerializeToString,
+            v1_dot_orders_dot_orders_dot_orders_dot_v1__pb2.UserOrdersResponse.FromString,
             options,
             channel_credentials,
             insecure,

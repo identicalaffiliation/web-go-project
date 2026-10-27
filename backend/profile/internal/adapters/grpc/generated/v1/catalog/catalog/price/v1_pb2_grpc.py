@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from internal.adapters.grpc.generated import payments_pb2 as payments__pb2
+from internal.adapters.grpc.generated.v1.catalog.catalog.price import v1_pb2 as v1_dot_catalog_dot_catalog_dot_price_dot_v1__pb2
 
 GRPC_GENERATED_VERSION = '1.84.0'
 GRPC_VERSION = grpc.__version__
@@ -18,14 +18,14 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in payments_pb2_grpc.py depends on'
+        + ' but the generated code in v1/catalog/catalog.price.v1_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
     )
 
 
-class PaymentsServiceStub:
+class PriceServiceStub:
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -34,43 +34,43 @@ class PaymentsServiceStub:
         Args:
             channel: A grpc.Channel.
         """
-        self.GetBalanceByUser = channel.unary_unary(
-                '/payments.PaymentsService/GetBalanceByUser',
-                request_serializer=payments__pb2.GetBalanceRequest.SerializeToString,
-                response_deserializer=payments__pb2.GetBalanceResponse.FromString,
+        self.GetPriceByProductId = channel.unary_unary(
+                '/catalog.price.v1.PriceService/GetPriceByProductId',
+                request_serializer=v1_dot_catalog_dot_catalog_dot_price_dot_v1__pb2.PriceRequest.SerializeToString,
+                response_deserializer=v1_dot_catalog_dot_catalog_dot_price_dot_v1__pb2.PriceResponse.FromString,
                 _registered_method=True)
 
 
-class PaymentsServiceServicer:
+class PriceServiceServicer:
     """Missing associated documentation comment in .proto file."""
 
-    def GetBalanceByUser(self, request, context):
+    def GetPriceByProductId(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
 
-def add_PaymentsServiceServicer_to_server(servicer, server):
+def add_PriceServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'GetBalanceByUser': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetBalanceByUser,
-                    request_deserializer=payments__pb2.GetBalanceRequest.FromString,
-                    response_serializer=payments__pb2.GetBalanceResponse.SerializeToString,
+            'GetPriceByProductId': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetPriceByProductId,
+                    request_deserializer=v1_dot_catalog_dot_catalog_dot_price_dot_v1__pb2.PriceRequest.FromString,
+                    response_serializer=v1_dot_catalog_dot_catalog_dot_price_dot_v1__pb2.PriceResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'payments.PaymentsService', rpc_method_handlers)
+            'catalog.price.v1.PriceService', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('payments.PaymentsService', rpc_method_handlers)
+    server.add_registered_method_handlers('catalog.price.v1.PriceService', rpc_method_handlers)
 
 
  # This class is part of an EXPERIMENTAL API.
-class PaymentsService:
+class PriceService:
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
-    def GetBalanceByUser(request,
+    def GetPriceByProductId(request,
             target,
             options=(),
             channel_credentials=None,
@@ -83,9 +83,9 @@ class PaymentsService:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/payments.PaymentsService/GetBalanceByUser',
-            payments__pb2.GetBalanceRequest.SerializeToString,
-            payments__pb2.GetBalanceResponse.FromString,
+            '/catalog.price.v1.PriceService/GetPriceByProductId',
+            v1_dot_catalog_dot_catalog_dot_price_dot_v1__pb2.PriceRequest.SerializeToString,
+            v1_dot_catalog_dot_catalog_dot_price_dot_v1__pb2.PriceResponse.FromString,
             options,
             channel_credentials,
             insecure,
