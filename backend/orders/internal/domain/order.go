@@ -14,10 +14,10 @@ const (
 	Failed  Status = "failed"
 )
 
-var integerStatuses = map[Status]int32{
-	Created: 0,
-	Paid:    1,
-	Failed:  2,
+var rpcStatuses = map[Status]ordersv1.OrderStatus{
+	Created: ordersv1.OrderStatus_CREATED,
+	Paid:    ordersv1.OrderStatus_PAID,
+	Failed:  ordersv1.OrderStatus_FAILED,
 }
 
 type Status string
@@ -41,7 +41,7 @@ func (o *Order) ToResponseRPC() *ordersv1.UserOrderResponse {
 		UserId:     o.UserID.String(),
 		Quantity:   int64(o.Quantity),
 		TotalPrice: o.TotalPrice,
-		Status:     ordersv1.OrderStatus(integerStatuses[o.Status]),
+		Status:     rpcStatuses[o.Status],
 		CreatedAt:  timestamppb.New(o.CreatedAt),
 		UpdatedAt:  timestamppb.New(o.UpdatedAt),
 	}

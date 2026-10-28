@@ -14,10 +14,11 @@ message UserOrdersRequest {
   string user_id = 1;
 }
 
+// значения совпадают с domain.Status в orders
 enum OrderStatus {
   CREATED = 0;
-  FAILED = 1;
-  CANCELLED = 2;
+  PAID = 1;
+  FAILED = 2;
 }
 
 message UserOrdersResponse {

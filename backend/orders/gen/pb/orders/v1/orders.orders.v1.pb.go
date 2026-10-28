@@ -22,25 +22,26 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// значения совпадают с domain.Status в orders
 type OrderStatus int32
 
 const (
-	OrderStatus_CREATED   OrderStatus = 0
-	OrderStatus_FAILED    OrderStatus = 1
-	OrderStatus_CANCELLED OrderStatus = 2
+	OrderStatus_CREATED OrderStatus = 0
+	OrderStatus_PAID    OrderStatus = 1
+	OrderStatus_FAILED  OrderStatus = 2
 )
 
 // Enum value maps for OrderStatus.
 var (
 	OrderStatus_name = map[int32]string{
 		0: "CREATED",
-		1: "FAILED",
-		2: "CANCELLED",
+		1: "PAID",
+		2: "FAILED",
 	}
 	OrderStatus_value = map[string]int32{
-		"CREATED":   0,
-		"FAILED":    1,
-		"CANCELLED": 2,
+		"CREATED": 0,
+		"PAID":    1,
+		"FAILED":  2,
 	}
 )
 
@@ -280,12 +281,12 @@ const file_v1_orders_orders_orders_v1_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt*5\n" +
+	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt*0\n" +
 	"\vOrderStatus\x12\v\n" +
-	"\aCREATED\x10\x00\x12\n" +
+	"\aCREATED\x10\x00\x12\b\n" +
+	"\x04PAID\x10\x01\x12\n" +
 	"\n" +
-	"\x06FAILED\x10\x01\x12\r\n" +
-	"\tCANCELLED\x10\x022k\n" +
+	"\x06FAILED\x10\x022k\n" +
 	"\rOrdersService\x12Z\n" +
 	"\rGetUserOrders\x12#.orders.orders.v1.UserOrdersRequest\x1a$.orders.orders.v1.UserOrdersResponseBYZWgithub.com/identicalaffiliation/web-go-project/backend/orders/gen/pb/orders/v1;ordersv1b\x06proto3"
 

@@ -56,6 +56,7 @@ help: ## список команд
 .PHONY: up
 up: ## поднять инфраструктуру (бд, kafka, minio, redis, temporal)
 	docker compose up --build -d $(INFRA)
+	docker compose up --build -d frontend
 
 .PHONY: migrations-up
 migrations-up: ## накатить миграции всех бд

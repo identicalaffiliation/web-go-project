@@ -174,8 +174,8 @@ func TestService_GetUserOrders(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, resp.GetOrders(), 2)
 		require.Equal(t, orders[0].ID.String(), resp.GetOrders()[0].GetOrderId())
-		require.Equal(t, ordersv1.OrderStatus(1), resp.GetOrders()[0].GetStatus())
-		require.Equal(t, ordersv1.OrderStatus(2), resp.GetOrders()[1].GetStatus())
+		require.Equal(t, ordersv1.OrderStatus_PAID, resp.GetOrders()[0].GetStatus())
+		require.Equal(t, ordersv1.OrderStatus_FAILED, resp.GetOrders()[1].GetStatus())
 	})
 
 	t.Run("repo error", func(t *testing.T) {

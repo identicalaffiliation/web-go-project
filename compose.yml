@@ -681,6 +681,20 @@ services:
       shop-temporal:
         condition: service_healthy
 
+  # FRONTEND
+  frontend:
+    container_name: frontend
+
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      # исходники фронта лежат в отдельном репозитории (kpo-market),
+      # путь можно переопределить через FRONTEND_PATH в .env
+      additional_contexts:
+        app: ${FRONTEND_PATH:-../kpo-market}
+
+    # наружу не публикуем: фронт отдаётся через gateway на http://localhost
+
   # API GATEWAY
   gateway:
     container_name: gateway
@@ -704,6 +718,7 @@ services:
       - catalog-service
       - profile-service
       - orders-service
+      - frontend
 
 volumes:
   auth_postgres_data:
