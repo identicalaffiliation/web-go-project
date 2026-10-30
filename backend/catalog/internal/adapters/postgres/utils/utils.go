@@ -8,12 +8,21 @@ import (
 )
 
 const (
-	checkCode = "23514"
+	checkCode   = "23514"
+	foreignCode = "23503"
 )
 
 func IsCheckConstraint(err error) bool {
 	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 		return strings.EqualFold(checkCode, pgErr.Code)
+	}
+
+	return false
+}
+
+func IsForeignConstraint(err error) bool {
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
+		return strings.EqualFold(foreignCode, pgErr.Code)
 	}
 
 	return false

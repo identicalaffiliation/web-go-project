@@ -14,4 +14,7 @@ type Product struct {
 	ImageKey    string    `json:"imageKey"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
+
+	Rating         float64 `json:"rating"`
+	FeedbacksCount int64   `json:"feedbacksCount"`
 }

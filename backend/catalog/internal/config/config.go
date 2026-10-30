@@ -20,6 +20,7 @@ type Config struct {
 	DBConfig
 	HTTPConfig        HTTPConfig    `yaml:"server"`
 	GRPCConfig        GRPCConfig    `yaml:"grpc"`
+	FeedbacksGRPC     GRPCConfig    `yaml:"feedbacks_grpc"`
 	MinioConfig       MinioConfig   `yaml:"s3"`
 	OperationDuration time.Duration `yaml:"operation_duration"`
 	Cache             RedisConfig   `yaml:"cache"`

@@ -7,13 +7,19 @@ import (
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/rest/handlers"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/rest/middlewares"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/config"
+	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/ports"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/service/catalog"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
-func SetupServer(cfg *config.HTTPConfig, c *catalog.Service) *echo.Echo {
+type FeedbackCases interface {
+	ports.CreateFeedbackCase
+	ports.GetProductFeedbacksCase
+}
+
+func SetupServer(cfg *config.HTTPConfig, c *catalog.Service, f FeedbackCases) *echo.Echo {
 	e := echo.New()
 	e.Server.Addr = fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
 	e.Server.ReadTimeout = cfg.ReadTimeout
@@ -41,6 +47,14 @@ func SetupServer(cfg *config.HTTPConfig, c *catalog.Service) *echo.Echo {
 		middlewares.RoleMiddleware(middlewares.Business),
 	)
 	internal.POST("/like", handlers.LikeProduct(c),
+		middlewares.RoleMiddleware(middlewares.Customer))
+	internal.GET("/:productId/feedbacks", handlers.GetProductFeedbacks(f),
+		middlewares.RoleMiddleware(
+			middlewares.Customer,
+			middlewares.Business,
+		),
+	)
+	internal.POST("/feedbacks", handlers.CreateFeedback(f),
 		middlewares.RoleMiddleware(middlewares.Customer))
 
 	return e

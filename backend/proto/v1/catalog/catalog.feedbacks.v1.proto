@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package feedbacks.v1;
+
+option go_package = "github.com/identicalaffiliation/web-go-project/backend/catalog/gen/pb/feedbacks/v1;feedbacksv1";
+
+import "google/protobuf/timestamp.proto";
+
+service FeedbackService {
+  rpc DeleteFeedback(DeleteFeedbackRequest) returns (DeleteFeedbackResponse);
+  rpc GetMyCreatedFeedbacks(GetMyFeedbacksRequest) returns (GetMyFeedbacksResponse);
+}
+
+message DeleteFeedbackRequest {
+  string id = 1; // id of feedback
+}
+
+message DeleteFeedbackResponse {}
+
+message GetMyFeedbacksRequest {
+  string user_id = 1;
+}
+
+message GetMyFeedbacksResponse {
+  repeated Feedback feedbacks = 1; // array of feedbacks
+}
+
+message Feedback {
+  string id = 1; // id of feedback
+  string product_id = 2; // id of feedback product
+  string user_id = 3; // id of feedback user
+  int32 score = 4; // score of feedback(stars, 1-5)
+  optional string description = 5; // description of feedback
+  google.protobuf.Timestamp createdAt = 6;
+}

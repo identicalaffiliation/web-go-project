@@ -27,11 +27,23 @@ CREATE TABLE IF NOT EXISTS outbox_likes (
     sent_at TIMESTAMPTZ
 );
 
+CREATE TABLE IF NOT EXISTS feedbacks (
+    id UUID PRIMARY KEY,
+    product_id UUID NOT NULL REFERENCES catalog(product_id),
+    user_id UUID NOT NULL,
+    score SMALLINT NOT NULL CHECK (score > 0 AND score < 6),
+    description TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS outbox_likes_not_sent ON outbox_likes(created_at) WHERE sent_at IS NULL;
 CREATE INDEX IF NOT EXISTS outbox_stock_not_sent ON outbox_stock(created_at) WHERE sent_at IS NULL;
-
+CREATE INDEX IF NOT EXISTS user_feedbacks ON feedbacks(user_id);
+-- агрегаты (LATERAL в карточке/списке) и пагинация отзывов товара
+CREATE INDEX IF NOT EXISTS product_feedbacks ON feedbacks(product_id, id DESC) INCLUDE (score);
 
 -- +goose Down
+DROP TABLE IF EXISTS feedbacks;
 DROP TABLE IF EXISTS outbox_stock;
 DROP TABLE IF EXISTS outbox_likes;
 DROP TABLE IF EXISTS catalog;

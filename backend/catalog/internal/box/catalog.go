@@ -4,14 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
-	"net"
 	"net/http"
-	"os"
 	"os/signal"
-	"sync"
 	"syscall"
-	"time"
 
 	trm "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
@@ -21,30 +16,32 @@ import (
 	likes_outbox "github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/likes-outbox"
 	outboxRepository "github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/outbox"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/rest"
-	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/rpc"
+	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/rpc/price"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/s3"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/config"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/ports"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/service/catalog"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/service/outbox"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
+	"golang.org/x/sync/errgroup"
 )
 
+// SetupCatalogBox - поднимает REST, grpc (price, feedbacks) и stock outbox-воркер.
+// Падение любого компонента или SIGINT/SIGTERM останавливает всё остальное.
 func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logger) error {
+	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	masterPool, err := getPostgresPool(ctx, cfg.OperationDuration, cfg.MasterDSN)
 	if err != nil {
 		return err
 	}
-
 	defer masterPool.Close()
 
 	replicaPool, err := getPostgresPool(ctx, cfg.OperationDuration, cfg.ReplicaDSN)
 	if err != nil {
 		return err
 	}
-
 	defer replicaPool.Close()
 
 	minioClient, err := s3.NewClient(&cfg.MinioConfig)
@@ -53,105 +50,77 @@ func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logge
 	}
 
 	redisClient := redis.NewClient(&cfg.Cache)
-	defer func() {
-		if err := redisClient.Close(ctx); err != nil {
-			slog.Error("failed to close redis client", "error", err)
-		}
-	}()
+	defer closeWithLog(logger, "redis client", func() error { return redisClient.Close(context.Background()) })
 
 	stockProducer := kafka.NewProducer(&cfg.Broker, cfg.Outbox.Stock.Topic)
-	defer func() {
-		if err := stockProducer.Close(); err != nil {
-			fmt.Println(err)
-		}
-	}()
+	defer closeWithLog(logger, "stock producer", stockProducer.Close)
 
-	catalogRepo := catalogRepository.NewRepository(masterPool, replicaPool)
 	stockOutboxRepo := outboxRepository.NewRepository(masterPool, replicaPool)
-	outboxLikesRepository := likes_outbox.NewRepository(masterPool, replicaPool)
 
-	service := catalog.NewService(
+	catalogService := catalog.NewService(
 		stockOutboxRepo,
-		catalogRepo,
-		outboxLikesRepository,
+		catalogRepository.NewRepository(masterPool, replicaPool),
+		likes_outbox.NewRepository(masterPool, replicaPool),
 		logger,
 		manager.Must(trm.NewDefaultFactory(masterPool)),
 		minioClient,
 		redisClient,
 	)
 
-	var wg sync.WaitGroup
-	notifyCtx, stop := signal.NotifyContext(ctx, syscall.SIGTERM, syscall.SIGINT)
-	defer stop()
+	feedbackService, feedbacksGRPCServer := setupFeedbacks(masterPool, replicaPool, logger)
+	priceGRPCServer := price.NewGRPCServer(catalogService)
+	httpServer := rest.SetupServer(&cfg.HTTPConfig, catalogService, feedbackService)
 
-	wg.Add(1)
-	go func() {
-		if err := outbox.Run(notifyCtx, stockOutboxRepo, stockProducer, logger, &cfg.Outbox.Stock, &wg); err != nil {
-			logger.Debug("ctx signal")
-		}
-	}()
-
-	server := rest.SetupServer(&cfg.HTTPConfig, service)
-
-	grpcListener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.GRPCConfig.Host, cfg.GRPCConfig.Port))
+	priceListener, err := grpcListener(&cfg.GRPCConfig)
 	if err != nil {
-		return fmt.Errorf("error ListenGRPC: %w", err)
+		return err
 	}
 
-	grpcServer := rpc.NewGRPCServer(service)
-
-	notifyChan := make(chan os.Signal, 1)
-	signal.Notify(notifyChan, syscall.SIGINT, syscall.SIGTERM)
-	defer signal.Stop(notifyChan)
-
-	errChan := make(chan error, 2)
-	go func() {
-		logger.Debug("start listening", zap.Int("port", cfg.HTTPConfig.Port))
-		if err := server.Start(server.Server.Addr); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			errChan <- err
-		}
-	}()
-
-	go func() {
-		logger.Debug("start grpc listening", zap.Int("port", cfg.GRPCConfig.Port))
-		if err := grpcServer.Serve(grpcListener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
-			errChan <- err
-		}
-	}()
-
-	select {
-	case <-notifyChan:
-		logger.Debug("server stopped by signal, graceful starts..")
-	case serverError := <-errChan:
-		logger.WithError(serverError).Error("failed to start server")
-	}
-
-	grpcServer.GracefulStop()
-
-	shutdownCtx, cancel := context.WithTimeout(ctx, cfg.HTTPConfig.ShutdownTimeout)
-	defer cancel()
-
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		return fmt.Errorf("error ShutdownServer: %w", err)
-	}
-
-	wg.Wait()
-
-	return nil
-}
-
-func getPostgresPool(ctx context.Context, duration time.Duration, dsn string) (*pgxpool.Pool, error) {
-	timeoutCtx, cancel := context.WithTimeout(ctx, duration)
-	defer cancel()
-
-	pool, err := pgxpool.New(timeoutCtx, dsn)
+	feedbacksListener, err := grpcListener(&cfg.FeedbacksGRPC)
 	if err != nil {
-		return nil, fmt.Errorf("error GetMasterPool: %w", err)
+		closeWithLog(logger, "price listener", priceListener.Close)
+		return err
 	}
 
-	if err := pool.Ping(timeoutCtx); err != nil {
-		return nil, fmt.Errorf("error GetMasterPool: %w", err)
-	}
+	g, gCtx := errgroup.WithContext(ctx)
 
-	return pool, nil
+	g.Go(func() error {
+		if err := outbox.Run(gCtx, stockOutboxRepo, stockProducer, logger, &cfg.Outbox.Stock); err != nil && !errors.Is(err, context.Canceled) {
+			return fmt.Errorf("stock outbox: %w", err)
+		}
+
+		return nil
+	})
+
+	g.Go(func() error {
+		logger.Debug("start http listening", zap.String("addr", httpServer.Server.Addr))
+		if err := httpServer.Start(httpServer.Server.Addr); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("http: %w", err)
+		}
+
+		return nil
+	})
+
+	g.Go(serveGRPC(priceGRPCServer, priceListener, "price", logger))
+	g.Go(serveGRPC(feedbacksGRPCServer, feedbacksListener, "feedbacks", logger))
+
+	// graceful: ждём сигнал или падение любого компонента, затем гасим серверы
+	g.Go(func() error {
+		<-gCtx.Done()
+		logger.Debug("shutdown started", zap.NamedError("cause", context.Cause(gCtx)))
+
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.HTTPConfig.ShutdownTimeout)
+		defer cancel()
+
+		stopGRPC(shutdownCtx, priceGRPCServer)
+		stopGRPC(shutdownCtx, feedbacksGRPCServer)
+
+		if err := httpServer.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("http shutdown: %w", err)
+		}
+
+		return nil
+	})
+
+	return g.Wait()
 }

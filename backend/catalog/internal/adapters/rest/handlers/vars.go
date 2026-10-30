@@ -5,4 +5,6 @@ const (
 	limitQuery  = "limit"
 	cursorQuery = "cursor"
 	formatQuery = "format"
+
+	userIDHeader = "X-User-Id"
 )

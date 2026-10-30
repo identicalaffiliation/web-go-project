@@ -18,6 +18,11 @@ func ProvideLogger() (ports.Logger, error) {
 	return &Logger{logger: logger}, nil
 }
 
+// NewNop - логгер, который ничего не пишет (для тестов).
+func NewNop() ports.Logger {
+	return &Logger{logger: zap.NewNop()}
+}
+
 func (l *Logger) WithError(err error) ports.Logger {
 	return l.With(zap.Error(err))
 }

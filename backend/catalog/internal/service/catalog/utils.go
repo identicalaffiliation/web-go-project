@@ -97,6 +97,9 @@ func (s *Service) toResponseOne(product *domain.Product, url string) *dto.Produc
 		PresignedURL: u,
 		CreatedAt:    product.CreatedAt,
 		UpdatedAt:    product.UpdatedAt,
+
+		Rating:         product.Rating,
+		FeedbacksCount: product.FeedbacksCount,
 	}
 
 	return &dto.ProductResponse{
@@ -129,6 +132,9 @@ func (s *Service) getPage(products []*domain.Product, urls []string, nextCursor 
 				Price:        v.Price,
 				CreatedAt:    v.CreatedAt,
 				UpdatedAt:    v.UpdatedAt,
+
+				Rating:         v.Rating,
+				FeedbacksCount: v.FeedbacksCount,
 			},
 		})
 	}

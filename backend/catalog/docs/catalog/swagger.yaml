@@ -17,6 +17,51 @@ definitions:
     - quantity
     - title
     type: object
+  github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.FeedbackCreateRequest:
+    properties:
+      description:
+        example: great product
+        type: string
+      productId:
+        example: 01a10112-c339-715d-8feb-4751a1ced5ef
+        type: string
+      score:
+        example: 5
+        maximum: 5
+        minimum: 1
+        type: integer
+    required:
+    - productId
+    - score
+    type: object
+  github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.FeedbackResponse:
+    properties:
+      createdAt:
+        type: string
+      description:
+        type: string
+      id:
+        format: uuid
+        type: string
+      productId:
+        format: uuid
+        type: string
+      score:
+        example: 5
+        type: integer
+      userId:
+        format: uuid
+        type: string
+    type: object
+  github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.FeedbacksPage:
+    properties:
+      feedbacks:
+        items:
+          $ref: '#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.FeedbackResponse'
+        type: array
+      nextCursor:
+        type: string
+    type: object
   github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.LikeAction:
     enum:
     - add
@@ -44,10 +89,17 @@ definitions:
         type: string
       description:
         type: string
+      feedbacksCount:
+        example: 3
+        type: integer
       price:
         type: integer
       productId:
         type: string
+      rating:
+        description: Rating - средняя оценка по отзывам (0, если отзывов нет)
+        example: 4.33
+        type: number
       title:
         type: string
       updatedAt:
@@ -148,6 +200,44 @@ paths:
       summary: Get item by ID
       tags:
       - catalog
+  /catalog/{productId}/feedbacks:
+    get:
+      description: Returns a page of product feedbacks, newest first. Use `nextCursor`
+        from the previous response to fetch the next page. Requires Bearer token.
+      parameters:
+      - description: Product ID
+        in: path
+        name: productId
+        required: true
+        type: string
+      - description: Page size (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Cursor from previous response
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.FeedbacksPage'
+        "400":
+          description: Invalid product id, limit or cursor
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: List product feedbacks (cursor pagination)
+      tags:
+      - feedbacks
   /catalog/{productId}/image:
     post:
       consumes:
@@ -189,6 +279,40 @@ paths:
       summary: Upload product image
       tags:
       - catalog
+  /catalog/feedbacks:
+    post:
+      consumes:
+      - application/json
+      description: Creates a feedback (score 1-5, optional description) on the product.
+        Available for customers only. Requires Bearer token. X-User-Id is set by the
+        gateway from the JWT.
+      parameters:
+      - description: Feedback payload
+        in: body
+        name: feedback
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.FeedbackCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.FeedbackResponse'
+        "400":
+          description: Invalid payload, score out of range or product not found
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Leave feedback on product
+      tags:
+      - feedbacks
   /catalog/like:
     post:
       consumes:

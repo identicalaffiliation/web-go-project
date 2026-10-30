@@ -24,6 +24,18 @@ type Repository struct {
 	getter *trm.CtxGetter
 }
 
+// feedbacksStats - агрегаты отзывов по товару. LATERAL отдаёт ровно одну строку на товар,
+// поэтому LIMIT в пагинации продолжает считать товары, а не отзывы.
+const feedbacksStats = `
+	LEFT JOIN LATERAL (
+		SELECT
+			COALESCE(round(avg(f.score), 2), 0)::float8 AS rating,
+			count(*) AS feedbacks_count
+		FROM feedbacks f
+		WHERE f.product_id = c.product_id
+	) fs ON true
+`
+
 func NewRepository(master, replica *pgxpool.Pool) *Repository {
 	return &Repository{
 		pool:   master,
@@ -34,10 +46,11 @@ func NewRepository(master, replica *pgxpool.Pool) *Repository {
 
 func (r *Repository) GetItemsByCursorPagination(ctx context.Context, cursor *string, limit int64) ([]*domain.Product, error) {
 	const query = `
-		SELECT product_id, title, description, price, image_key, created_at, updated_at
-		FROM catalog
-		WHERE product_id < COALESCE($1::uuid, 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid) -- uuid max filter
-		ORDER BY product_id DESC
+		SELECT c.product_id, c.title, c.description, c.price, c.image_key, c.created_at, c.updated_at,
+			fs.rating, fs.feedbacks_count
+		FROM catalog c` + feedbacksStats + `
+		WHERE c.product_id < COALESCE($1::uuid, 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid) -- uuid max filter
+		ORDER BY c.product_id DESC
 		LIMIT $2::bigint
 	`
 
@@ -72,9 +85,10 @@ func (r *Repository) GetItemsByCursorPagination(ctx context.Context, cursor *str
 
 func (r *Repository) GetItemByID(ctx context.Context, id uuid.UUID) (*domain.Product, error) {
 	const query = `
-		SELECT 
-    	product_id, title, description, price, image_key, created_at, updated_at 
-		FROM catalog WHERE product_id::uuid = $1
+		SELECT c.product_id, c.title, c.description, c.price, c.image_key, c.created_at, c.updated_at,
+			fs.rating, fs.feedbacks_count
+		FROM catalog c` + feedbacksStats + `
+		WHERE c.product_id = $1
 	`
 
 	var m productModel
@@ -87,6 +101,8 @@ func (r *Repository) GetItemByID(ctx context.Context, id uuid.UUID) (*domain.Pro
 		&m.ImageKey,
 		&m.CreatedAt,
 		&m.UpdatedAt,
+		&m.Rating,
+		&m.FeedbacksCount,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -144,8 +160,15 @@ func (r *Repository) Insert(ctx context.Context, product *domain.Product) (*doma
 }
 
 func (r *Repository) UpdateImageKey(ctx context.Context, key string, productID uuid.UUID) (*domain.Product, error) {
-	const query = `UPDATE catalog SET image_key = $1, updated_at = now() WHERE product_id = $2
-		RETURNING *`
+	// агрегаты нужны и здесь: результат кладётся в кэш карточки
+	const query = `
+		WITH c AS (
+			UPDATE catalog SET image_key = $1, updated_at = now() WHERE product_id = $2
+			RETURNING product_id, title, description, price, image_key, created_at, updated_at
+		)
+		SELECT c.product_id, c.title, c.description, c.price, c.image_key, c.created_at, c.updated_at,
+			fs.rating, fs.feedbacks_count
+		FROM c` + feedbacksStats
 
 	conn := r.getter.DefaultTrOrDB(ctx, r.pool)
 
@@ -158,6 +181,8 @@ func (r *Repository) UpdateImageKey(ctx context.Context, key string, productID u
 		&m.ImageKey,
 		&m.CreatedAt,
 		&m.UpdatedAt,
+		&m.Rating,
+		&m.FeedbacksCount,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

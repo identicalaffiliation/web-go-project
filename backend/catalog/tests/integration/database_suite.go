@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/catalog"
+	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/feedbacks"
 	likes_outbox "github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/likes-outbox"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/outbox"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -33,6 +34,7 @@ type DatabaseSuite struct {
 	catalog     *catalog.Repository
 	outbox      *outbox.Repository
 	likesOutbox *likes_outbox.Repository
+	feedback    *feedbacks.Repository
 	pool        *pgxpool.Pool
 	ctx         context.Context
 }
@@ -61,18 +63,19 @@ func (s *DatabaseSuite) SetupSuite() {
 	s.catalog = catalog.NewRepository(pool, pool)
 	s.outbox = outbox.NewRepository(pool, pool)
 	s.likesOutbox = likes_outbox.NewRepository(pool, pool)
-
+	s.feedback = feedbacks.NewRepository(pool, pool)
+	
 	require.NoError(s.T(), runMigrations(s.ctx, pool))
 }
 
 func (s *DatabaseSuite) TearDownTest() {
 	ctx := context.Background()
-	_, err := s.pool.Exec(ctx, `TRUNCATE TABLE catalog, outbox_stock, outbox_likes RESTART IDENTITY CASCADE`)
+	_, err := s.pool.Exec(ctx, `TRUNCATE TABLE catalog, outbox_stock, outbox_likes, feedbacks RESTART IDENTITY CASCADE`)
 	s.Require().NoError(err, "failed to truncate tables after test")
 }
 
 func (s *DatabaseSuite) TearDownSuite() {
-	_, err := s.pool.Exec(context.Background(), `TRUNCATE catalog, outbox_stock, outbox_likes RESTART IDENTITY CASCADE`)
+	_, err := s.pool.Exec(context.Background(), `TRUNCATE catalog, outbox_stock, outbox_likes, feedbacks RESTART IDENTITY CASCADE`)
 	s.Require().NoError(err, "failed to truncate tables after all tests")
 
 	s.pool.Close()

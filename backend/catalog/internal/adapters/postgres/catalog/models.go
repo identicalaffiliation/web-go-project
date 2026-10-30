@@ -16,6 +16,9 @@ type productModel struct {
 	ImageKey    sql.Null[string] `db:"image_key"`
 	CreatedAt   time.Time        `db:"created_at"`
 	UpdatedAt   time.Time        `db:"updated_at"`
+
+	Rating         float64 `db:"rating"`
+	FeedbacksCount int64   `db:"feedbacks_count"`
 }
 
 func (m *productModel) toDomain() *domain.Product {
@@ -27,5 +30,8 @@ func (m *productModel) toDomain() *domain.Product {
 		ImageKey:    m.ImageKey.V,
 		CreatedAt:   m.CreatedAt,
 		UpdatedAt:   m.UpdatedAt,
+
+		Rating:         m.Rating,
+		FeedbacksCount: m.FeedbacksCount,
 	}
 }
