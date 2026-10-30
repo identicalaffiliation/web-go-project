@@ -17,8 +17,23 @@ definitions:
     - quantity
     - title
     type: object
+  github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.LikeAction:
+    enum:
+    - add
+    - remove
+    type: string
+    x-enum-varnames:
+    - LikeAdd
+    - LikeRemove
   github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.LikeProductRequest:
     properties:
+      action:
+        allOf:
+        - $ref: '#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.LikeAction'
+        enum:
+        - add
+        - remove
+        example: add
       id:
         example: 0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b
         type: string
@@ -178,10 +193,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: Puts a like on the product. Available for customers only. Requires
-        Bearer token.
+      description: Puts (action=add) or removes (action=remove) a like on the product.
+        Available for customers only. Requires Bearer token.
       parameters:
-      - description: Product to like
+      - description: Product and like action
         in: body
         name: like
         required: true
@@ -200,7 +215,7 @@ paths:
           description: Internal Server Error
       security:
       - BearerAuth: []
-      summary: Like product
+      summary: Like or unlike product
       tags:
       - catalog
 securityDefinitions:

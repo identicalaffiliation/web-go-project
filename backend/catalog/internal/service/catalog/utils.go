@@ -58,8 +58,12 @@ func (s *Service) toEvent(product *domain.Product) (*domain.Event, error) {
 	}, nil
 }
 
-func (s *Service) toLikeEvent(id uuid.UUID) (*domain.Event, error) {
-	payload, err := json.Marshal(id.String())
+// toLikeEvent - метод формирования события лайка товара (поставлен/убран) для отправки в Kafka.
+func (s *Service) toLikeEvent(id uuid.UUID, action dto.LikeAction) (*domain.Event, error) {
+	payload, err := json.Marshal(domain.LikePayload{
+		ProductID: id,
+		Action:    string(action),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("error MarshalEvent: %w", err)
 	}

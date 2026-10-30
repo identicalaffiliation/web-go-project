@@ -33,39 +33,39 @@ type HandlersSuite struct {
 }
 
 func (s *HandlersSuite) Test_LikeItem() {
-	body := `{"id":"` + uuid.NewV7().String() + `"}`
+	body := `{"id":"` + uuid.NewV7().String() + `","action":"add"}`
 
 	request := httptest.NewRequest(http.MethodPost, "/catalog/like", strings.NewReader(body))
 	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	response := httptest.NewRecorder()
-	s.likePort.EXPECT().LikeItem(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+	s.likePort.EXPECT().LikeItem(gomock.Any(), gomock.Any(), dto.LikeAdd).Return(nil).Times(1)
 
 	s.e.ServeHTTP(response, request)
 	s.Require().Equal(http.StatusCreated, response.Code)
 }
 
 func (s *HandlersSuite) Test_LikeItemInvalidID() {
-	body := `{"id":"invalid id"}`
+	body := `{"id":"invalid id","action":"add"}`
 
 	request := httptest.NewRequest(http.MethodPost, "/catalog/like", strings.NewReader(body))
 	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	response := httptest.NewRecorder()
-	s.likePort.EXPECT().LikeItem(gomock.Any(), gomock.Any()).Return(catalog.ErrInvalid).Times(1)
+	s.likePort.EXPECT().LikeItem(gomock.Any(), gomock.Any(), dto.LikeAdd).Return(catalog.ErrInvalid).Times(1)
 
 	s.e.ServeHTTP(response, request)
 	s.Require().Equal(http.StatusBadRequest, response.Code)
 }
 
 func (s *HandlersSuite) Test_LikeItemInternal() {
-	body := `{"id":"invalid id"}`
+	body := `{"id":"` + uuid.NewV7().String() + `","action":"remove"}`
 
 	request := httptest.NewRequest(http.MethodPost, "/catalog/like", strings.NewReader(body))
 	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	response := httptest.NewRecorder()
-	s.likePort.EXPECT().LikeItem(gomock.Any(), gomock.Any()).Return(errors.New("some err")).Times(1)
+	s.likePort.EXPECT().LikeItem(gomock.Any(), gomock.Any(), dto.LikeRemove).Return(errors.New("some err")).Times(1)
 
 	s.e.ServeHTTP(response, request)
 	s.Require().Equal(http.StatusInternalServerError, response.Code)

@@ -30,6 +30,18 @@ func (f ImageFormat) Ext() (string, bool) {
 	return ext, ok
 }
 
+// LikeAction - тип события лайка: поставить или убрать лайк.
+type LikeAction string
+
+const (
+	LikeAdd    LikeAction = "add"
+	LikeRemove LikeAction = "remove"
+)
+
+func (a LikeAction) Valid() bool {
+	return a == LikeAdd || a == LikeRemove
+}
+
 // CreateProductRequest - Data transfer object структура JSON запроса для создания товара в каталоге.
 // Поля:
 // Title - название товара, минимальная длина - 1, поле обязательно.
@@ -61,8 +73,10 @@ func (req *CreateProductRequest) ToDomain() *domain.Product {
 
 // LikeProductRequest - DTO запроса лайка товара.
 // ID - идентификатор товара (UUID), поле обязательно.
+// Action - тип события: add - поставить лайк, remove - убрать лайк, поле обязательно.
 type LikeProductRequest struct {
-	ID string `json:"id" example:"0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"`
+	ID     string     `json:"id" example:"0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"`
+	Action LikeAction `json:"action" enums:"add,remove" example:"add"`
 }
 
 // Page - структура страницы продуктов.

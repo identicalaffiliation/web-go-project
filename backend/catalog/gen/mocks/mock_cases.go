@@ -198,15 +198,15 @@ func (m *MockLikeItem) EXPECT() *MockLikeItemMockRecorder {
 }
 
 // LikeItem mocks base method.
-func (m *MockLikeItem) LikeItem(ctx context.Context, id string) error {
+func (m *MockLikeItem) LikeItem(ctx context.Context, id string, action dto.LikeAction) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "LikeItem", ctx, id)
+	ret := m.ctrl.Call(m, "LikeItem", ctx, id, action)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // LikeItem indicates an expected call of LikeItem.
-func (mr *MockLikeItemMockRecorder) LikeItem(ctx, id any) *gomock.Call {
+func (mr *MockLikeItemMockRecorder) LikeItem(ctx, id, action any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LikeItem", reflect.TypeOf((*MockLikeItem)(nil).LikeItem), ctx, id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LikeItem", reflect.TypeOf((*MockLikeItem)(nil).LikeItem), ctx, id, action)
 }
