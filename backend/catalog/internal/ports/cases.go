@@ -30,3 +30,19 @@ type UploadImageCase interface {
 type LikeItem interface {
 	LikeItem(ctx context.Context, id string, action dto.LikeAction) error
 }
+
+//go:generate mockgen -source=$GOFILE -destination=../../gen/mocks/mock_$GOFILE -package=mocks
+type CreateFeedbackCase interface {
+	CreateFeedback(ctx context.Context, req *dto.FeedbackCreateRequest) (*dto.FeedbackResponse, error)
+}
+
+//go:generate mockgen -source=$GOFILE -destination=../../gen/mocks/mock_$GOFILE -package=mocks
+type GetProductFeedbacksCase interface {
+	GetProductFeedbacks(ctx context.Context, productID string, cursor *string, limit int64) (*dto.FeedbacksPage, error)
+}
+
+//go:generate mockgen -source=$GOFILE -destination=../../gen/mocks/mock_$GOFILE -package=mocks
+type FeedbackService interface {
+	GetMyCreatedFeedbacks(ctx context.Context, userID string) ([]*dto.FeedbackResponse, error)
+	DeleteFeedback(ctx context.Context, id string) error
+}

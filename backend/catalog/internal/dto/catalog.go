@@ -99,4 +99,8 @@ type Product struct {
 	PresignedURL *string   `json:"url,omitempty"`
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`
+
+	// Rating - средняя оценка по отзывам (0, если отзывов нет)
+	Rating         float64 `json:"rating" example:"4.33"`
+	FeedbacksCount int64   `json:"feedbacksCount" example:"3"`
 }

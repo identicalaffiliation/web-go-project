@@ -210,3 +210,134 @@ func (mr *MockLikeItemMockRecorder) LikeItem(ctx, id, action any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LikeItem", reflect.TypeOf((*MockLikeItem)(nil).LikeItem), ctx, id, action)
 }
+
+// MockCreateFeedbackCase is a mock of CreateFeedbackCase interface.
+type MockCreateFeedbackCase struct {
+	ctrl     *gomock.Controller
+	recorder *MockCreateFeedbackCaseMockRecorder
+	isgomock struct{}
+}
+
+// MockCreateFeedbackCaseMockRecorder is the mock recorder for MockCreateFeedbackCase.
+type MockCreateFeedbackCaseMockRecorder struct {
+	mock *MockCreateFeedbackCase
+}
+
+// NewMockCreateFeedbackCase creates a new mock instance.
+func NewMockCreateFeedbackCase(ctrl *gomock.Controller) *MockCreateFeedbackCase {
+	mock := &MockCreateFeedbackCase{ctrl: ctrl}
+	mock.recorder = &MockCreateFeedbackCaseMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockCreateFeedbackCase) EXPECT() *MockCreateFeedbackCaseMockRecorder {
+	return m.recorder
+}
+
+// CreateFeedback mocks base method.
+func (m *MockCreateFeedbackCase) CreateFeedback(ctx context.Context, req *dto.FeedbackCreateRequest) (*dto.FeedbackResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateFeedback", ctx, req)
+	ret0, _ := ret[0].(*dto.FeedbackResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateFeedback indicates an expected call of CreateFeedback.
+func (mr *MockCreateFeedbackCaseMockRecorder) CreateFeedback(ctx, req any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateFeedback", reflect.TypeOf((*MockCreateFeedbackCase)(nil).CreateFeedback), ctx, req)
+}
+
+// MockGetProductFeedbacksCase is a mock of GetProductFeedbacksCase interface.
+type MockGetProductFeedbacksCase struct {
+	ctrl     *gomock.Controller
+	recorder *MockGetProductFeedbacksCaseMockRecorder
+	isgomock struct{}
+}
+
+// MockGetProductFeedbacksCaseMockRecorder is the mock recorder for MockGetProductFeedbacksCase.
+type MockGetProductFeedbacksCaseMockRecorder struct {
+	mock *MockGetProductFeedbacksCase
+}
+
+// NewMockGetProductFeedbacksCase creates a new mock instance.
+func NewMockGetProductFeedbacksCase(ctrl *gomock.Controller) *MockGetProductFeedbacksCase {
+	mock := &MockGetProductFeedbacksCase{ctrl: ctrl}
+	mock.recorder = &MockGetProductFeedbacksCaseMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockGetProductFeedbacksCase) EXPECT() *MockGetProductFeedbacksCaseMockRecorder {
+	return m.recorder
+}
+
+// GetProductFeedbacks mocks base method.
+func (m *MockGetProductFeedbacksCase) GetProductFeedbacks(ctx context.Context, productID string, cursor *string, limit int64) (*dto.FeedbacksPage, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProductFeedbacks", ctx, productID, cursor, limit)
+	ret0, _ := ret[0].(*dto.FeedbacksPage)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProductFeedbacks indicates an expected call of GetProductFeedbacks.
+func (mr *MockGetProductFeedbacksCaseMockRecorder) GetProductFeedbacks(ctx, productID, cursor, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProductFeedbacks", reflect.TypeOf((*MockGetProductFeedbacksCase)(nil).GetProductFeedbacks), ctx, productID, cursor, limit)
+}
+
+// MockFeedbackService is a mock of FeedbackService interface.
+type MockFeedbackService struct {
+	ctrl     *gomock.Controller
+	recorder *MockFeedbackServiceMockRecorder
+	isgomock struct{}
+}
+
+// MockFeedbackServiceMockRecorder is the mock recorder for MockFeedbackService.
+type MockFeedbackServiceMockRecorder struct {
+	mock *MockFeedbackService
+}
+
+// NewMockFeedbackService creates a new mock instance.
+func NewMockFeedbackService(ctrl *gomock.Controller) *MockFeedbackService {
+	mock := &MockFeedbackService{ctrl: ctrl}
+	mock.recorder = &MockFeedbackServiceMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockFeedbackService) EXPECT() *MockFeedbackServiceMockRecorder {
+	return m.recorder
+}
+
+// DeleteFeedback mocks base method.
+func (m *MockFeedbackService) DeleteFeedback(ctx context.Context, id string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteFeedback", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteFeedback indicates an expected call of DeleteFeedback.
+func (mr *MockFeedbackServiceMockRecorder) DeleteFeedback(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFeedback", reflect.TypeOf((*MockFeedbackService)(nil).DeleteFeedback), ctx, id)
+}
+
+// GetMyCreatedFeedbacks mocks base method.
+func (m *MockFeedbackService) GetMyCreatedFeedbacks(ctx context.Context, userID string) ([]*dto.FeedbackResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMyCreatedFeedbacks", ctx, userID)
+	ret0, _ := ret[0].([]*dto.FeedbackResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMyCreatedFeedbacks indicates an expected call of GetMyCreatedFeedbacks.
+func (mr *MockFeedbackServiceMockRecorder) GetMyCreatedFeedbacks(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMyCreatedFeedbacks", reflect.TypeOf((*MockFeedbackService)(nil).GetMyCreatedFeedbacks), ctx, userID)
+}

@@ -2,7 +2,6 @@ package outbox
 
 import (
 	"context"
-	"sync"
 	"time"
 	"uuid"
 
@@ -16,10 +15,8 @@ func Run(
 	producer ports.Producer,
 	logger ports.Logger,
 	cfg *config.OutboxWorkerConfig,
-	wg *sync.WaitGroup,
 ) error {
 	ticker := time.NewTicker(cfg.TickTime)
-	defer wg.Done()
 	defer ticker.Stop()
 
 	for {
@@ -38,6 +35,10 @@ func processEvents(ctx context.Context, repo ports.OutboxRepository, producer po
 	events, err := repo.GetEvents(ctx, limit)
 	if err != nil {
 		return err
+	}
+
+	if len(events) == 0 {
+		return nil
 	}
 
 	if err := producer.SendMessages(ctx, events); err != nil {

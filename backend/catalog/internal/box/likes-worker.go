@@ -2,7 +2,7 @@ package box
 
 import (
 	"context"
-	"sync"
+	"errors"
 
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/brokers/kafka"
 	likes_outbox "github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/likes-outbox"
@@ -30,29 +30,11 @@ func ProvideLikesWorker(ctx context.Context, cfg *config.Config, logger ports.Lo
 
 	producer := kafka.NewProducer(&cfg.Broker, cfg.Outbox.Likes.Topic)
 
-	defer func() {
-		if err := producer.Close(); err != nil {
-			logger.WithError(err).Error("failed to close producer conn")
-		}
-	}()
+	defer closeWithLog(logger, "likes producer", producer.Close)
 
-	wg := &sync.WaitGroup{}
-
-	wg.Add(1)
-	errChan := make(chan error, 1)
-	go func() {
-		if err := outbox.Run(ctx, repo, producer, logger, &cfg.Outbox.Likes, wg); err != nil {
-			errChan <- err
-		}
-	}()
-
-	wg.Wait()
-
-	if val, ok := <-errChan; ok {
-		close(errChan)
-		return val
+	if err := outbox.Run(ctx, repo, producer, logger, &cfg.Outbox.Likes); err != nil && !errors.Is(err, context.Canceled) {
+		return err
 	}
 
-	close(errChan)
 	return nil
 }

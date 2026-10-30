@@ -1,4 +1,4 @@
-package rpc
+package price
 
 import (
 	"context"
@@ -15,14 +15,12 @@ import (
 
 type GRPCServer struct {
 	pricev1.UnimplementedPriceServiceServer
-
 	app ports.GetItemCase
 }
 
 func NewGRPCServer(app ports.GetItemCase) *grpc.Server {
 	server := grpc.NewServer()
 	pricev1.RegisterPriceServiceServer(server, &GRPCServer{app: app})
-
 	return server
 }
 

@@ -1,6 +1,6 @@
 //go:build unit
 
-package rpc
+package price
 
 import (
 	"context"
@@ -8,8 +8,8 @@ import (
 	"testing"
 	"uuid"
 
-	pricev1 "github.com/identicalaffiliation/web-go-project/backend/catalog/gen/pb/price/v1"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/gen/mocks"
+	pricev1 "github.com/identicalaffiliation/web-go-project/backend/catalog/gen/pb/price/v1"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/dto"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"

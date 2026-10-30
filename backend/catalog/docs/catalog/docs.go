@@ -101,6 +101,57 @@ const docTemplate = `{
                 }
             }
         },
+        "/catalog/feedbacks": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a feedback (score 1-5, optional description) on the product. Available for customers only. Requires Bearer token. X-User-Id is set by the gateway from the JWT.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "feedbacks"
+                ],
+                "summary": "Leave feedback on product",
+                "parameters": [
+                    {
+                        "description": "Feedback payload",
+                        "name": "feedback",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.FeedbackCreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.FeedbackResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid payload, score out of range or product not found"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
         "/catalog/like": {
             "post": {
                 "security": [
@@ -177,6 +228,64 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/catalog/{productId}/feedbacks": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a page of product feedbacks, newest first. Use ` + "`" + `nextCursor` + "`" + ` from the previous response to fetch the next page. Requires Bearer token.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "feedbacks"
+                ],
+                "summary": "List product feedbacks (cursor pagination)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product ID",
+                        "name": "productId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 20, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Cursor from previous response",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.FeedbacksPage"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid product id, limit or cursor"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "description": "Forbidden"
                     },
                     "500": {
                         "description": "Internal Server Error"
@@ -272,6 +381,70 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.FeedbackCreateRequest": {
+            "type": "object",
+            "required": [
+                "productId",
+                "score"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "example": "great product"
+                },
+                "productId": {
+                    "type": "string",
+                    "example": "01a10112-c339-715d-8feb-4751a1ced5ef"
+                },
+                "score": {
+                    "type": "integer",
+                    "maximum": 5,
+                    "minimum": 1,
+                    "example": 5
+                }
+            }
+        },
+        "github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.FeedbackResponse": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "productId": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "score": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "userId": {
+                    "type": "string",
+                    "format": "uuid"
+                }
+            }
+        },
+        "github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.FeedbacksPage": {
+            "type": "object",
+            "properties": {
+                "feedbacks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.FeedbackResponse"
+                    }
+                },
+                "nextCursor": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.LikeAction": {
             "type": "string",
             "enum": [
@@ -313,11 +486,20 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
+                "feedbacksCount": {
+                    "type": "integer",
+                    "example": 3
+                },
                 "price": {
                     "type": "integer"
                 },
                 "productId": {
                     "type": "string"
+                },
+                "rating": {
+                    "description": "Rating - средняя оценка по отзывам (0, если отзывов нет)",
+                    "type": "number",
+                    "example": 4.33
                 },
                 "title": {
                     "type": "string"

@@ -34,3 +34,17 @@ func (req *CreateProductRequest) ValidateData() error {
 
 	return nil
 }
+
+func (req *FeedbackCreateRequest) Validate() error {
+	if err := validate().Struct(req); err != nil {
+		return ErrInvalidJSON
+	}
+
+	if req.Description != nil {
+		if len(strings.TrimSpace(*req.Description)) == 0 {
+			return ErrInvalidData
+		}
+	}
+
+	return nil
+}
