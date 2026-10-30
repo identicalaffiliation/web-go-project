@@ -25,7 +25,7 @@ func NewRepository(pool1, pool2 *pgxpool.Pool) *Repository {
 }
 
 func (r *Repository) Insert(ctx context.Context, event *domain.Event) error {
-	const query = `INSERT INTO outbox (id, key, payload) VALUES ($1, $2, $3)`
+	const query = `INSERT INTO outbox_stock (id, key, payload) VALUES ($1, $2, $3)`
 
 	conn := r.getter.DefaultTrOrDB(ctx, r.pool)
 	_, err := conn.Exec(ctx, query, event.EventID, event.Key, event.Payload)
@@ -38,7 +38,7 @@ func (r *Repository) Insert(ctx context.Context, event *domain.Event) error {
 
 func (r *Repository) GetEvents(ctx context.Context, limit int64) ([]*domain.Event, error) {
 	const query = `
-		SELECT id, key, payload, created_at, sent_at FROM outbox
+		SELECT id, key, payload, created_at, sent_at FROM outbox_stock
 		WHERE sent_at IS NULL ORDER BY created_at LIMIT $1`
 
 	conn := r.getter.DefaultTrOrDB(ctx, r.poolRO)
@@ -61,7 +61,7 @@ func (r *Repository) GetEvents(ctx context.Context, limit int64) ([]*domain.Even
 }
 
 func (r *Repository) SentEvent(ctx context.Context, ids []uuid.UUID) error {
-	const query = `UPDATE outbox SET sent_at = now() WHERE id = ANY($1)`
+	const query = `UPDATE outbox_stock SET sent_at = now() WHERE id = ANY($1)`
 
 	if _, err := r.pool.Exec(ctx, query, ids); err != nil {
 		return fmt.Errorf("update rows: %w", err)

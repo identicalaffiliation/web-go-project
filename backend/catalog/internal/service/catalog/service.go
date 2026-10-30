@@ -4,6 +4,7 @@ import "github.com/identicalaffiliation/web-go-project/backend/catalog/internal/
 
 type Service struct {
 	outbox      ports.OutboxRepository
+	likes       ports.OutboxRepository
 	catalog     ports.CatalogRepository
 	logger      ports.Logger
 	manager     ports.TxManager
@@ -14,6 +15,7 @@ type Service struct {
 func NewService(
 	outboxRepository ports.OutboxRepository,
 	catalogRepository ports.CatalogRepository,
+	likesOutboxRepository ports.OutboxRepository,
 	logger ports.Logger,
 	manager ports.TxManager,
 	client ports.S3Client,
@@ -22,6 +24,7 @@ func NewService(
 	return &Service{
 		outbox:      outboxRepository,
 		catalog:     catalogRepository,
+		likes:       likesOutboxRepository,
 		logger:      logger,
 		manager:     manager,
 		minioClient: client,

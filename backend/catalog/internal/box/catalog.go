@@ -18,6 +18,7 @@ import (
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/brokers/kafka"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/cache/redis"
 	catalogRepository "github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/catalog"
+	likes_outbox "github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/likes-outbox"
 	outboxRepository "github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/outbox"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/rest"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/rpc"
@@ -58,19 +59,21 @@ func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logge
 		}
 	}()
 
-	kafkaproducer := kafka.NewProducer(&cfg.Broker)
+	stockProducer := kafka.NewProducer(&cfg.Broker, cfg.Outbox.Stock.Topic)
 	defer func() {
-		if err := kafkaproducer.Close(); err != nil {
+		if err := stockProducer.Close(); err != nil {
 			fmt.Println(err)
 		}
 	}()
 
 	catalogRepo := catalogRepository.NewRepository(masterPool, replicaPool)
-	outboxRepo := outboxRepository.NewRepository(masterPool, replicaPool)
+	stockOutboxRepo := outboxRepository.NewRepository(masterPool, replicaPool)
+	outboxLikesRepository := likes_outbox.NewRepository(masterPool, replicaPool)
 
 	service := catalog.NewService(
-		outboxRepo,
+		stockOutboxRepo,
 		catalogRepo,
+		outboxLikesRepository,
 		logger,
 		manager.Must(trm.NewDefaultFactory(masterPool)),
 		minioClient,
@@ -83,7 +86,7 @@ func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logge
 
 	wg.Add(1)
 	go func() {
-		if err := outbox.Run(notifyCtx, outboxRepo, kafkaproducer, logger, &cfg.Outbox, &wg); err != nil {
+		if err := outbox.Run(notifyCtx, stockOutboxRepo, stockProducer, logger, &cfg.Outbox.Stock, &wg); err != nil {
 			logger.Debug("ctx signal")
 		}
 	}()

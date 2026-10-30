@@ -23,12 +23,16 @@ cache:
   ttl: 600s
 
 outbox:
-  tick: 250ms
-  limit: 100
-
+  stock:
+    tick: 250ms
+    limit: 100
+    topic: stock.created
+  likes:
+    tick: 250ms
+    limit: 100
+    topic: like.events
 kafka:
     brokers: [shop-kafka:9092]
-    produce_topic: stock.created
     batch_size: 100
     batch_timeout: 50ms
     write_timeout: 5s

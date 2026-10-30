@@ -15,7 +15,7 @@ func Run(
 	repo ports.OutboxRepository,
 	producer ports.Producer,
 	logger ports.Logger,
-	cfg *config.OutboxConfig,
+	cfg *config.OutboxWorkerConfig,
 	wg *sync.WaitGroup,
 ) error {
 	ticker := time.NewTicker(cfg.TickTime)

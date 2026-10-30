@@ -509,8 +509,9 @@ services:
       kafka-topics --bootstrap-server shop-kafka:9092 --list
 
       echo -e 'Creating kafka topics'
-      kafka-topics --bootstrap-server shop-kafka:9092 --create --if-not-exists --topic users.created --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server shop-kafka:9092 --create --if-not-exists --topic users.created --replication-factor 1 --partitions 3
       kafka-topics --bootstrap-server shop-kafka:9092 --create --if-not-exists --topic stock.created --replication-factor 1 --partitions 3
+      kafka-topics --bootstrap-server shop-kafka:9092 --create --if-not-exists --topic like.events --replication-factor 1 --partitions 3
       kafka-topics --bootstrap-server shop-kafka:9092 --create --if-not-exists --topic profiles.business.created --replication-factor 1 --partitions 3
 
       echo -e 'Successfully created the following topics:'
@@ -679,6 +680,31 @@ services:
       shop-kafka:
         condition: service_healthy
       shop-temporal:
+        condition: service_healthy
+
+  # outbox likes worker in other bin
+  likes-outbox-worker:
+    container_name: likes-outbox-worker
+
+    build:
+      context: ./backend/catalog
+      dockerfile: likes.Dockerfile
+
+    environment:
+      MASTER_DSN: ${MASTER_CATALOG_POSTGRES_DSN}
+      REPLICA_DSN: ${REPLICA_CATALOG_POSTGRES_DSN}
+
+    volumes:
+      - ./backend/catalog/configs/catalog.yml:/app/config.yml:ro
+
+    depends_on:
+      catalog-master-postgres:
+        condition: service_healthy
+      catalog-replica-postgres:
+        condition: service_healthy
+      shop-zookeeper:
+        condition: service_healthy
+      shop-kafka:
         condition: service_healthy
 
   # FRONTEND

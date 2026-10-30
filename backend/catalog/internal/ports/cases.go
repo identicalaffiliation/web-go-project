@@ -25,3 +25,8 @@ type GetPageCase interface {
 type UploadImageCase interface {
 	UploadImage(ctx context.Context, id string, format dto.ImageFormat) (*dto.ProductResponse, error)
 }
+
+//go:generate mockgen -source=$GOFILE -destination=../../gen/mocks/mock_$GOFILE -package=mocks
+type LikeItem interface {
+	LikeItem(ctx context.Context, id string) error
+}

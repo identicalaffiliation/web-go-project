@@ -9,23 +9,7 @@ import (
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/domain"
 )
 
-const (
-	Pending    EventStatus = "pending"
-	Processing EventStatus = "processing"
-	Sent       EventStatus = "sent"
-)
-
 type EventStatus string
-
-type eventModels []eventModel //nolint: unused
-
-func (em *eventModels) toDomainList() []*domain.Event { //nolint: unused
-	list := make([]*domain.Event, 0, len(*em))
-	for _, m := range *em {
-		list = append(list, m.toDomain())
-	}
-	return list
-}
 
 type eventModel struct { //nolint: unused
 	EventID   uuid.UUID           `db:"id"`
@@ -35,7 +19,7 @@ type eventModel struct { //nolint: unused
 	SentAt    sql.Null[time.Time] `db:"sent_at"`
 }
 
-func (m *eventModel) toDomain() *domain.Event { //nolint: unused
+func (m *eventModel) toDomain() *domain.Event {
 	return &domain.Event{
 		EventID:   m.EventID,
 		Key:       m.Key,

@@ -18,6 +18,7 @@ import (
 var (
 	ErrInternal = errors.New("internal error")
 	ErrNotFound = errors.New("not found")
+	ErrInvalid  = errors.New("invalid data")
 )
 
 func buildImageKey(ext string) string {
@@ -48,9 +49,24 @@ func (s *Service) toEvent(product *domain.Product) (*domain.Event, error) {
 		return nil, fmt.Errorf("error MarshalEvent: %w", err)
 	}
 
+	// incorrect logic (key per partition => need to productID instead random id)
+	// + idempotency consumer with processed events ('cause at-least-once)
 	return &domain.Event{
 		EventID: product.ID,
 		Key:     uuid.NewV7(),
+		Payload: payload,
+	}, nil
+}
+
+func (s *Service) toLikeEvent(id uuid.UUID) (*domain.Event, error) {
+	payload, err := json.Marshal(id.String())
+	if err != nil {
+		return nil, fmt.Errorf("error MarshalEvent: %w", err)
+	}
+
+	return &domain.Event{
+		EventID: uuid.NewV7(),
+		Key:     id,
 		Payload: payload,
 	}, nil
 }

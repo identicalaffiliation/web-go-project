@@ -166,3 +166,23 @@ func (s *Service) UploadImage(ctx context.Context, id string, format dto.ImageFo
 
 	return s.toResponseOne(product, url), nil
 }
+
+func (s *Service) LikeItem(ctx context.Context, id string) error {
+	productID, err := uuid.Parse(id)
+	if err != nil {
+		return ErrInvalid
+	}
+
+	event, err := s.toLikeEvent(productID)
+	if err != nil {
+		s.logger.WithError(err).Error("failed to mapping event")
+		return err
+	}
+
+	if err := s.likes.Insert(ctx, event); err != nil {
+		s.logger.WithError(err).Error("failed to create like event")
+		return err
+	}
+
+	return nil
+}
