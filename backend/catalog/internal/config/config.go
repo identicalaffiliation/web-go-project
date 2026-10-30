@@ -63,14 +63,20 @@ type RedisConfig struct {
 	TTL      time.Duration `yaml:"ttl"`
 }
 
+// OutboxConfig - настройки outbox-воркеров, по одному на каждую outbox-таблицу.
 type OutboxConfig struct {
+	Stock OutboxWorkerConfig `yaml:"stock"`
+	Likes OutboxWorkerConfig `yaml:"likes"`
+}
+
+type OutboxWorkerConfig struct {
 	TickTime time.Duration `yaml:"tick"`
 	Limit    int64         `yaml:"limit"`
+	Topic    string        `yaml:"topic"`
 }
 
 type KafkaConfig struct {
 	Brokers      []string      `yaml:"brokers"`
-	ProduceTopic string        `yaml:"produce_topic"`
 	BatchSize    int           `yaml:"batch_size"`
 	BatchTimeout time.Duration `yaml:"batch_timeout"`
 	WriteTimeout time.Duration `yaml:"write_timeout"`

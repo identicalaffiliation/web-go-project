@@ -40,6 +40,8 @@ func SetupServer(cfg *config.HTTPConfig, c *catalog.Service) *echo.Echo {
 	internal.POST("/:productId/image", handlers.UploadImage(c),
 		middlewares.RoleMiddleware(middlewares.Business),
 	)
+	internal.POST("/like", handlers.LikeProduct(c),
+		middlewares.RoleMiddleware(middlewares.Customer))
 
 	return e
 }

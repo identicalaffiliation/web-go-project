@@ -59,6 +59,12 @@ func (req *CreateProductRequest) ToDomain() *domain.Product {
 	return model
 }
 
+// LikeProductRequest - DTO запроса лайка товара.
+// ID - идентификатор товара (UUID), поле обязательно.
+type LikeProductRequest struct {
+	ID string `json:"id" example:"0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"`
+}
+
 // Page - структура страницы продуктов.
 // NextCursor - Опциональное поле следующей пейджи.
 type Page struct {

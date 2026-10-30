@@ -53,12 +53,11 @@ func (s *KafkaSuite) SetupTest() {
 
 	cfg := &config.KafkaConfig{
 		Brokers:      s.brokers,
-		ProduceTopic: s.topic,
 		BatchSize:    1,
 		BatchTimeout: 10 * time.Millisecond,
 		WriteTimeout: 5 * time.Second,
 	}
-	s.producer = brokerkafka.NewProducer(cfg)
+	s.producer = brokerkafka.NewProducer(cfg, s.topic)
 }
 
 func (s *KafkaSuite) createTopic(ctx context.Context) error {

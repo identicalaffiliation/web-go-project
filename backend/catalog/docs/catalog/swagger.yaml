@@ -17,6 +17,12 @@ definitions:
     - quantity
     - title
     type: object
+  github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.LikeProductRequest:
+    properties:
+      id:
+        example: 0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b
+        type: string
+    type: object
   github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.Product:
     properties:
       createdAt:
@@ -166,6 +172,35 @@ paths:
       security:
       - BearerAuth: []
       summary: Upload product image
+      tags:
+      - catalog
+  /catalog/like:
+    post:
+      consumes:
+      - application/json
+      description: Puts a like on the product. Available for customers only. Requires
+        Bearer token.
+      parameters:
+      - description: Product to like
+        in: body
+        name: like
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.LikeProductRequest'
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Like product
       tags:
       - catalog
 securityDefinitions:

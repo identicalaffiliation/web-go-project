@@ -4,6 +4,7 @@ package integration
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -27,7 +28,47 @@ type HandlersSuite struct {
 	getItemPort *mocks.MockGetItemCase
 	getPagePort *mocks.MockGetPageCase
 	uploadPort  *mocks.MockUploadImageCase
+	likePort    *mocks.MockLikeItem
 	e           *echo.Echo
+}
+
+func (s *HandlersSuite) Test_LikeItem() {
+	body := `{"id":"` + uuid.NewV7().String() + `"}`
+
+	request := httptest.NewRequest(http.MethodPost, "/catalog/like", strings.NewReader(body))
+	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	response := httptest.NewRecorder()
+	s.likePort.EXPECT().LikeItem(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+
+	s.e.ServeHTTP(response, request)
+	s.Require().Equal(http.StatusCreated, response.Code)
+}
+
+func (s *HandlersSuite) Test_LikeItemInvalidID() {
+	body := `{"id":"invalid id"}`
+
+	request := httptest.NewRequest(http.MethodPost, "/catalog/like", strings.NewReader(body))
+	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	response := httptest.NewRecorder()
+	s.likePort.EXPECT().LikeItem(gomock.Any(), gomock.Any()).Return(catalog.ErrInvalid).Times(1)
+
+	s.e.ServeHTTP(response, request)
+	s.Require().Equal(http.StatusBadRequest, response.Code)
+}
+
+func (s *HandlersSuite) Test_LikeItemInternal() {
+	body := `{"id":"invalid id"}`
+
+	request := httptest.NewRequest(http.MethodPost, "/catalog/like", strings.NewReader(body))
+	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	response := httptest.NewRecorder()
+	s.likePort.EXPECT().LikeItem(gomock.Any(), gomock.Any()).Return(errors.New("some err")).Times(1)
+
+	s.e.ServeHTTP(response, request)
+	s.Require().Equal(http.StatusInternalServerError, response.Code)
 }
 
 func (s *HandlersSuite) Test_AddItemToCatalogHandler() {
@@ -325,11 +366,13 @@ func (s *HandlersSuite) SetupTest() {
 	s.getItemPort = mocks.NewMockGetItemCase(ctrl)
 	s.getPagePort = mocks.NewMockGetPageCase(ctrl)
 	s.uploadPort = mocks.NewMockUploadImageCase(ctrl)
+	s.likePort = mocks.NewMockLikeItem(ctrl)
 
 	s.e.POST("/catalog", handlers.AddItemToCatalog(s.createPort))
 	s.e.GET("/catalog/:productId", handlers.GetItem(s.getItemPort))
 	s.e.GET("/catalog", handlers.GetItemsPage(s.getPagePort))
 	s.e.POST("/catalog/:productId/image", handlers.UploadImage(s.uploadPort))
+	s.e.POST("/catalog/like", handlers.LikeProduct(s.likePort))
 }
 
 func TestHandlersSuite(t *testing.T) {

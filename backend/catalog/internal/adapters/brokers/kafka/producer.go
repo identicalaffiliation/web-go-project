@@ -17,11 +17,11 @@ type Producer struct {
 	writer *kafka.Writer
 }
 
-func NewProducer(cfg *config.KafkaConfig) *Producer {
+func NewProducer(cfg *config.KafkaConfig, topic string) *Producer {
 	return &Producer{
 		writer: &kafka.Writer{
 			Addr:         kafka.TCP(cfg.Brokers...),
-			Topic:        cfg.ProduceTopic,
+			Topic:        topic,
 			MaxAttempts:  3,
 			BatchSize:    cfg.BatchSize,
 			BatchTimeout: cfg.BatchTimeout,

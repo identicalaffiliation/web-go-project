@@ -172,3 +172,41 @@ func (mr *MockUploadImageCaseMockRecorder) UploadImage(ctx, id, format any) *gom
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadImage", reflect.TypeOf((*MockUploadImageCase)(nil).UploadImage), ctx, id, format)
 }
+
+// MockLikeItem is a mock of LikeItem interface.
+type MockLikeItem struct {
+	ctrl     *gomock.Controller
+	recorder *MockLikeItemMockRecorder
+	isgomock struct{}
+}
+
+// MockLikeItemMockRecorder is the mock recorder for MockLikeItem.
+type MockLikeItemMockRecorder struct {
+	mock *MockLikeItem
+}
+
+// NewMockLikeItem creates a new mock instance.
+func NewMockLikeItem(ctrl *gomock.Controller) *MockLikeItem {
+	mock := &MockLikeItem{ctrl: ctrl}
+	mock.recorder = &MockLikeItemMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockLikeItem) EXPECT() *MockLikeItemMockRecorder {
+	return m.recorder
+}
+
+// LikeItem mocks base method.
+func (m *MockLikeItem) LikeItem(ctx context.Context, id string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LikeItem", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// LikeItem indicates an expected call of LikeItem.
+func (mr *MockLikeItemMockRecorder) LikeItem(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LikeItem", reflect.TypeOf((*MockLikeItem)(nil).LikeItem), ctx, id)
+}
