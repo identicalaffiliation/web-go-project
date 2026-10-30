@@ -35,7 +35,7 @@ type HandlersSuite struct {
 func (s *HandlersSuite) Test_LikeItem() {
 	body := `{"id":"` + uuid.NewV7().String() + `"}`
 
-	request := httptest.NewRequest(http.MethodPost, "/catalog", strings.NewReader(body))
+	request := httptest.NewRequest(http.MethodPost, "/catalog/like", strings.NewReader(body))
 	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	response := httptest.NewRecorder()
@@ -48,7 +48,7 @@ func (s *HandlersSuite) Test_LikeItem() {
 func (s *HandlersSuite) Test_LikeItemInvalidID() {
 	body := `{"id":"invalid id"}`
 
-	request := httptest.NewRequest(http.MethodPost, "/catalog", strings.NewReader(body))
+	request := httptest.NewRequest(http.MethodPost, "/catalog/like", strings.NewReader(body))
 	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	response := httptest.NewRecorder()
@@ -61,7 +61,7 @@ func (s *HandlersSuite) Test_LikeItemInvalidID() {
 func (s *HandlersSuite) Test_LikeItemInternal() {
 	body := `{"id":"invalid id"}`
 
-	request := httptest.NewRequest(http.MethodPost, "/catalog", strings.NewReader(body))
+	request := httptest.NewRequest(http.MethodPost, "/catalog/like", strings.NewReader(body))
 	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	response := httptest.NewRecorder()
@@ -372,7 +372,7 @@ func (s *HandlersSuite) SetupTest() {
 	s.e.GET("/catalog/:productId", handlers.GetItem(s.getItemPort))
 	s.e.GET("/catalog", handlers.GetItemsPage(s.getPagePort))
 	s.e.POST("/catalog/:productId/image", handlers.UploadImage(s.uploadPort))
-	s.e.POST("/catalog", handlers.LikeProduct(s.likePort))
+	s.e.POST("/catalog/like", handlers.LikeProduct(s.likePort))
 }
 
 func TestHandlersSuite(t *testing.T) {

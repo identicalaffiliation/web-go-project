@@ -101,6 +101,51 @@ const docTemplate = `{
                 }
             }
         },
+        "/catalog/like": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Puts a like on the product. Available for customers only. Requires Bearer token.",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "catalog"
+                ],
+                "summary": "Like product",
+                "parameters": [
+                    {
+                        "description": "Product to like",
+                        "name": "like",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.LikeProductRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
         "/catalog/{productId}": {
             "get": {
                 "description": "Returns a single product by its ID. Public endpoint.",
@@ -224,6 +269,15 @@ const docTemplate = `{
                 "title": {
                     "type": "string",
                     "minLength": 1
+                }
+            }
+        },
+        "github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.LikeProductRequest": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"
                 }
             }
         },
