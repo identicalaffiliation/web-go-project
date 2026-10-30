@@ -28,5 +28,5 @@ type UploadImageCase interface {
 
 //go:generate mockgen -source=$GOFILE -destination=../../gen/mocks/mock_$GOFILE -package=mocks
 type LikeItem interface {
-	LikeItem(ctx context.Context, id string) error
+	LikeItem(ctx context.Context, id string, action dto.LikeAction) error
 }

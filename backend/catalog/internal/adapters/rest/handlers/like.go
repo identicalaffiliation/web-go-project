@@ -11,12 +11,12 @@ import (
 )
 
 // LikeProduct godoc
-// @Summary      Like product
-// @Description  Puts a like on the product. Available for customers only. Requires Bearer token.
+// @Summary      Like or unlike product
+// @Description  Puts (action=add) or removes (action=remove) a like on the product. Available for customers only. Requires Bearer token.
 // @Tags         catalog
 // @Accept       json
 // @Security     BearerAuth
-// @Param        like  body  dto.LikeProductRequest  true  "Product to like"
+// @Param        like  body  dto.LikeProductRequest  true  "Product and like action"
 // @Success      201
 // @Failure      400
 // @Failure      401
@@ -31,7 +31,7 @@ func LikeProduct(usecase ports.LikeItem) echo.HandlerFunc {
 		}
 
 		reqCtx := ctx.Request().Context()
-		if err := usecase.LikeItem(reqCtx, req.ID); err != nil {
+		if err := usecase.LikeItem(reqCtx, req.ID, req.Action); err != nil {
 			if errors.Is(err, catalog.ErrInvalid) {
 				return echo.ErrBadRequest
 			}

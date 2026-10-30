@@ -102,17 +102,17 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Puts a like on the product. Available for customers only. Requires Bearer token.",
+                "description": "Puts (action=add) or removes (action=remove) a like on the product. Available for customers only. Requires Bearer token.",
                 "consumes": [
                     "application/json"
                 ],
                 "tags": [
                     "catalog"
                 ],
-                "summary": "Like product",
+                "summary": "Like or unlike product",
                 "parameters": [
                     {
-                        "description": "Product to like",
+                        "description": "Product and like action",
                         "name": "like",
                         "in": "body",
                         "required": true,
@@ -266,9 +266,32 @@
                 }
             }
         },
+        "github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.LikeAction": {
+            "type": "string",
+            "enum": [
+                "add",
+                "remove"
+            ],
+            "x-enum-varnames": [
+                "LikeAdd",
+                "LikeRemove"
+            ]
+        },
         "github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.LikeProductRequest": {
             "type": "object",
             "properties": {
+                "action": {
+                    "enum": [
+                        "add",
+                        "remove"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.LikeAction"
+                        }
+                    ],
+                    "example": "add"
+                },
                 "id": {
                     "type": "string",
                     "example": "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"
