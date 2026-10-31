@@ -17,6 +17,38 @@
 Сам k6 на 2000 rps ест заметно CPU: запускать лучше не на той же машине, где тормозит docker,
 или смотреть, что k6 не упирается в CPU раньше сервисов.
 
+## Rate limit
+
+Gateway ограничивает запросы (`nginx/templates/rate-limits.conf.template`, значения — env `RL_*` у `gateway` в `compose.yml`):
+
+- **на сервис** — 30 r/s на все ручки сервиса, чтение тоже: `RL_AUTH`, `RL_PROFILE`, `RL_ORDERS`.
+  У каталога два потолка: чтение (GET) 1000 r/s — `RL_CATALOG_READ`, запись 30 r/s — `RL_CATALOG_WRITE`;
+- **на клиента** на ручках записи:
+
+| Ручка | лимит |
+|-------|-------|
+| `POST /api/v1/orders` | 5 r/s на токен (`RL_ORDERS_USER`) |
+| `POST /api/v1/profiles/business` | 1 r/s на токен (`RL_PROFILE_USER`) |
+| `POST /api/v1/auth/register` | 5 r/s на IP (`RL_REGISTER_IP`) |
+| `POST /api/v1/catalog`, `/catalog/*` (товар, картинка, лайк, отзыв) | 30 r/s на токен (`RL_CATALOG_WRITE_USER`) |
+
+Сверх лимита (и burst) gateway сразу отвечает `429` с `Retry-After`, до сервисов запрос не доходит.
+Проверка токена (`auth_request`) лимит auth не расходует.
+
+Все скрипты нагружают выше этих лимитов, поэтому для прогона **на ёмкость сервисов** лимиты
+поднимают в `.env` и пересоздают gateway:
+
+```sh
+for v in RL_AUTH RL_CATALOG_READ RL_CATALOG_WRITE RL_PROFILE RL_ORDERS \
+         RL_ORDERS_USER RL_PROFILE_USER RL_REGISTER_IP RL_CATALOG_WRITE_USER; do
+  echo "$v=100000r/s" >> .env
+done
+docker compose up -d --force-recreate gateway
+```
+
+Без этого `setup` всё равно пройдёт (на 429 он ждёт и повторяет), но в самой нагрузке будут 429,
+и пороги по ошибкам упадут. Убрать — удалить строки `RL_*` из `.env` и снова пересоздать gateway.
+
 ## Локальный запуск
 
 Поднять проект (`make up migrations-up init-kafka-topics run`), потом:

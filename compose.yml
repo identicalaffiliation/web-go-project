@@ -736,6 +736,18 @@ services:
 
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/templates:/etc/nginx/templates:ro
+
+    environment:
+      RL_AUTH: ${RL_AUTH:-30r/s}
+      RL_CATALOG_READ: ${RL_CATALOG_READ:-1000r/s}
+      RL_CATALOG_WRITE: ${RL_CATALOG_WRITE:-30r/s}
+      RL_PROFILE: ${RL_PROFILE:-30r/s}
+      RL_ORDERS: ${RL_ORDERS:-30r/s}
+      RL_ORDERS_USER: ${RL_ORDERS_USER:-5r/s}
+      RL_PROFILE_USER: ${RL_PROFILE_USER:-1r/s}
+      RL_REGISTER_IP: ${RL_REGISTER_IP:-5r/s}
+      RL_CATALOG_WRITE_USER: ${RL_CATALOG_WRITE_USER:-30r/s}
 
     healthcheck:
       test: [ "CMD-SHELL", "wget -qO- http://localhost/healthz || exit 1" ]

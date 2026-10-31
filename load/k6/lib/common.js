@@ -65,12 +65,27 @@ export function pick(arr) {
 
 export const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
+// POST для setup: при 429 от rate limit gateway ждёт Retry-After и повторяет.
+// Подготовка данных (регистрации, товары) так проходит и при включённых лимитах,
+// а в самой нагрузке 429 остаётся ошибкой - значит, лимиты для прогона не подняты.
+function postRetry(url, body, params) {
+  for (let i = 0; i < 60; i++) {
+    const res = http.post(url, body, params);
+    if (res.status !== 429) {
+      return res;
+    }
+    sleep(Number(res.headers['Retry-After'] || 1));
+  }
+
+  throw new Error(`${url}: still 429 after 60 retries`);
+}
+
 export function authHeaders(token) {
   return { ...JSON_HEADERS, Authorization: `Bearer ${token}` };
 }
 
 function login(email, password) {
-  const res = http.post(
+  const res = postRetry(
     `${BASE_URL}/api/v1/auth/login`,
     JSON.stringify({ email, password }),
     { headers: JSON_HEADERS },
@@ -92,7 +107,7 @@ export function registerAndLogin() {
   const email = `k6-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
   const password = 'k6-password-123';
 
-  const reg = http.post(
+  const reg = postRetry(
     `${BASE_URL}/api/v1/auth/register`,
     JSON.stringify({ email, password }),
     { headers: JSON_HEADERS },
@@ -106,7 +121,7 @@ export function registerAndLogin() {
 // Роль в auth меняется асинхронно (profile -> kafka -> auth), поэтому
 // перелогиниваемся, пока в токене не появится role=business.
 export function becomeBusiness(user) {
-  const res = http.post(
+  const res = postRetry(
     `${BASE_URL}/api/v1/profiles/business`,
     JSON.stringify({ company_name: 'k6 company' }),
     { headers: authHeaders(user.token) },
@@ -130,8 +145,10 @@ export function registerBusiness() {
 }
 
 // Создаёт товар от имени business пользователя. Возвращает id товара.
-export function createProduct(token) {
-  const res = http.post(
+// retry - повторять на 429 (для setup); в нагрузке 429 - ошибка, как у остальных ручек.
+export function createProduct(token, retry = true) {
+  const post = retry ? postRetry : (url, body, params) => http.post(url, body, params);
+  const res = post(
     `${BASE_URL}/api/v1/catalog`,
     JSON.stringify({ title: 'k6 product', price: 100, quantity: 99 }),
     { headers: authHeaders(token) },

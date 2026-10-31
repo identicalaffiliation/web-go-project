@@ -53,6 +53,11 @@ jobs:
       - name: Prepare env and jwt keys
         run: |
           cp .env.example .env
+          # прогон на ёмкость сервисов: rate limit gateway поднимаем выше нагрузки k6
+          for v in RL_AUTH RL_CATALOG_READ RL_CATALOG_WRITE RL_PROFILE RL_ORDERS \
+                   RL_ORDERS_USER RL_PROFILE_USER RL_REGISTER_IP RL_CATALOG_WRITE_USER; do
+            echo "$v=100000r/s" >> .env
+          done
           make keys
 
       - name: Start project
