@@ -27,14 +27,14 @@ func ProvidePaymentsBox(ctx context.Context, cfg *config.Config, logger ports.Lo
 	notifyCtx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	masterPool, err := providePostgres(notifyCtx, cfg.OperationDuration, cfg.Postgres.MasterDSN)
+	masterPool, err := providePostgres(notifyCtx, cfg.OperationDuration, cfg.Postgres.MasterDSN, &cfg.Postgres.Master)
 	if err != nil {
 		return err
 	}
 
 	defer masterPool.Close()
 
-	replicaPool, err := providePostgres(notifyCtx, cfg.OperationDuration, cfg.Postgres.ReplicaDSN)
+	replicaPool, err := providePostgres(notifyCtx, cfg.OperationDuration, cfg.Postgres.ReplicaDSN, &cfg.Postgres.Replica)
 	if err != nil {
 		return err
 	}

@@ -32,13 +32,13 @@ func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logge
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	masterPool, err := getPostgresPool(ctx, cfg.OperationDuration, cfg.MasterDSN)
+	masterPool, err := getPostgresPool(ctx, cfg.OperationDuration, cfg.MasterDSN, &cfg.Master)
 	if err != nil {
 		return err
 	}
 	defer masterPool.Close()
 
-	replicaPool, err := getPostgresPool(ctx, cfg.OperationDuration, cfg.ReplicaDSN)
+	replicaPool, err := getPostgresPool(ctx, cfg.OperationDuration, cfg.ReplicaDSN, &cfg.Replica)
 	if err != nil {
 		return err
 	}
@@ -56,13 +56,14 @@ func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logge
 	defer closeWithLog(logger, "stock producer", stockProducer.Close)
 
 	stockOutboxRepo := outboxRepository.NewRepository(masterPool, replicaPool)
+	txManager := manager.Must(trm.NewDefaultFactory(masterPool))
 
 	catalogService := catalog.NewService(
 		stockOutboxRepo,
 		catalogRepository.NewRepository(masterPool, replicaPool),
 		likes_outbox.NewRepository(masterPool, replicaPool),
 		logger,
-		manager.Must(trm.NewDefaultFactory(masterPool)),
+		txManager,
 		minioClient,
 		redisClient,
 	)
@@ -85,7 +86,7 @@ func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logge
 	g, gCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		if err := outbox.Run(gCtx, stockOutboxRepo, stockProducer, logger, &cfg.Outbox.Stock); err != nil && !errors.Is(err, context.Canceled) {
+		if err := outbox.Run(gCtx, txManager, stockOutboxRepo, stockProducer, logger, &cfg.Outbox.Stock); err != nil && !errors.Is(err, context.Canceled) {
 			return fmt.Errorf("stock outbox: %w", err)
 		}
 

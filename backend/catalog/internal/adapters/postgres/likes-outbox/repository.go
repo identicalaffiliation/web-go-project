@@ -37,12 +37,16 @@ func (r *Repository) Insert(ctx context.Context, event *domain.Event) error {
 	return nil
 }
 
+// GetEvents - пачка неотправленных событий. Читает master: с реплики (лаг) приходят уже
+// отправленные события. Внутри транзакции строки блокируются до коммита, а занятые другой
+// репликой воркера пропускаются - одно событие забирает только одна реплика.
 func (r *Repository) GetEvents(ctx context.Context, limit int64) ([]*domain.Event, error) {
 	const query = `
 		SELECT id, key, payload, created_at, sent_at FROM outbox_likes
-		WHERE sent_at IS NULL ORDER BY created_at LIMIT $1`
+		WHERE sent_at IS NULL ORDER BY created_at LIMIT $1
+		FOR UPDATE SKIP LOCKED`
 
-	conn := r.getter.DefaultTrOrDB(ctx, r.poolRO)
+	conn := r.getter.DefaultTrOrDB(ctx, r.pool)
 	rows, err := conn.Query(ctx, query, limit)
 	if err != nil {
 		return nil, fmt.Errorf("get unsent rows: %w", err)
@@ -64,7 +68,7 @@ func (r *Repository) GetEvents(ctx context.Context, limit int64) ([]*domain.Even
 func (r *Repository) SentEvent(ctx context.Context, ids []uuid.UUID) error {
 	const query = `UPDATE outbox_likes SET sent_at = now() WHERE id = ANY($1)`
 
-	if _, err := r.pool.Exec(ctx, query, ids); err != nil {
+	if _, err := r.getter.DefaultTrOrDB(ctx, r.pool).Exec(ctx, query, ids); err != nil {
 		return fmt.Errorf("update rows: %w", err)
 	}
 
