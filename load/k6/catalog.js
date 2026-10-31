@@ -104,7 +104,7 @@ export function createFeedback(data) {
 }
 
 export function create(data) {
-  createProduct(data.sellerToken);
+  createProduct(data.sellerToken, false);
 }
 
 export function image(data) {

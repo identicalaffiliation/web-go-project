@@ -1,0 +1,47 @@
+# Зоны rate limit. Шаблон: при старте контейнера entrypoint nginx подставляет ${...} из env
+# (значения и дефолты - в compose.yml, сервис gateway) и кладёт результат в
+# /etc/nginx/conf.d/rate-limits.conf, его подключает nginx.conf. Переменные nginx ($...) не трогаются.
+#
+# Два уровня:
+#   rl_<service> - общий потолок сервиса на все его ручки (чтение тоже), ключ одинаковый у всех запросов;
+#   *_user / *_ip - лимит одного клиента на ручках записи: ключ - Authorization (токен) или IP.
+#              limit_req срабатывает раньше auth_request, поэтому $user_id на этом этапе ещё пустой.
+# Пустой ключ nginx не считает, поэтому через map лимит включается только для нужных методов.
+# Подзапросы (auth_request /_auth) limit_req не считает: проверка токена не съедает лимит auth.
+
+# общий ключ для потолков сервисов
+map $host $rl_all {
+    default all;
+}
+
+# у каталога два потолка: чтение (GET/HEAD) и запись (остальные методы)
+map $request_method $rl_catalog_read {
+    GET     all;
+    HEAD    all;
+    default "";
+}
+
+map $request_method $rl_catalog_write {
+    GET     "";
+    HEAD    "";
+    default all;
+}
+
+# лимит на клиента в каталоге - только на запись
+map $request_method $rl_catalog_write_user {
+    POST    $http_authorization;
+    default "";
+}
+
+# потолки сервисов (имена не совпадают с zone у upstream: у shared memory зон имя должно быть уникальным)
+limit_req_zone $rl_all zone=rl_auth:64k    rate=${RL_AUTH};
+limit_req_zone $rl_catalog_read  zone=rl_catalog_read:64k  rate=${RL_CATALOG_READ};
+limit_req_zone $rl_catalog_write zone=rl_catalog_write:64k rate=${RL_CATALOG_WRITE};
+limit_req_zone $rl_all zone=rl_profile:64k rate=${RL_PROFILE};
+limit_req_zone $rl_all zone=rl_orders:64k  rate=${RL_ORDERS};
+
+# на клиента
+limit_req_zone $http_authorization    zone=orders_create_user:10m   rate=${RL_ORDERS_USER};
+limit_req_zone $http_authorization    zone=business_create_user:10m rate=${RL_PROFILE_USER};
+limit_req_zone $binary_remote_addr    zone=register_ip:10m          rate=${RL_REGISTER_IP};
+limit_req_zone $rl_catalog_write_user zone=catalog_write_user:10m   rate=${RL_CATALOG_WRITE_USER};
