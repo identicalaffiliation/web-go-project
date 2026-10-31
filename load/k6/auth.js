@@ -1,41 +1,25 @@
-// Нагрузка на auth тремя параллельными сценариями:
-//   register — 20 rps, каждый раз новый пользователь
-//   login    — 50 rps, логин одного и того же пользователя
-//   refresh  — 50 rps, ротация refresh токена
+// Нагрузка на auth, по умолчанию 300 rps суммарно:
+//   register  60 rps  каждый раз новый пользователь (bcrypt - самая тяжёлая ручка)
+//   login    120 rps  логин одного и того же пользователя
+//   refresh  120 rps  ротация refresh токена
 // Запуск: k6 run load/k6/auth.js
-// Свой rps на сценарий: -e REGISTER_RATE=10 -e LOGIN_RATE=100 -e REFRESH_RATE=100
-// (RATE, как в остальных скриптах, перебивает все три сразу)
+// Параметры (-e): RATE=300 DURATION=1m - общий rps (делится по долям выше) и длительность
 import http from 'k6/http';
 import { check } from 'k6';
-import { BASE_URL, JSON_HEADERS, loadOptions, registerAndLogin } from './lib/common.js';
+import { BASE_URL, JSON_HEADERS, registerAndLogin, weightedOptions } from './lib/common.js';
 
-const base = loadOptions(0).scenarios.load;
-
-function scenario(fn, rate) {
-  return { ...base, exec: fn, rate: Number(__ENV.RATE || rate) };
-}
-
-export const options = {
-  scenarios: {
-    register: scenario('register', __ENV.REGISTER_RATE || 20),
-    login: scenario('login', __ENV.LOGIN_RATE || 50),
-    refresh: scenario('refresh', __ENV.REFRESH_RATE || 50),
-  },
-  thresholds: {
-    ...loadOptions(0).thresholds,
-    // те же пороги отдельно по сценариям, чтобы было видно, какой просел
-    'http_req_duration{scenario:register}': ['p(95)<500'],
-    'http_req_duration{scenario:login}': ['p(95)<500'],
-    'http_req_duration{scenario:refresh}': ['p(95)<500'],
-  },
-};
+export const options = weightedOptions(300, {
+  register: 0.2,
+  login: 0.4,
+  refresh: 0.4,
+});
 
 // setup выполняется один раз до начала нагрузки
 export function setup() {
   return registerAndLogin();
 }
 
-function login(user) {
+function doLogin(user) {
   const res = http.post(
     `${BASE_URL}/api/v1/auth/login`,
     JSON.stringify({ email: user.email, password: user.password }),
@@ -44,6 +28,10 @@ function login(user) {
   check(res, { 'login 200': (r) => r.status === 200 });
 
   return res;
+}
+
+export function login(user) {
+  doLogin(user);
 }
 
 export function register() {
@@ -57,15 +45,13 @@ export function register() {
   check(res, { 'register 201': (r) => r.status === 201 });
 }
 
-export { login };
-
 // Refresh токен одноразовый: после ротации старый уже не принимается.
 // Поэтому у каждого VU своя цепочка токенов, первый берём логином.
 let refreshToken = null;
 
 export function refresh(user) {
   if (refreshToken === null) {
-    const res = login(user);
+    const res = doLogin(user);
     if (res.status !== 200) {
       return;
     }

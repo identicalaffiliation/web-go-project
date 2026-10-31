@@ -21,14 +21,14 @@ import (
 )
 
 func ProvideOrdersBox(ctx context.Context, cfg *config.Config, logger ports.Logger) error {
-	masterPool, err := providePostgres(ctx, cfg.Postgres.MasterDSN)
+	masterPool, err := providePostgres(ctx, cfg.OperationDuration, cfg.Postgres.MasterDSN, &cfg.Postgres.Master)
 	if err != nil {
 		return err
 	}
 
 	defer masterPool.Close()
 
-	replicaPool, err := providePostgres(ctx, cfg.Postgres.ReplicaDSN)
+	replicaPool, err := providePostgres(ctx, cfg.OperationDuration, cfg.Postgres.ReplicaDSN, &cfg.Postgres.Replica)
 	if err != nil {
 		return err
 	}

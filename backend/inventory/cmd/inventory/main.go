@@ -49,7 +49,7 @@ func run(cfg *config.Config, logger ports.Logger) error {
 	notifyCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	pool, err := getPostgresPool(notifyCtx, cfg.OperationDuration, cfg.DB.MasterDSN)
+	pool, err := getPostgresPool(notifyCtx, cfg.OperationDuration, cfg.DB.MasterDSN, &cfg.DB.Master)
 	if err != nil {
 		return err
 	}
@@ -92,11 +92,21 @@ func run(cfg *config.Config, logger ports.Logger) error {
 	return workerErr
 }
 
-func getPostgresPool(ctx context.Context, duration time.Duration, dsn string) (*pgxpool.Pool, error) {
+func getPostgresPool(
+	ctx context.Context,
+	duration time.Duration,
+	dsn string,
+	cfg *config.PoolConfig,
+) (*pgxpool.Pool, error) {
+	poolCfg, err := poolConfig(dsn, cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	timeoutCtx, cancel := context.WithTimeout(ctx, duration)
 	defer cancel()
 
-	pool, err := pgxpool.New(timeoutCtx, dsn)
+	pool, err := pgxpool.NewWithConfig(timeoutCtx, poolCfg)
 	if err != nil {
 		return nil, fmt.Errorf("create postgres pool: %w", err)
 	}
@@ -107,4 +117,38 @@ func getPostgresPool(ctx context.Context, duration time.Duration, dsn string) (*
 	}
 
 	return pool, nil
+}
+
+// poolConfig - pgxpool.Config из DSN с настройками пула из конфига.
+// Нулевые поля конфига не трогают значения pgx по умолчанию (или pool_* из DSN).
+func poolConfig(dsn string, cfg *config.PoolConfig) (*pgxpool.Config, error) {
+	poolCfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("parse postgres dsn: %w", err)
+	}
+
+	if cfg.MaxConns > 0 {
+		poolCfg.MaxConns = cfg.MaxConns
+	}
+	if cfg.MinConns > 0 {
+		poolCfg.MinConns = cfg.MinConns
+	}
+	if poolCfg.MinConns > poolCfg.MaxConns {
+		return nil, fmt.Errorf("postgres pool: min_conns (%d) > max_conns (%d)", poolCfg.MinConns, poolCfg.MaxConns)
+	}
+	if cfg.MaxConnLifetime > 0 {
+		poolCfg.MaxConnLifetime = cfg.MaxConnLifetime
+	}
+	if cfg.MaxConnIdleTime > 0 {
+		poolCfg.MaxConnIdleTime = cfg.MaxConnIdleTime
+	}
+	if cfg.HealthCheckPeriod > 0 {
+		poolCfg.HealthCheckPeriod = cfg.HealthCheckPeriod
+	}
+	// таймаут на каждое новое соединение, а не только на первое при старте
+	if cfg.ConnectTimeout > 0 {
+		poolCfg.ConnConfig.ConnectTimeout = cfg.ConnectTimeout
+	}
+
+	return poolCfg, nil
 }

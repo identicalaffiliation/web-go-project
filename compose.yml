@@ -407,6 +407,7 @@ services:
       POSTGRES_USER: temporal
       POSTGRES_PWD: temporal
       DEFAULT_NAMESPACE: default
+      NUM_HISTORY_SHARDS: 128
 
     # external connection (grpc): localhost:7233
     ports:
@@ -522,20 +523,19 @@ services:
         condition: service_healthy
 
   orders-service:
-    container_name: orders-service
-
     build:
       context: ./backend/orders
       dockerfile: Dockerfile
+
+    deploy:
+      replicas: 3
 
     environment:
       MASTER_DSN: ${MASTER_ORDERS_POSTGRES_DSN}
       REPLICA_DSN: ${REPLICA_ORDERS_POSTGRES_DSN}
 
-    # external connection: http://localhost:8080 (rest), localhost:50051 (grpc)
-    ports:
-      - "8080:8080"
-      - "50051:50052"
+    # наружу не публикуем: 3 реплики не могут занять один порт хоста.
+    # REST - через gateway (http://localhost/api/v1/orders), grpc - внутри сети: orders-service:50052
 
     volumes:
       - ./backend/orders/configs/orders.yml:/app/config.yml:ro
@@ -551,11 +551,12 @@ services:
         condition: service_started
 
   catalog-service:
-    container_name: catalog-service
-
     build:
       context: ./backend/catalog
       dockerfile: Dockerfile
+
+    deploy:
+      replicas: 3
 
     environment:
       MASTER_DSN: ${MASTER_CATALOG_POSTGRES_DSN}
@@ -580,11 +581,12 @@ services:
         condition: service_healthy
 
   auth-service:
-    container_name: auth-service
-
     build:
       context: ./backend/auth
       dockerfile: Dockerfile
+
+    deploy:
+      replicas: 3
 
     environment:
       MASTER_DSN: ${MASTER_AUTH_POSTGRES_DSN}
@@ -604,10 +606,12 @@ services:
         condition: service_healthy
 
   profile-service:
-    container_name: profile-service
     build:
       context: ./backend/profile
       dockerfile: Dockerfile
+
+    deploy:
+      replicas: 3
 
     environment:
       POSTGRES_HOST: profile-postgres
@@ -724,7 +728,7 @@ services:
   # API GATEWAY
   gateway:
     container_name: gateway
-    image: nginx:1.27-alpine
+    image: nginx:1.27.5-alpine
 
     # external connection: http://localhost:80
     ports:

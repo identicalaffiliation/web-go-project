@@ -9,8 +9,12 @@ import (
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/ports"
 )
 
+// Run - раз в TickTime отправляет пачку неотправленных событий в kafka.
+// Безопасен при нескольких репликах: выборка, отправка и отметка sent_at идут в одной
+// транзакции, а строки, занятые другой репликой, пропускаются (FOR UPDATE SKIP LOCKED).
 func Run(
 	ctx context.Context,
+	manager ports.TxManager,
 	repo ports.OutboxRepository,
 	producer ports.Producer,
 	logger ports.Logger,
@@ -24,35 +28,39 @@ func Run(
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			if err := processEvents(ctx, repo, producer, cfg.Limit); err != nil {
+			if err := processEvents(ctx, manager, repo, producer, cfg.Limit); err != nil {
 				logger.WithError(err).Error("failed to sent events")
 			}
 		}
 	}
 }
 
-func processEvents(ctx context.Context, repo ports.OutboxRepository, producer ports.Producer, limit int64) error {
-	events, err := repo.GetEvents(ctx, limit)
-	if err != nil {
-		return err
-	}
+func processEvents(
+	ctx context.Context,
+	manager ports.TxManager,
+	repo ports.OutboxRepository,
+	producer ports.Producer,
+	limit int64,
+) error {
+	return manager.Do(ctx, func(ctx context.Context) error {
+		events, err := repo.GetEvents(ctx, limit)
+		if err != nil {
+			return err
+		}
 
-	if len(events) == 0 {
-		return nil
-	}
+		if len(events) == 0 {
+			return nil
+		}
 
-	if err := producer.SendMessages(ctx, events); err != nil {
-		return err
-	}
+		if err := producer.SendMessages(ctx, events); err != nil {
+			return err
+		}
 
-	ids := make([]uuid.UUID, len(events))
-	for i, v := range events {
-		ids[i] = v.EventID
-	}
+		ids := make([]uuid.UUID, len(events))
+		for i, v := range events {
+			ids[i] = v.EventID
+		}
 
-	if err := repo.SentEvent(ctx, ids); err != nil {
-		return err
-	}
-
-	return nil
+		return repo.SentEvent(ctx, ids)
+	})
 }

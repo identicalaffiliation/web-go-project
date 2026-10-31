@@ -28,6 +28,41 @@ export function loadOptions(rate) {
   };
 }
 
+export const DURATION = __ENV.DURATION || '1m';
+
+// Опции для нескольких ручек под общий rps: total делится по долям weights, у каждой ручки
+// свой constant-arrival-rate сценарий. Медленная ручка не съедает rps соседних, а в отчёте
+// пороги и метрики видны по каждой ручке (тег scenario). Имя сценария = имя exec функции.
+// Общий rps перебивается -e RATE=..., доли при этом сохраняются.
+export function weightedOptions(total, weights) {
+  const rps = Number(__ENV.RATE || total);
+  const scenarios = {};
+  const thresholds = { http_req_failed: ['rate<0.01'] };
+
+  for (const [name, weight] of Object.entries(weights)) {
+    const rate = Math.max(1, Math.round(rps * weight));
+    scenarios[name] = {
+      executor: 'constant-arrival-rate',
+      exec: name,
+      rate,
+      timeUnit: '1s',
+      duration: DURATION,
+      preAllocatedVUs: Math.max(5, Math.ceil(rate / 10)), // хватает при ответе ~100ms
+      // при ответе дольше 500ms k6 упрётся в предел и начнёт пропускать итерации
+      // (dropped_iterations) - это и есть сигнал, что сервис не держит rps
+      maxVUs: Math.max(50, Math.ceil(rate / 2)),
+    };
+    thresholds[`http_req_failed{scenario:${name}}`] = ['rate<0.01'];
+    thresholds[`http_req_duration{scenario:${name}}`] = ['p(95)<500'];
+  }
+
+  return { setupTimeout: '5m', scenarios, thresholds };
+}
+
+export function pick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
 export const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 export function authHeaders(token) {

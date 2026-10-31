@@ -16,7 +16,7 @@ on:
           - orders
           - profile
       rate:
-        description: Запросов в секунду (пусто = из скрипта, catalog 500, остальные 50)
+        description: Общий rps скрипта (пусто = из скрипта, catalog 2000, orders 500, auth 300, profile 50)
         type: string
         default: ""
       duration:

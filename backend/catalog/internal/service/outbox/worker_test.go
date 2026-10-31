@@ -18,6 +18,11 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+// passTx - TxManager без транзакции: просто вызывает fn с тем же ctx
+type passTx struct{}
+
+func (passTx) Do(ctx context.Context, fn func(ctx context.Context) error) error { return fn(ctx) }
+
 func TestProcessEvents(t *testing.T) {
 	ctx := context.Background()
 	events := []*domain.Event{
@@ -37,7 +42,7 @@ func TestProcessEvents(t *testing.T) {
 			repo.EXPECT().SentEvent(ctx, ids).Return(nil),
 		)
 
-		require.NoError(t, processEvents(ctx, repo, producer, 10))
+		require.NoError(t, processEvents(ctx, passTx{}, repo, producer, 10))
 	})
 
 	t.Run("empty batch - nothing sent", func(t *testing.T) {
@@ -47,7 +52,7 @@ func TestProcessEvents(t *testing.T) {
 
 		repo.EXPECT().GetEvents(ctx, int64(10)).Return(nil, nil)
 
-		require.NoError(t, processEvents(ctx, repo, producer, 10))
+		require.NoError(t, processEvents(ctx, passTx{}, repo, producer, 10))
 	})
 
 	t.Run("get events error", func(t *testing.T) {
@@ -57,7 +62,7 @@ func TestProcessEvents(t *testing.T) {
 
 		repo.EXPECT().GetEvents(ctx, int64(10)).Return(nil, errors.New("db down"))
 
-		require.Error(t, processEvents(ctx, repo, producer, 10))
+		require.Error(t, processEvents(ctx, passTx{}, repo, producer, 10))
 	})
 
 	t.Run("send error - events not marked as sent", func(t *testing.T) {
@@ -68,7 +73,7 @@ func TestProcessEvents(t *testing.T) {
 		repo.EXPECT().GetEvents(ctx, int64(10)).Return(events, nil)
 		producer.EXPECT().SendMessages(ctx, events).Return(errors.New("kafka down"))
 
-		require.Error(t, processEvents(ctx, repo, producer, 10))
+		require.Error(t, processEvents(ctx, passTx{}, repo, producer, 10))
 	})
 
 	t.Run("mark sent error", func(t *testing.T) {
@@ -80,7 +85,7 @@ func TestProcessEvents(t *testing.T) {
 		producer.EXPECT().SendMessages(ctx, events).Return(nil)
 		repo.EXPECT().SentEvent(ctx, ids).Return(errors.New("db down"))
 
-		require.Error(t, processEvents(ctx, repo, producer, 10))
+		require.Error(t, processEvents(ctx, passTx{}, repo, producer, 10))
 	})
 }
 
@@ -104,7 +109,7 @@ func TestRun(t *testing.T) {
 		).MinTimes(1)
 
 		done := make(chan error, 1)
-		go func() { done <- Run(ctx, repo, producer, logger.NewNop(), cfg) }()
+		go func() { done <- Run(ctx, passTx{}, repo, producer, logger.NewNop(), cfg) }()
 
 		<-ticked
 		cancel()
@@ -137,7 +142,7 @@ func TestRun(t *testing.T) {
 		).MinTimes(2)
 
 		done := make(chan error, 1)
-		go func() { done <- Run(ctx, repo, producer, logger.NewNop(), cfg) }()
+		go func() { done <- Run(ctx, passTx{}, repo, producer, logger.NewNop(), cfg) }()
 
 		<-calls
 		<-calls

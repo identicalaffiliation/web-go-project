@@ -315,7 +315,7 @@ PowerShell: то же через `$env:MASTER_DSN = "..."` и т. д.
 | Redis             | localhost:6379 |
 | Kafka             | localhost:9092 |
 | Temporal (gRPC)   | localhost:7233 |
-| orders REST / gRPC | localhost:8080 / localhost:50051 |
+| orders REST       | через gateway: http://localhost/api/v1/orders (3 реплики, наружу порт не публикуется) |
 | payments gRPC     | localhost:50053 |
 
 PostgreSQL (пользователь `postgres` / `postgres`):
