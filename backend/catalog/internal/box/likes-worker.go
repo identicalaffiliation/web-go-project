@@ -14,14 +14,14 @@ import (
 )
 
 func ProvideLikesWorker(ctx context.Context, cfg *config.Config, logger ports.Logger) error {
-	masterPool, err := getPostgresPool(ctx, cfg.OperationDuration, cfg.MasterDSN, &cfg.DBConfig.Master)
+	masterPool, err := getPostgresPool(ctx, cfg.OperationDuration, cfg.MasterDSN, &cfg.Master)
 	if err != nil {
 		return err
 	}
 
 	defer masterPool.Close()
 
-	replicaPool, err := getPostgresPool(ctx, cfg.OperationDuration, cfg.ReplicaDSN, &cfg.DBConfig.Replica)
+	replicaPool, err := getPostgresPool(ctx, cfg.OperationDuration, cfg.ReplicaDSN, &cfg.Replica)
 	if err != nil {
 		return err
 	}
