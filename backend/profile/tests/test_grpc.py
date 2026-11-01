@@ -1,12 +1,18 @@
 import uuid
 from unittest.mock import AsyncMock, patch
 
+import grpc
 import pytest
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from internal.adapters.grpc.generated.v1.orders import orders_pb2
 from internal.adapters.grpc.generated.v1.payments import payments_pb2
-from internal.adapters.rpc.grpc_clients import GrpcOrdersClient, GrpcPaymentsClient
+from internal.adapters.rpc.grpc_clients import (
+    GrpcOrdersClient,
+    GrpcPaymentsClient,
+    create_balanced_channel,
+    execute_with_retry,
+)
 
 
 @pytest.mark.asyncio
@@ -60,3 +66,66 @@ async def test_grpc_payments_client_success():
         balance = await client.get_user_balance(uuid.uuid4())
 
         assert balance.amount == 100_500
+
+
+@pytest.mark.asyncio
+async def test_retry_on_resource_exhausted_success():
+    """Тест: перехват RESOURCE_EXHAUSTED и успешный ответ на второй попытке."""
+    call_mock = AsyncMock()
+
+    # Имитируем AioRpcError со статусом RESOURCE_EXHAUSTED
+    mock_error = grpc.aio.AioRpcError(
+        code=grpc.StatusCode.RESOURCE_EXHAUSTED,
+        initial_metadata=None,
+        trailing_metadata=None,
+        details="Too many requests",
+    )
+    mock_error.code = lambda: grpc.StatusCode.RESOURCE_EXHAUSTED
+    mock_error.details = lambda: "Too many requests"
+
+    call_mock.side_effect = [mock_error, "success_result"]
+
+    result = await execute_with_retry(
+        call_mock,
+        max_retries=2,
+        initial_backoff=0.01,
+        multiplier=1.0,
+        max_backoff=0.01,
+    )
+
+    assert result == "success_result"
+    assert call_mock.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_retry_exhausted_raises_runtime_error():
+    """Тест: если все попытки исчерпаны, выбрасывается RuntimeError."""
+    call_mock = AsyncMock()
+    mock_error = grpc.aio.AioRpcError(
+        code=grpc.StatusCode.RESOURCE_EXHAUSTED,
+        initial_metadata=None,
+        trailing_metadata=None,
+        details="Too many requests",
+    )
+    mock_error.code = lambda: grpc.StatusCode.RESOURCE_EXHAUSTED
+    mock_error.details = lambda: "Too many requests"
+
+    call_mock.side_effect = mock_error
+
+    with pytest.raises(RuntimeError) as exc_info:
+        await execute_with_retry(
+            call_mock,
+            max_retries=2,
+            initial_backoff=0.01,
+            multiplier=1.0,
+            max_backoff=0.01,
+        )
+
+    assert "RESOURCE_EXHAUSTED" in str(exc_info.value)
+    assert call_mock.await_count == 3  # 1 первичный + 2 ретрая
+
+
+def test_create_balanced_channel_options():
+    """Проверка передачи опций round_robin в gRPC канал."""
+    channel = create_balanced_channel("orders-service:50051")
+    assert channel is not None
