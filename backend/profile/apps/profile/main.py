@@ -12,7 +12,11 @@ from internal.adapters.kafka.producer import KafkaEventProducer
 from internal.adapters.postgres.database import async_session_maker, engine
 from internal.adapters.postgres.repository import SqlAlchemyProfileRepository
 from internal.adapters.postgres.uow import SqlAlchemyUnitOfWork
-from internal.adapters.rpc.grpc_clients import GrpcOrdersClient, GrpcPaymentsClient
+from internal.adapters.rpc.grpc_clients import (
+    GrpcOrdersClient,
+    GrpcPaymentsClient,
+    create_balanced_channel,
+)
 from internal.app.service import ProfileService
 from internal.config.config import settings
 
@@ -61,12 +65,17 @@ async def process_kafka_message(msg_data: dict) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global kafka_consumer, kafka_producer, orders_channel, payments_channel
-    global grpc_orders_client, grpc_payments_client
+    global grpc_orders_client, grpc_payments_client, redis_client, redis_cache
 
     logger.info("Starting Profile Service...")
 
-    orders_channel = grpc.aio.insecure_channel(settings.ORDERS_GRPC_HOST)
-    payments_channel = grpc.aio.insecure_channel(settings.PAYMENTS_GRPC_HOST)
+    redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+    redis_cache = RedisCache(redis_client)
+
+    # Инициализация каналов с балансировкой Round Robin
+    orders_channel = create_balanced_channel(settings.ORDERS_GRPC_HOST)
+    payments_channel = create_balanced_channel(settings.PAYMENTS_GRPC_HOST)
+
     grpc_orders_client = GrpcOrdersClient(orders_channel)
     grpc_payments_client = GrpcPaymentsClient(payments_channel)
 
@@ -89,6 +98,8 @@ async def lifespan(app: FastAPI):
             await kafka_consumer.stop()
         if kafka_producer:
             await kafka_producer.stop()
+        if redis_client:
+            await redis_client.aclose()
         await engine.dispose()
         await orders_channel.close()
         await payments_channel.close()

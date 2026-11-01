@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     KAFKA_USER_REGISTERED_TOPIC: str = "users.created"
     KAFKA_BUSINESS_CREATED_TOPIC: str = "profiles.business.created"
 
+    GRPC_MAX_RETRIES: int = 3
+    GRPC_INITIAL_BACKOFF_SEC: float = 0.2
+    GRPC_MAX_BACKOFF_SEC: float = 2.0
+    GRPC_BACKOFF_MULTIPLIER: float = 2.0
+
     ORDERS_GRPC_HOST: str = "localhost:50051"
     PAYMENTS_GRPC_HOST: str = "localhost:50052"
 
