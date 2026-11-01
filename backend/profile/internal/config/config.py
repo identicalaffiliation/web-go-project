@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     ORDERS_GRPC_HOST: str = "localhost:50051"
     PAYMENTS_GRPC_HOST: str = "localhost:50052"
 
+    REDIS_URL: str = "redis://localhost:6379/0"
+    CACHE_TTL_PROFILES_SEC: int = 300
+
     @property
     def database_url(self) -> str:
         return (
