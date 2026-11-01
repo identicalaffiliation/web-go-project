@@ -3,6 +3,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import grpc
+import redis.asyncio as redis
 from fastapi import FastAPI
 
 from internal.adapters.http.dependencies import get_profile_service
@@ -12,6 +13,7 @@ from internal.adapters.kafka.producer import KafkaEventProducer
 from internal.adapters.postgres.database import async_session_maker, engine
 from internal.adapters.postgres.repository import SqlAlchemyProfileRepository
 from internal.adapters.postgres.uow import SqlAlchemyUnitOfWork
+from internal.adapters.redis.cache import RedisCache
 from internal.adapters.rpc.grpc_clients import GrpcOrdersClient, GrpcPaymentsClient
 from internal.app.service import ProfileService
 from internal.config.config import settings
@@ -25,6 +27,8 @@ orders_channel: grpc.aio.Channel | None = None
 payments_channel: grpc.aio.Channel | None = None
 grpc_orders_client: GrpcOrdersClient | None = None
 grpc_payments_client: GrpcPaymentsClient | None = None
+redis_client: redis.Redis | None = None
+redis_cache: RedisCache | None = None
 
 
 async def build_profile_service() -> AsyncGenerator[ProfileService, None]:
@@ -38,6 +42,7 @@ async def build_profile_service() -> AsyncGenerator[ProfileService, None]:
                 orders_client=grpc_orders_client,
                 payments_client=grpc_payments_client,
                 event_producer=kafka_producer,
+                cache=redis_cache,
             )
             yield service
         finally:
@@ -54,6 +59,7 @@ async def process_kafka_message(msg_data: dict) -> None:
             orders_client=grpc_orders_client,
             payments_client=grpc_payments_client,
             event_producer=kafka_producer,
+            cache=redis_cache,
         )
         await service.process_registration_event(msg_data)
 
@@ -61,9 +67,12 @@ async def process_kafka_message(msg_data: dict) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global kafka_consumer, kafka_producer, orders_channel, payments_channel
-    global grpc_orders_client, grpc_payments_client
+    global grpc_orders_client, grpc_payments_client, redis_client, redis_cache
 
     logger.info("Starting Profile Service...")
+
+    redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+    redis_cache = RedisCache(redis_client)
 
     orders_channel = grpc.aio.insecure_channel(settings.ORDERS_GRPC_HOST)
     payments_channel = grpc.aio.insecure_channel(settings.PAYMENTS_GRPC_HOST)
@@ -89,6 +98,8 @@ async def lifespan(app: FastAPI):
             await kafka_consumer.stop()
         if kafka_producer:
             await kafka_producer.stop()
+        if redis_client:
+            await redis_client.aclose()
         await engine.dispose()
         await orders_channel.close()
         await payments_channel.close()
