@@ -3,6 +3,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import grpc
+import redis.asyncio as redis
 from fastapi import FastAPI
 
 from internal.adapters.http.dependencies import get_profile_service
@@ -12,6 +13,7 @@ from internal.adapters.kafka.producer import KafkaEventProducer
 from internal.adapters.postgres.database import async_session_maker, engine
 from internal.adapters.postgres.repository import SqlAlchemyProfileRepository
 from internal.adapters.postgres.uow import SqlAlchemyUnitOfWork
+from internal.adapters.redis.cache import RedisCache
 from internal.adapters.rpc.grpc_clients import (
     GrpcOrdersClient,
     GrpcPaymentsClient,
@@ -29,6 +31,8 @@ orders_channel: grpc.aio.Channel | None = None
 payments_channel: grpc.aio.Channel | None = None
 grpc_orders_client: GrpcOrdersClient | None = None
 grpc_payments_client: GrpcPaymentsClient | None = None
+redis_client: redis.Redis | None = None
+redis_cache: RedisCache | None = None
 
 
 async def build_profile_service() -> AsyncGenerator[ProfileService, None]:
@@ -42,6 +46,7 @@ async def build_profile_service() -> AsyncGenerator[ProfileService, None]:
                 orders_client=grpc_orders_client,
                 payments_client=grpc_payments_client,
                 event_producer=kafka_producer,
+                cache=redis_cache,
             )
             yield service
         finally:
@@ -58,6 +63,7 @@ async def process_kafka_message(msg_data: dict) -> None:
             orders_client=grpc_orders_client,
             payments_client=grpc_payments_client,
             event_producer=kafka_producer,
+            cache=redis_cache,
         )
         await service.process_registration_event(msg_data)
 
@@ -76,6 +82,8 @@ async def lifespan(app: FastAPI):
     orders_channel = create_balanced_channel(settings.ORDERS_GRPC_HOST)
     payments_channel = create_balanced_channel(settings.PAYMENTS_GRPC_HOST)
 
+    orders_channel = grpc.aio.insecure_channel(settings.ORDERS_GRPC_HOST)
+    payments_channel = grpc.aio.insecure_channel(settings.PAYMENTS_GRPC_HOST)
     grpc_orders_client = GrpcOrdersClient(orders_channel)
     grpc_payments_client = GrpcPaymentsClient(payments_channel)
 

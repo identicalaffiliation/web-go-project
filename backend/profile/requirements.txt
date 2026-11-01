@@ -89,6 +89,8 @@ python-dotenv==1.2.4
     #   uvicorn
 pyyaml==6.0.3
     # via uvicorn
+redis==8.1.0
+    # via -r requirements.in
 sqlalchemy[asyncio]==2.1.4
     # via -r requirements.in
 starlette==1.7.0

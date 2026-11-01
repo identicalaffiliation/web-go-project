@@ -1,3 +1,4 @@
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -10,6 +11,7 @@ from internal.adapters.kafka.producer import KafkaEventProducer
 from internal.config.config import settings
 from internal.domain.exceptions import ProfileAlreadyExistsError, ProfileNotFoundError
 from internal.domain.models import BalanceDTO, OrderDTO, Profile, ProfileType
+from internal.ports.cache import ICache
 from internal.ports.repository import IProfileRepository
 from internal.ports.rpc_clients import IOrdersClient, IPaymentsClient
 from internal.ports.uow import IUnitOfWork
@@ -20,7 +22,7 @@ logger = logging.getLogger(__name__)
 class ProfileService:
     """
     Слой Use Case (Бизнес-логика).
-    Оркестрирует доменные модели, репозиторий и управление транзакциями.
+    Оркестрирует доменные модели, репозиторий, кэш и управление транзакциями.
     """
 
     def __init__(
@@ -30,12 +32,64 @@ class ProfileService:
         orders_client: IOrdersClient,
         payments_client: IPaymentsClient,
         event_producer: KafkaEventProducer | None = None,
+        cache: ICache | None = None,
     ):
         self.repo = repo
         self.uow = uow
         self.orders_client = orders_client
         self.payments_client = payments_client
         self.event_producer = event_producer
+        self.cache = cache
+
+    @staticmethod
+    def _profiles_to_json(profiles: list[Profile]) -> str:
+        data = [
+            {
+                "id": str(p.id),
+                "user_id": str(p.user_id),
+                "profile_type": p.profile_type.value,
+                "first_name": p.first_name,
+                "last_name": p.last_name,
+                "phone": p.phone,
+                "company_name": p.company_name,
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+                "updated_at": p.updated_at.isoformat() if p.updated_at else None,
+            }
+            for p in profiles
+        ]
+        return json.dumps(data)
+
+    @staticmethod
+    def _json_to_profiles(raw_json: str) -> list[Profile]:
+        data = json.loads(raw_json)
+        profiles = []
+        for item in data:
+            profiles.append(
+                Profile(
+                    id=uuid.UUID(item["id"]),
+                    user_id=uuid.UUID(item["user_id"]),
+                    profile_type=ProfileType(item["profile_type"]),
+                    first_name=item.get("first_name"),
+                    last_name=item.get("last_name"),
+                    phone=item.get("phone"),
+                    company_name=item.get("company_name"),
+                    created_at=(
+                        datetime.fromisoformat(item["created_at"])
+                        if item.get("created_at")
+                        else None
+                    ),
+                    updated_at=(
+                        datetime.fromisoformat(item["updated_at"])
+                        if item.get("updated_at")
+                        else None
+                    ),
+                )
+            )
+        return profiles
+
+    async def _invalidate_user_profiles_cache(self, user_id: uuid.UUID) -> None:
+        if self.cache:
+            await self.cache.delete(f"profiles:{user_id}")
 
     async def process_registration_event(self, event_data: dict[str, Any]) -> None:
         """
@@ -60,6 +114,7 @@ class ProfileService:
 
             if created_profile:
                 await self.uow.commit()
+                await self._invalidate_user_profiles_cache(user_id)
                 logger.info(f"Successfully created CUSTOMER profile for user {user_id}")
             else:
                 await self.uow.rollback()
@@ -74,9 +129,32 @@ class ProfileService:
 
     async def get_profiles_by_user(self, user_id: uuid.UUID) -> list[Profile]:
         """
-        Получить все профили пользователя.
+        Получить все профили пользователя с проверкой кэша.
         """
-        return await self.repo.get_by_user_id(user_id)
+        cache_key = f"profiles:{user_id}"
+
+        if self.cache:
+            cached_data = await self.cache.get(cache_key)
+            if cached_data:
+                try:
+                    return self._json_to_profiles(cached_data)
+                except Exception:
+                    logger.exception("Failed to parse cached profiles for %s", user_id)
+
+        profiles = await self.repo.get_by_user_id(user_id)
+
+        if self.cache and profiles:
+            try:
+                serialized = self._profiles_to_json(profiles)
+                await self.cache.set(
+                    cache_key,
+                    serialized,
+                    ttl=settings.CACHE_TTL_PROFILES_SEC,
+                )
+            except Exception:
+                logger.exception("Failed to cache profiles for %s", user_id)
+
+        return profiles
 
     async def update_profile(
         self, profile_id: uuid.UUID, user_id: uuid.UUID, update_data: dict[str, Any]
@@ -103,6 +181,7 @@ class ProfileService:
         try:
             updated_profile = await self.repo.update(target_profile)
             await self.uow.commit()
+            await self._invalidate_user_profiles_cache(user_id)
             return updated_profile
 
         except Exception:
@@ -110,11 +189,9 @@ class ProfileService:
             raise
 
     async def get_orders(self, user_id: uuid.UUID) -> list[OrderDTO]:
-        """Получить историю заказов пользователя из внешнего сервиса."""
         return await self.orders_client.get_user_orders(user_id)
 
     async def get_balance(self, user_id: uuid.UUID) -> BalanceDTO:
-        """Получить баланс пользователя из внешнего сервиса."""
         return await self.payments_client.get_user_balance(user_id)
 
     async def create_business_profile(
@@ -146,6 +223,7 @@ class ProfileService:
                 await self.uow.rollback()
                 raise RuntimeError("Failed to create business profile")
             await self.uow.commit()
+            await self._invalidate_user_profiles_cache(user_id)
         except IntegrityError:
             await self.uow.rollback()
             raise ProfileAlreadyExistsError(
