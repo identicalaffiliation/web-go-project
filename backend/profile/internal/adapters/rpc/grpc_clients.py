@@ -15,6 +15,7 @@ from internal.adapters.grpc.generated.v1.payments import (
     payments_pb2,
     payments_pb2_grpc,
 )
+from internal.adapters.rpc.circuit_breaker import CircuitBreaker
 from internal.config.config import settings
 from internal.domain.models import BalanceDTO, OrderDTO
 
@@ -117,8 +118,17 @@ class GrpcOrdersClient:
 
 
 class GrpcPaymentsClient:
-    def __init__(self, channel: grpc.aio.Channel):
+    def __init__(
+        self,
+        channel: grpc.aio.Channel,
+        circuit_breaker: CircuitBreaker | None = None,
+    ):
         self.stub = payments_pb2_grpc.PaymentsServiceStub(channel)
+        self.circuit_breaker = circuit_breaker or CircuitBreaker(
+            name="payments_service",
+            failure_threshold=settings.CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+            recovery_timeout=settings.CIRCUIT_BREAKER_RECOVERY_TIMEOUT_SEC,
+        )
 
     async def get_user_balance(self, user_id: uuid.UUID) -> BalanceDTO:
         request = payments_pb2.GetBalanceRequest(user_id=str(user_id))
@@ -126,5 +136,5 @@ class GrpcPaymentsClient:
         async def _call() -> payments_pb2.GetBalanceResponse:
             return await self.stub.GetBalanceByUser(request, timeout=GRPC_TIMEOUT)
 
-        response = await execute_with_retry(_call)
+        response = await self.circuit_breaker.call(lambda: execute_with_retry(_call))
         return BalanceDTO(amount=response.amount)
