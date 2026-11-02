@@ -14,7 +14,11 @@ from internal.adapters.postgres.database import async_session_maker, engine
 from internal.adapters.postgres.repository import SqlAlchemyProfileRepository
 from internal.adapters.postgres.uow import SqlAlchemyUnitOfWork
 from internal.adapters.redis.cache import RedisCache
-from internal.adapters.rpc.grpc_clients import GrpcOrdersClient, GrpcPaymentsClient
+from internal.adapters.rpc.grpc_clients import (
+    GrpcOrdersClient,
+    GrpcPaymentsClient,
+    create_balanced_channel,
+)
 from internal.app.service import ProfileService
 from internal.config.config import settings
 
@@ -73,6 +77,10 @@ async def lifespan(app: FastAPI):
 
     redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
     redis_cache = RedisCache(redis_client)
+
+    # Инициализация каналов с балансировкой Round Robin
+    orders_channel = create_balanced_channel(settings.ORDERS_GRPC_HOST)
+    payments_channel = create_balanced_channel(settings.PAYMENTS_GRPC_HOST)
 
     orders_channel = grpc.aio.insecure_channel(settings.ORDERS_GRPC_HOST)
     payments_channel = grpc.aio.insecure_channel(settings.PAYMENTS_GRPC_HOST)
