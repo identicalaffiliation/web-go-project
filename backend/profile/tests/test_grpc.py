@@ -201,3 +201,26 @@ async def test_grpc_orders_client_circuit_breaker_blocks_requests():
             await client.get_user_orders(uuid.uuid4())
 
         assert stub_mock.GetUserOrders.await_count == 1
+
+
+async def test_grpc_payments_client_circuit_breaker_blocks_requests():
+    """GrpcPaymentsClient моментально отклоняет последующие запросы при размыкании цепи."""
+    cb = CircuitBreaker(name="payments_test", failure_threshold=1, recovery_timeout=1.0)
+    stub_mock = AsyncMock()
+    stub_mock.GetBalanceByUser.side_effect = RuntimeError("Payments down")
+
+    with patch(
+        "internal.adapters.rpc.grpc_clients.payments_pb2_grpc.PaymentsServiceStub",
+        return_value=stub_mock,
+    ):
+        client = GrpcPaymentsClient(channel=AsyncMock(), circuit_breaker=cb)
+
+        with pytest.raises(RuntimeError):
+            await client.get_user_balance(uuid.uuid4())
+
+        assert cb.state == CircuitBreakerState.OPEN
+
+        with pytest.raises(CircuitBreakerOpenError):
+            await client.get_user_balance(uuid.uuid4())
+
+        assert stub_mock.GetBalanceByUser.await_count == 1
