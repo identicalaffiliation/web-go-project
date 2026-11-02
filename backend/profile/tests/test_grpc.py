@@ -139,7 +139,7 @@ def test_create_balanced_channel_options():
 
 @pytest.mark.asyncio
 async def test_circuit_breaker_trips_to_open_after_failures():
-    """CircuitBreaker переходит в состояние OPEN после превышения порога сбоев."""
+    """Проверка перехода в OPEN при достижении порога ошибок."""
     cb = CircuitBreaker(name="test_cb", failure_threshold=2, recovery_timeout=0.1)
 
     async def failing_call():
@@ -159,7 +159,7 @@ async def test_circuit_breaker_trips_to_open_after_failures():
 
 @pytest.mark.asyncio
 async def test_circuit_breaker_recovers_to_closed():
-    """CircuitBreaker переходит в HALF_OPEN и восстанавливается в CLOSED после успеха."""
+    """Проверка восстановления цепи в CLOSED после успешного пробного запроса в HALF_OPEN."""
     cb = CircuitBreaker(name="test_cb", failure_threshold=1, recovery_timeout=0.05)
 
     async def failing_call():
@@ -180,6 +180,29 @@ async def test_circuit_breaker_recovers_to_closed():
 
 
 @pytest.mark.asyncio
+async def test_grpc_orders_client_circuit_breaker_blocks_requests():
+    """Тест интеграции GrpcOrdersClient и CircuitBreaker: блокировка запросов при сбоях."""
+    cb = CircuitBreaker(name="orders_test", failure_threshold=1, recovery_timeout=1.0)
+    stub_mock = AsyncMock()
+    stub_mock.GetUserOrders.side_effect = RuntimeError("Service Unavailable")
+
+    with patch(
+        "internal.adapters.rpc.grpc_clients.orders_pb2_grpc.OrdersServiceStub",
+        return_value=stub_mock,
+    ):
+        client = GrpcOrdersClient(channel=AsyncMock(), circuit_breaker=cb)
+
+        with pytest.raises(RuntimeError):
+            await client.get_user_orders(uuid.uuid4())
+
+        assert cb.state == CircuitBreakerState.OPEN
+
+        with pytest.raises(CircuitBreakerOpenError):
+            await client.get_user_orders(uuid.uuid4())
+
+        assert stub_mock.GetUserOrders.await_count == 1
+
+
 async def test_grpc_payments_client_circuit_breaker_blocks_requests():
     """GrpcPaymentsClient моментально отклоняет последующие запросы при размыкании цепи."""
     cb = CircuitBreaker(name="payments_test", failure_threshold=1, recovery_timeout=1.0)
@@ -192,13 +215,11 @@ async def test_grpc_payments_client_circuit_breaker_blocks_requests():
     ):
         client = GrpcPaymentsClient(channel=AsyncMock(), circuit_breaker=cb)
 
-        # Первый запрос инициирует сбой и размыкает цепь
         with pytest.raises(RuntimeError):
             await client.get_user_balance(uuid.uuid4())
 
         assert cb.state == CircuitBreakerState.OPEN
 
-        # Второй запрос блокируется Circuit Breaker'ом без вызова stub
         with pytest.raises(CircuitBreakerOpenError):
             await client.get_user_balance(uuid.uuid4())
 

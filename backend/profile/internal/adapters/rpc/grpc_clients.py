@@ -39,7 +39,7 @@ def create_balanced_channel(target: str) -> grpc.aio.Channel:
 
     options = [
         ("grpc.service_config", service_config),
-        ("grpc.enable_retries", 0),  # Управляем ретраями явно в коде
+        ("grpc.enable_retries", 0),
     ]
 
     channel_target = target
@@ -94,8 +94,17 @@ async def execute_with_retry(
 
 
 class GrpcOrdersClient:
-    def __init__(self, channel: grpc.aio.Channel):
+    def __init__(
+        self,
+        channel: grpc.aio.Channel,
+        circuit_breaker: CircuitBreaker | None = None,
+    ):
         self.stub = orders_pb2_grpc.OrdersServiceStub(channel)
+        self.circuit_breaker = circuit_breaker or CircuitBreaker(
+            name="orders_service",
+            failure_threshold=settings.CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+            recovery_timeout=settings.CIRCUIT_BREAKER_RECOVERY_TIMEOUT_SEC,
+        )
 
     async def get_user_orders(self, user_id: uuid.UUID) -> list[OrderDTO]:
         request = orders_pb2.UserOrdersRequest(user_id=str(user_id))
@@ -103,7 +112,8 @@ class GrpcOrdersClient:
         async def _call() -> orders_pb2.UserOrdersResponse:
             return await self.stub.GetUserOrders(request, timeout=GRPC_TIMEOUT)
 
-        response = await execute_with_retry(_call)
+        response = await self.circuit_breaker.call(lambda: execute_with_retry(_call))
+
         return [
             OrderDTO(
                 id=o.order_id,
