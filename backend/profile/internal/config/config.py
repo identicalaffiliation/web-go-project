@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     GRPC_MAX_BACKOFF_SEC: float = 2.0
     GRPC_BACKOFF_MULTIPLIER: float = 2.0
 
+    CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 3
+    CIRCUIT_BREAKER_RECOVERY_TIMEOUT_SEC: float = 10.0
+
     ORDERS_GRPC_HOST: str = "localhost:50051"
     PAYMENTS_GRPC_HOST: str = "localhost:50052"
 

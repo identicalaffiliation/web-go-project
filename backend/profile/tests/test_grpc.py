@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from unittest.mock import AsyncMock, patch
 
@@ -7,6 +8,11 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 from internal.adapters.grpc.generated.v1.orders import orders_pb2
 from internal.adapters.grpc.generated.v1.payments import payments_pb2
+from internal.adapters.rpc.circuit_breaker import (
+    CircuitBreaker,
+    CircuitBreakerOpenError,
+    CircuitBreakerState,
+)
 from internal.adapters.rpc.grpc_clients import (
     GrpcOrdersClient,
     GrpcPaymentsClient,
@@ -129,3 +135,69 @@ def test_create_balanced_channel_options():
     """Проверка передачи опций round_robin в gRPC канал."""
     channel = create_balanced_channel("orders-service:50051")
     assert channel is not None
+
+
+@pytest.mark.asyncio
+async def test_circuit_breaker_trips_to_open_after_failures():
+    """Проверка перехода в OPEN при достижении порога ошибок."""
+    cb = CircuitBreaker(name="test_cb", failure_threshold=2, recovery_timeout=0.1)
+
+    async def failing_call():
+        raise RuntimeError("Service down")
+
+    with pytest.raises(RuntimeError):
+        await cb.call(failing_call)
+    assert cb.state == CircuitBreakerState.CLOSED
+
+    with pytest.raises(RuntimeError):
+        await cb.call(failing_call)
+    assert cb.state == CircuitBreakerState.OPEN
+
+    with pytest.raises(CircuitBreakerOpenError):
+        await cb.call(failing_call)
+
+
+@pytest.mark.asyncio
+async def test_circuit_breaker_recovers_to_closed():
+    """Проверка восстановления цепи в CLOSED после успешного пробного запроса в HALF_OPEN."""
+    cb = CircuitBreaker(name="test_cb", failure_threshold=1, recovery_timeout=0.05)
+
+    async def failing_call():
+        raise RuntimeError("Service down")
+
+    with pytest.raises(RuntimeError):
+        await cb.call(failing_call)
+    assert cb.state == CircuitBreakerState.OPEN
+
+    await asyncio.sleep(0.06)
+
+    async def success_call():
+        return "ok"
+
+    result = await cb.call(success_call)
+    assert result == "ok"
+    assert cb.state == CircuitBreakerState.CLOSED
+
+
+@pytest.mark.asyncio
+async def test_grpc_orders_client_circuit_breaker_blocks_requests():
+    """Тест интеграции GrpcOrdersClient и CircuitBreaker: блокировка запросов при сбоях."""
+    cb = CircuitBreaker(name="orders_test", failure_threshold=1, recovery_timeout=1.0)
+    stub_mock = AsyncMock()
+    stub_mock.GetUserOrders.side_effect = RuntimeError("Service Unavailable")
+
+    with patch(
+        "internal.adapters.rpc.grpc_clients.orders_pb2_grpc.OrdersServiceStub",
+        return_value=stub_mock,
+    ):
+        client = GrpcOrdersClient(channel=AsyncMock(), circuit_breaker=cb)
+
+        with pytest.raises(RuntimeError):
+            await client.get_user_orders(uuid.uuid4())
+
+        assert cb.state == CircuitBreakerState.OPEN
+
+        with pytest.raises(CircuitBreakerOpenError):
+            await client.get_user_orders(uuid.uuid4())
+
+        assert stub_mock.GetUserOrders.await_count == 1

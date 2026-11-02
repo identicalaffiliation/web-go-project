@@ -78,12 +78,9 @@ async def lifespan(app: FastAPI):
     redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
     redis_cache = RedisCache(redis_client)
 
-    # Инициализация каналов с балансировкой Round Robin
     orders_channel = create_balanced_channel(settings.ORDERS_GRPC_HOST)
     payments_channel = create_balanced_channel(settings.PAYMENTS_GRPC_HOST)
 
-    orders_channel = grpc.aio.insecure_channel(settings.ORDERS_GRPC_HOST)
-    payments_channel = grpc.aio.insecure_channel(settings.PAYMENTS_GRPC_HOST)
     grpc_orders_client = GrpcOrdersClient(orders_channel)
     grpc_payments_client = GrpcPaymentsClient(payments_channel)
 
