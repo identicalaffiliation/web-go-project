@@ -6,7 +6,6 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from apps.profile.main import app
-from internal.adapters.http.dependencies import get_profile_service
 from internal.adapters.http.schemas import CreateBusinessProfileRequest
 from internal.app.service import ProfileService
 from internal.domain.exceptions import ProfileAlreadyExistsError, ProfileNotFoundError
@@ -92,18 +91,6 @@ async def test_create_business_profile_already_exists_raises_error(mock_service)
     repo_mock.create.assert_not_called()
     uow_mock.commit.assert_not_called()
     producer_mock.publish_event.assert_not_called()
-
-
-@pytest.fixture
-def mock_profile_service():
-    return AsyncMock()
-
-
-@pytest.fixture
-def override_get_service(mock_profile_service):
-    app.dependency_overrides[get_profile_service] = lambda: mock_profile_service
-    yield
-    app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
