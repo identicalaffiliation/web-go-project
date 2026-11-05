@@ -1,7 +1,7 @@
 import uuid
 from abc import ABC, abstractmethod
 
-from internal.domain.models import Profile, ProfileType
+from internal.domain.models import Profile, ProfileType, WishlistItemDTO
 
 
 class IProfileRepository(ABC):
@@ -42,3 +42,15 @@ class IProfileRepository(ABC):
         """
         Обновляет данные существующего профиля.
         """
+
+    @abstractmethod
+    async def add_like(self, user_id: uuid.UUID, product_id: uuid.UUID) -> None:
+        """Добавляет лайк товара (идемпотентно)."""
+
+    @abstractmethod
+    async def remove_like(self, user_id: uuid.UUID, product_id: uuid.UUID) -> None:
+        """Удаляет лайк товара."""
+
+    @abstractmethod
+    async def get_likes_by_user_id(self, user_id: uuid.UUID) -> list[WishlistItemDTO]:
+        """Возвращает список лайкнутых пользователем товаров."""

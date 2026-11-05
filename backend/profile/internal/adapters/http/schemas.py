@@ -57,3 +57,10 @@ class CreateBusinessProfileRequest(BaseModel):
         pattern=r"^\+?[1-9]\d{1,14}$",
         description="Контактный номер телефона (международный формат)",
     )
+
+
+class WishlistItemResponse(BaseModel):
+    product_id: str
+    added_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
