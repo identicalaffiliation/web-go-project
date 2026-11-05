@@ -54,5 +54,4 @@ async def test_get_likes_filters_by_user_and_orders_by_date(test_db_setup):
 
         assert len(likes_user1) == 2
         assert len(likes_user2) == 1
-        # Проверяем, что чужой лайк не попал в выборку
-        assert {l.product_id for l in likes_user1} == {str(prod1), str(prod2)}
+        assert {like.product_id for like in likes_user1} == {str(prod1), str(prod2)}
