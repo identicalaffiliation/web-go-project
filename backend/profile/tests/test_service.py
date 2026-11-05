@@ -322,3 +322,85 @@ async def test_update_profile_invalidates_cache(mock_service):
     )
 
     cache_mock.delete.assert_called_once_with(f"profiles:{user_id}")
+
+
+@pytest.mark.asyncio
+async def test_process_like_event_add_success(mock_service):
+    service, repo_mock, uow_mock, _, _ = mock_service
+    user_id = uuid.uuid4()
+    product_id = uuid.uuid4()
+    event_data = {
+        "user_id": str(user_id),
+        "product_id": str(product_id),
+        "action": "add",
+    }
+
+    await service.process_like_event(event_data)
+
+    repo_mock.add_like.assert_called_once_with(user_id=user_id, product_id=product_id)
+    uow_mock.commit.assert_called_once()
+    uow_mock.rollback.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_process_like_event_remove_success(mock_service):
+    service, repo_mock, uow_mock, _, _ = mock_service
+    user_id = uuid.uuid4()
+    product_id = uuid.uuid4()
+    event_data = {
+        "user_id": str(user_id),
+        "product_id": str(product_id),
+        "action": "remove",
+    }
+
+    await service.process_like_event(event_data)
+
+    repo_mock.remove_like.assert_called_once_with(
+        user_id=user_id, product_id=product_id
+    )
+    uow_mock.commit.assert_called_once()
+    uow_mock.rollback.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_process_like_event_db_error_rolls_back(mock_service):
+    service, repo_mock, uow_mock, _, _ = mock_service
+    repo_mock.add_like.side_effect = RuntimeError("DB connection error")
+
+    event_data = {
+        "user_id": str(uuid.uuid4()),
+        "product_id": str(uuid.uuid4()),
+        "action": "add",
+    }
+
+    with pytest.raises(RuntimeError):
+        await service.process_like_event(event_data)
+
+    uow_mock.commit.assert_not_called()
+    uow_mock.rollback.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "invalid_payload",
+    [
+        {},  # пустой словарь
+        {"user_id": "bad-uuid", "product_id": str(uuid.uuid4()), "action": "add"},
+        {"user_id": str(uuid.uuid4()), "action": "add"},  # отсутствует product_id
+        {
+            "user_id": str(uuid.uuid4()),
+            "product_id": str(uuid.uuid4()),
+            "action": "unknown_action",
+        },
+    ],
+)
+async def test_process_like_event_malformed_payload_does_not_call_repo(
+    mock_service, invalid_payload
+):
+    service, repo_mock, uow_mock, _, _ = mock_service
+
+    await service.process_like_event(invalid_payload)
+
+    repo_mock.add_like.assert_not_called()
+    repo_mock.remove_like.assert_not_called()
+    uow_mock.commit.assert_not_called()

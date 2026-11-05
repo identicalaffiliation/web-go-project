@@ -1,12 +1,12 @@
 import uuid
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from internal.adapters.postgres.models import ProfileModel
+from internal.adapters.postgres.models import ProductLikeModel, ProfileModel
 from internal.domain.exceptions import ProfileNotFoundError
-from internal.domain.models import Profile, ProfileType
+from internal.domain.models import Profile, ProfileType, WishlistItemDTO
 from internal.ports.repository import IProfileRepository
 
 
@@ -91,3 +91,34 @@ class SqlAlchemyProfileRepository(IProfileRepository):
             raise ProfileNotFoundError(profile_id=str(profile.id))
 
         return self._to_domain(updated_model)
+
+    async def add_like(self, user_id: uuid.UUID, product_id: uuid.UUID) -> None:
+        stmt = (
+            insert(ProductLikeModel)
+            .values(user_id=user_id, product_id=product_id)
+            .on_conflict_do_nothing(index_elements=["user_id", "product_id"])
+        )
+        await self.session.execute(stmt)
+
+    async def remove_like(self, user_id: uuid.UUID, product_id: uuid.UUID) -> None:
+        stmt = delete(ProductLikeModel).where(
+            ProductLikeModel.user_id == user_id,
+            ProductLikeModel.product_id == product_id,
+        )
+        await self.session.execute(stmt)
+
+    async def get_likes_by_user_id(self, user_id: uuid.UUID) -> list[WishlistItemDTO]:
+        stmt = (
+            select(ProductLikeModel)
+            .where(ProductLikeModel.user_id == user_id)
+            .order_by(ProductLikeModel.created_at.desc())
+        )
+        result = await self.session.execute(stmt)
+        models = result.scalars().all()
+        return [
+            WishlistItemDTO(
+                product_id=str(m.product_id),
+                added_at=m.created_at,
+            )
+            for m in models
+        ]

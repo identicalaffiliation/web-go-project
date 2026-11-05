@@ -8,7 +8,10 @@ from fastapi import FastAPI
 
 from internal.adapters.http.dependencies import get_profile_service
 from internal.adapters.http.profiles import router as profiles_router
-from internal.adapters.kafka.consumer import KafkaUserRegisteredConsumer
+from internal.adapters.kafka.consumer import (
+    KafkaLikesConsumer,
+    KafkaUserRegisteredConsumer,
+)
 from internal.adapters.kafka.producer import KafkaEventProducer
 from internal.adapters.postgres.database import async_session_maker, engine
 from internal.adapters.postgres.repository import SqlAlchemyProfileRepository
@@ -27,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 kafka_consumer: KafkaUserRegisteredConsumer | None = None
 kafka_producer: KafkaEventProducer | None = None
+kafka_likes_consumer: KafkaLikesConsumer | None = None
 orders_channel: grpc.aio.Channel | None = None
 payments_channel: grpc.aio.Channel | None = None
 grpc_orders_client: GrpcOrdersClient | None = None
@@ -68,9 +72,29 @@ async def process_kafka_message(msg_data: dict) -> None:
         await service.process_registration_event(msg_data)
 
 
+async def process_kafka_like_message(msg_data: dict) -> None:
+    async with async_session_maker() as session:
+        repo = SqlAlchemyProfileRepository(session)
+        uow = SqlAlchemyUnitOfWork(session)
+        service = ProfileService(
+            repo=repo,
+            uow=uow,
+            orders_client=grpc_orders_client,
+            payments_client=grpc_payments_client,
+            event_producer=kafka_producer,
+            cache=redis_cache,
+        )
+        await service.process_like_event(msg_data)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global kafka_consumer, kafka_producer, orders_channel, payments_channel
+    global \
+        kafka_consumer, \
+        kafka_producer, \
+        kafka_likes_consumer, \
+        orders_channel, \
+        payments_channel
     global grpc_orders_client, grpc_payments_client, redis_client, redis_cache
 
     logger.info("Starting Profile Service...")
@@ -87,6 +111,14 @@ async def lifespan(app: FastAPI):
     kafka_producer = KafkaEventProducer(settings.KAFKA_BOOTSTRAP_SERVERS)
     await kafka_producer.start()
 
+    kafka_likes_consumer = KafkaLikesConsumer(
+        bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+        group_id=settings.KAFKA_LIKES_CONSUMER_GROUP,
+        topic=settings.KAFKA_LIKE_EVENTS_TOPIC,
+        process_callback=process_kafka_like_message,
+    )
+    await kafka_likes_consumer.start()
+
     kafka_consumer = KafkaUserRegisteredConsumer(
         bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
         group_id=settings.KAFKA_CONSUMER_GROUP,
@@ -94,6 +126,14 @@ async def lifespan(app: FastAPI):
         process_callback=process_kafka_message,
     )
     await kafka_consumer.start()
+
+    kafka_likes_consumer = KafkaLikesConsumer(
+        bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+        group_id=settings.KAFKA_LIKES_CONSUMER_GROUP,
+        topic=settings.KAFKA_LIKE_EVENTS_TOPIC,
+        process_callback=process_kafka_like_message,
+    )
+    await kafka_likes_consumer.start()
 
     try:
         yield
@@ -103,6 +143,8 @@ async def lifespan(app: FastAPI):
             await kafka_consumer.stop()
         if kafka_producer:
             await kafka_producer.stop()
+        if kafka_likes_consumer:
+            await kafka_likes_consumer.stop()
         if redis_client:
             await redis_client.aclose()
         await engine.dispose()
