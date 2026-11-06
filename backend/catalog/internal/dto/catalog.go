@@ -48,27 +48,35 @@ func (a LikeAction) Valid() bool {
 // Description - описание товара, поле опционально.
 // Price - цена товара, минимальное значение - 1, не может быть отрицательно, поле обязательно.
 // Quantity - количество товара, диапозон количества [1, 100), поле обязательно.
+// BusinessID - user_id бизнеса, выставляется из X-User-Id (gateway), из тела не читается.
 type CreateProductRequest struct {
 	Title       string  `json:"title" validate:"required,min=1"`
 	Description *string `json:"description,omitempty"`
 	Price       int64   `json:"price" validate:"required,gt=0"`
 	Quantity    int16   `json:"quantity" validate:"required,gte=1,lt=100"`
+	BusinessID  string  `json:"-"`
 }
 
 // ToDomain - метод преобразования DTO в domain структуру.
-func (req *CreateProductRequest) ToDomain() *domain.Product {
+func (req *CreateProductRequest) ToDomain() (*domain.Product, error) {
+	businessID, err := uuid.Parse(req.BusinessID)
+	if err != nil {
+		return nil, ErrInvalidData
+	}
+
 	model := &domain.Product{
-		ID:       uuid.New(),
-		Title:    req.Title,
-		Price:    req.Price,
-		Quantity: req.Quantity,
+		ID:         uuid.New(),
+		BusinessID: businessID,
+		Title:      req.Title,
+		Price:      req.Price,
+		Quantity:   req.Quantity,
 	}
 
 	if req.Description != nil {
 		model.Description = *req.Description
 	}
 
-	return model
+	return model, nil
 }
 
 // LikeProductRequest - DTO запроса лайка товара.

@@ -9,6 +9,13 @@ class ProfileType(str, Enum):
     BUSINESS = "business"
 
 
+class UserRole(str, Enum):
+    """Роль пользователя из JWT (выдаёт auth, прокидывает шлюз в X-User-Role)."""
+
+    CUSTOMER = "customer"
+    BUSINESS = "business"
+
+
 @dataclass
 class Profile:
     id: uuid.UUID
@@ -37,6 +44,25 @@ class OrderDTO:
 @dataclass
 class BalanceDTO:
     amount: int
+
+
+@dataclass
+class BusinessProductDTO:
+    product_id: str
+    title: str
+    description: str | None
+    price: int
+    image_url: str | None
+    rating: float
+    feedbacks_count: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class BusinessProductsPageDTO:
+    products: list[BusinessProductDTO]
+    next_cursor: str | None
 
 
 @dataclass

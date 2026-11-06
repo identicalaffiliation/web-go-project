@@ -57,7 +57,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a new product and returns it. Requires Bearer token.",
+                "description": "Creates a new product and returns it. Available for business only. Requires Bearer token. X-User-Id (product owner) is set by the gateway from the JWT.",
                 "consumes": [
                     "application/json"
                 ],

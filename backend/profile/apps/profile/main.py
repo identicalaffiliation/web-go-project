@@ -15,6 +15,7 @@ from internal.adapters.postgres.repository import SqlAlchemyProfileRepository
 from internal.adapters.postgres.uow import SqlAlchemyUnitOfWork
 from internal.adapters.redis.cache import RedisCache
 from internal.adapters.rpc.grpc_clients import (
+    GrpcCatalogClient,
     GrpcOrdersClient,
     GrpcPaymentsClient,
     create_balanced_channel,
@@ -29,8 +30,10 @@ kafka_consumer: KafkaUserRegisteredConsumer | None = None
 kafka_producer: KafkaEventProducer | None = None
 orders_channel: grpc.aio.Channel | None = None
 payments_channel: grpc.aio.Channel | None = None
+catalog_channel: grpc.aio.Channel | None = None
 grpc_orders_client: GrpcOrdersClient | None = None
 grpc_payments_client: GrpcPaymentsClient | None = None
+grpc_catalog_client: GrpcCatalogClient | None = None
 redis_client: redis.Redis | None = None
 redis_cache: RedisCache | None = None
 
@@ -45,6 +48,7 @@ async def build_profile_service() -> AsyncGenerator[ProfileService, None]:
                 uow=uow,
                 orders_client=grpc_orders_client,
                 payments_client=grpc_payments_client,
+                catalog_client=grpc_catalog_client,
                 event_producer=kafka_producer,
                 cache=redis_cache,
             )
@@ -62,6 +66,7 @@ async def process_kafka_message(msg_data: dict) -> None:
             uow=uow,
             orders_client=grpc_orders_client,
             payments_client=grpc_payments_client,
+            catalog_client=grpc_catalog_client,
             event_producer=kafka_producer,
             cache=redis_cache,
         )
@@ -71,6 +76,7 @@ async def process_kafka_message(msg_data: dict) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global kafka_consumer, kafka_producer, orders_channel, payments_channel
+    global catalog_channel, grpc_catalog_client
     global grpc_orders_client, grpc_payments_client, redis_client, redis_cache
 
     logger.info("Starting Profile Service...")
@@ -80,9 +86,11 @@ async def lifespan(app: FastAPI):
 
     orders_channel = create_balanced_channel(settings.ORDERS_GRPC_HOST)
     payments_channel = create_balanced_channel(settings.PAYMENTS_GRPC_HOST)
+    catalog_channel = create_balanced_channel(settings.CATALOG_GRPC_HOST)
 
     grpc_orders_client = GrpcOrdersClient(orders_channel)
     grpc_payments_client = GrpcPaymentsClient(payments_channel)
+    grpc_catalog_client = GrpcCatalogClient(catalog_channel)
 
     kafka_producer = KafkaEventProducer(settings.KAFKA_BOOTSTRAP_SERVERS)
     await kafka_producer.start()
@@ -108,6 +116,7 @@ async def lifespan(app: FastAPI):
         await engine.dispose()
         await orders_channel.close()
         await payments_channel.close()
+        await catalog_channel.close()
 
 
 app = FastAPI(

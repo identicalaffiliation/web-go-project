@@ -75,7 +75,7 @@ func poolConfig(dsn string, cfg *config.PoolConfig) (*pgxpool.Config, error) {
 	return poolCfg, nil
 }
 
-// grpcListener - отдельный listener на каждый grpc-сервер (price, feedbacks).
+// grpcListener - отдельный listener на каждый grpc-сервер (price, feedbacks, products).
 func grpcListener(cfg *config.GRPCConfig) (net.Listener, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.Host, cfg.Port))
 	if err != nil {
