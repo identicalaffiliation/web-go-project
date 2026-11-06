@@ -32,3 +32,18 @@ func Test_ProductModel_ToDomain(t *testing.T) {
 	require.Equal(t, false, domainModel.UpdatedAt.IsZero())
 	require.Equal(t, false, domainModel.CreatedAt.IsZero())
 }
+
+func Test_ProductModel_ToDomain_BusinessID(t *testing.T) {
+	t.Run("owner set", func(t *testing.T) {
+		businessID := uuid.NewV7()
+		model := &productModel{ID: uuid.NewV7(), BusinessID: &businessID}
+
+		require.Equal(t, businessID, model.toDomain().BusinessID)
+	})
+
+	t.Run("NULL owner - zero uuid", func(t *testing.T) {
+		model := &productModel{ID: uuid.NewV7()}
+
+		require.Equal(t, uuid.Nil(), model.toDomain().BusinessID)
+	})
+}

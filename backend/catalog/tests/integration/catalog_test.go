@@ -20,6 +20,7 @@ func (s *DatabaseSuite) Test_CatalogRepository_Insert() {
 	t := s.T()
 	expected := &domain.Product{
 		ID:          uuid.New(),
+		BusinessID:  uuid.NewV7(),
 		Title:       "some title",
 		Description: "some description",
 		Price:       120000,
@@ -29,6 +30,7 @@ func (s *DatabaseSuite) Test_CatalogRepository_Insert() {
 	require.NoError(t, err)
 
 	require.Equal(t, expected.ID, actual.ID)
+	require.Equal(t, expected.BusinessID, actual.BusinessID)
 	require.Equal(t, expected.Title, actual.Title)
 	require.Equal(t, expected.Description, actual.Description)
 	require.Equal(t, expected.Price, actual.Price)
@@ -112,6 +114,7 @@ func (s *DatabaseSuite) Test_CatalogRepository_GetItemByID() {
 		s.Require().Equal("test desc1", actual.Description)
 		s.Require().Equal(int64(100), actual.Price)
 		s.Require().Equal("some_key1", actual.ImageKey)
+		s.Require().Equal(uuid.Nil(), actual.BusinessID, "fixture products have no owner (NULL)")
 		s.Require().NotEmpty(actual.CreatedAt)
 		s.Require().NotEmpty(actual.UpdatedAt)
 	})
@@ -139,5 +142,60 @@ func (s *DatabaseSuite) Test_CatalogRepository_GetItemsByCursorPagination() {
 		s.Require().NoError(err)
 		s.Require().NotNil(items)
 		s.Require().Len(items, 3)
+	})
+}
+
+func (s *DatabaseSuite) Test_CatalogRepository_GetItemsByBusinessID() {
+	// товары без владельца (NULL) в выдачу бизнеса не попадают
+	s.Require().NoError(s.loadFixtures("items_list.sql"))
+
+	businessID, otherID := uuid.NewV7(), uuid.NewV7()
+	// id по возрастанию: выдача идёт по product_id DESC
+	own := []uuid.UUID{
+		uuid.MustParse("01a20000-0000-7000-8000-000000000001"),
+		uuid.MustParse("01a20000-0000-7000-8000-000000000002"),
+		uuid.MustParse("01a20000-0000-7000-8000-000000000003"),
+	}
+	for _, id := range own {
+		_, err := s.catalog.Insert(s.ctx, &domain.Product{ID: id, BusinessID: businessID, Title: "own", Price: 100})
+		s.Require().NoError(err)
+	}
+
+	_, err := s.catalog.Insert(s.ctx, &domain.Product{
+		ID:         uuid.MustParse("01a20000-0000-7000-8000-000000000004"),
+		BusinessID: otherID,
+		Title:      "other",
+		Price:      100,
+	})
+	s.Require().NoError(err)
+
+	s.T().Run("only owner products, newest first", func(t *testing.T) {
+		items, err := s.catalog.GetItemsByBusinessID(s.ctx, businessID, nil, 10)
+		s.Require().NoError(err)
+		s.Require().Len(items, 3)
+
+		for i, item := range items {
+			s.Require().Equal(own[len(own)-1-i], item.ID)
+			s.Require().Equal(businessID, item.BusinessID)
+		}
+	})
+
+	s.T().Run("cursor and limit", func(t *testing.T) {
+		items, err := s.catalog.GetItemsByBusinessID(s.ctx, businessID, new(own[2].String()), 1)
+		s.Require().NoError(err)
+		s.Require().Len(items, 1)
+		s.Require().Equal(own[1], items[0].ID)
+	})
+
+	s.T().Run("unknown business - empty", func(t *testing.T) {
+		items, err := s.catalog.GetItemsByBusinessID(s.ctx, uuid.NewV7(), nil, 10)
+		s.Require().NoError(err)
+		s.Require().Empty(items)
+	})
+
+	s.T().Run("invalid cursor", func(t *testing.T) {
+		items, err := s.catalog.GetItemsByBusinessID(s.ctx, businessID, new("bad"), 10)
+		s.Require().ErrorIs(err, catalog.ErrInvalidData)
+		s.Require().Nil(items)
 	})
 }

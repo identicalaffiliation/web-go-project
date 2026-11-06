@@ -134,6 +134,45 @@ func (mr *MockGetPageCaseMockRecorder) GetItemsPage(ctx, cursor, limit any) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetItemsPage", reflect.TypeOf((*MockGetPageCase)(nil).GetItemsPage), ctx, cursor, limit)
 }
 
+// MockGetBusinessItemsCase is a mock of GetBusinessItemsCase interface.
+type MockGetBusinessItemsCase struct {
+	ctrl     *gomock.Controller
+	recorder *MockGetBusinessItemsCaseMockRecorder
+	isgomock struct{}
+}
+
+// MockGetBusinessItemsCaseMockRecorder is the mock recorder for MockGetBusinessItemsCase.
+type MockGetBusinessItemsCaseMockRecorder struct {
+	mock *MockGetBusinessItemsCase
+}
+
+// NewMockGetBusinessItemsCase creates a new mock instance.
+func NewMockGetBusinessItemsCase(ctrl *gomock.Controller) *MockGetBusinessItemsCase {
+	mock := &MockGetBusinessItemsCase{ctrl: ctrl}
+	mock.recorder = &MockGetBusinessItemsCaseMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockGetBusinessItemsCase) EXPECT() *MockGetBusinessItemsCaseMockRecorder {
+	return m.recorder
+}
+
+// GetBusinessItems mocks base method.
+func (m *MockGetBusinessItemsCase) GetBusinessItems(ctx context.Context, businessID string, cursor *string, limit int64) (*dto.Page, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBusinessItems", ctx, businessID, cursor, limit)
+	ret0, _ := ret[0].(*dto.Page)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBusinessItems indicates an expected call of GetBusinessItems.
+func (mr *MockGetBusinessItemsCaseMockRecorder) GetBusinessItems(ctx, businessID, cursor, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBusinessItems", reflect.TypeOf((*MockGetBusinessItemsCase)(nil).GetBusinessItems), ctx, businessID, cursor, limit)
+}
+
 // MockUploadImageCase is a mock of UploadImageCase interface.
 type MockUploadImageCase struct {
 	ctrl     *gomock.Controller

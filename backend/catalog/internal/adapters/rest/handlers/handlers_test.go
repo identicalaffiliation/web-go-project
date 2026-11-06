@@ -38,19 +38,43 @@ func jsonRequest(method, target, body string) *http.Request {
 func TestAddItemToCatalog(t *testing.T) {
 	const route = "/catalog"
 	body := `{"title":"t","price":100,"quantity":5}`
+	businessID := uuid.NewV7()
 
-	t.Run("201", func(t *testing.T) {
+	t.Run("201 - business id taken from header", func(t *testing.T) {
 		app := mocks.NewMockAddToCatalogCase(gomock.NewController(t))
 		id := uuid.NewV7()
-		app.EXPECT().AddProductToCatalog(gomock.Any(), &dto.CreateProductRequest{Title: "t", Price: 100, Quantity: 5}).
-			Return(&dto.ProductResponse{Product: dto.Product{ProductID: id}}, nil)
+		app.EXPECT().AddProductToCatalog(gomock.Any(), &dto.CreateProductRequest{
+			Title:      "t",
+			Price:      100,
+			Quantity:   5,
+			BusinessID: businessID.String(),
+		}).Return(&dto.ProductResponse{Product: dto.Product{ProductID: id}}, nil)
 
-		rec := serve(http.MethodPost, route, AddItemToCatalog(app), jsonRequest(http.MethodPost, route, body))
+		req := jsonRequest(http.MethodPost, route, body)
+		req.Header.Set(userIDHeader, businessID.String())
+
+		rec := serve(http.MethodPost, route, AddItemToCatalog(app), req)
 		require.Equal(t, http.StatusCreated, rec.Code)
 
 		var resp dto.ProductResponse
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 		require.Equal(t, id, resp.Product.ProductID)
+	})
+
+	t.Run("business id in body is ignored", func(t *testing.T) {
+		app := mocks.NewMockAddToCatalogCase(gomock.NewController(t))
+		app.EXPECT().AddProductToCatalog(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ any, req *dto.CreateProductRequest) (*dto.ProductResponse, error) {
+				require.Equal(t, businessID.String(), req.BusinessID)
+				return &dto.ProductResponse{}, nil
+			},
+		)
+
+		req := jsonRequest(http.MethodPost, route, `{"title":"t","price":100,"quantity":5,"businessId":"`+uuid.NewV7().String()+`"}`)
+		req.Header.Set(userIDHeader, businessID.String())
+
+		rec := serve(http.MethodPost, route, AddItemToCatalog(app), req)
+		require.Equal(t, http.StatusCreated, rec.Code)
 	})
 
 	t.Run("400 - broken json", func(t *testing.T) {

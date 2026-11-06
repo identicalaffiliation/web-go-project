@@ -48,6 +48,27 @@ class BalanceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class BusinessProductResponse(BaseModel):
+    product_id: str
+    title: str
+    description: str | None
+    price: int
+    image_url: str | None
+    rating: float
+    feedbacks_count: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BusinessProductsPageResponse(BaseModel):
+    products: list[BusinessProductResponse]
+    next_cursor: str | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class CreateBusinessProfileRequest(BaseModel):
     company_name: str = Field(
         ..., min_length=1, max_length=255, description="Название компании или ИП"

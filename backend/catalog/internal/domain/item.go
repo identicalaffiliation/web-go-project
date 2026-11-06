@@ -7,6 +7,7 @@ import (
 
 type Product struct {
 	ID          uuid.UUID `json:"id"`
+	BusinessID  uuid.UUID `json:"businessId"` // user_id бизнеса, выложившего товар
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
 	Price       int64     `json:"price"`

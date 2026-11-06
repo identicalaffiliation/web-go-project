@@ -22,6 +22,11 @@ type GetPageCase interface {
 }
 
 //go:generate mockgen -source=$GOFILE -destination=../../gen/mocks/mock_$GOFILE -package=mocks
+type GetBusinessItemsCase interface {
+	GetBusinessItems(ctx context.Context, businessID string, cursor *string, limit int64) (*dto.Page, error)
+}
+
+//go:generate mockgen -source=$GOFILE -destination=../../gen/mocks/mock_$GOFILE -package=mocks
 type UploadImageCase interface {
 	UploadImage(ctx context.Context, id string, format dto.ImageFormat) (*dto.ProductResponse, error)
 }

@@ -2,6 +2,7 @@ MODULE        := github.com/identicalaffiliation/web-go-project/backend
 PROTO_DIR     := backend/proto
 CATALOG_PROTO := v1/catalog/catalog.price.v1.proto
 FEEDBACKS_PROTO := v1/catalog/catalog.feedbacks.v1.proto
+PRODUCTS_PROTO := v1/catalog/catalog.products.v1.proto
 ORDERS_PROTO  := v1/orders/orders.orders.v1.proto
 PAYMENTS_PROTO := v1/payments/payments.balance.v1.proto
 
@@ -174,6 +175,10 @@ proto: ## сгенерировать go код из proto
     	--go_out=backend/catalog --go_opt=module=$(MODULE)/catalog \
     	--go-grpc_out=backend/catalog --go-grpc_opt=module=$(MODULE)/catalog \
     	$(PROTO_DIR)/$(FEEDBACKS_PROTO)
+	protoc -I $(PROTO_DIR) \
+		--go_out=backend/catalog --go_opt=module=$(MODULE)/catalog \
+		--go-grpc_out=backend/catalog --go-grpc_opt=module=$(MODULE)/catalog \
+		$(PROTO_DIR)/$(PRODUCTS_PROTO)
 
 .PHONY: swag
 swag: ## swagger всех сервисов

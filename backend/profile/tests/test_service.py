@@ -10,7 +10,12 @@ from internal.adapters.http.dependencies import get_profile_service
 from internal.adapters.http.schemas import CreateBusinessProfileRequest
 from internal.app.service import ProfileService
 from internal.domain.exceptions import ProfileAlreadyExistsError, ProfileNotFoundError
-from internal.domain.models import Profile, ProfileType
+from internal.domain.models import (
+    BusinessProductDTO,
+    BusinessProductsPageDTO,
+    Profile,
+    ProfileType,
+)
 
 
 @pytest.fixture
@@ -19,6 +24,7 @@ def mock_service():
     uow = AsyncMock()
     orders_client = AsyncMock()
     payments_client = AsyncMock()
+    catalog_client = AsyncMock()
     event_producer = AsyncMock()
     cache = AsyncMock()
 
@@ -27,6 +33,7 @@ def mock_service():
         uow=uow,
         orders_client=orders_client,
         payments_client=payments_client,
+        catalog_client=catalog_client,
         event_producer=event_producer,
         cache=cache,
     )
@@ -322,3 +329,164 @@ async def test_update_profile_invalidates_cache(mock_service):
     )
 
     cache_mock.delete.assert_called_once_with(f"profiles:{user_id}")
+
+
+def _products_page(next_cursor: str | None = None) -> BusinessProductsPageDTO:
+    now = datetime.now(timezone.utc)
+    return BusinessProductsPageDTO(
+        products=[
+            BusinessProductDTO(
+                product_id=str(uuid.uuid4()),
+                title="Чайник",
+                description=None,
+                price=1500,
+                image_url="http://minio/image.png",
+                rating=4.5,
+                feedbacks_count=2,
+                created_at=now,
+                updated_at=now,
+            )
+        ],
+        next_cursor=next_cursor,
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_business_products_delegates_to_catalog(mock_service):
+    service, *_ = mock_service
+    user_id = uuid.uuid4()
+    page = _products_page()
+    service.catalog_client.get_business_products.return_value = page
+
+    result = await service.get_business_products(user_id, "cursor", 10)
+
+    assert result is page
+    service.catalog_client.get_business_products.assert_awaited_once_with(
+        user_id, "cursor", 10
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_business_products_api_success(
+    mock_profile_service, override_get_service
+):
+    user_id = str(uuid.uuid4())
+    cursor = str(uuid.uuid4())
+    next_cursor = str(uuid.uuid4())
+    page = _products_page(next_cursor=next_cursor)
+    mock_profile_service.get_business_products.return_value = page
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        response = await ac.get(
+            "/api/v1/profiles/business/products",
+            params={"cursor": cursor, "limit": 10},
+            headers={"X-User-Id": user_id, "X-User-Role": "business"},
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["next_cursor"] == next_cursor
+    assert len(data["products"]) == 1
+    product = data["products"][0]
+    assert product["product_id"] == page.products[0].product_id
+    assert product["title"] == "Чайник"
+    assert product["description"] is None
+    assert product["price"] == 1500
+    assert product["image_url"] == "http://minio/image.png"
+
+    mock_profile_service.get_business_products.assert_awaited_once_with(
+        uuid.UUID(user_id), cursor, 10
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_business_products_api_defaults(
+    mock_profile_service, override_get_service
+):
+    user_id = str(uuid.uuid4())
+    mock_profile_service.get_business_products.return_value = BusinessProductsPageDTO(
+        products=[], next_cursor=None
+    )
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        response = await ac.get(
+            "/api/v1/profiles/business/products",
+            headers={"X-User-Id": user_id, "X-User-Role": "business"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"products": [], "next_cursor": None}
+    mock_profile_service.get_business_products.assert_awaited_once_with(
+        uuid.UUID(user_id), None, 50
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "params",
+    [{"cursor": "not-a-uuid"}, {"limit": 0}, {"limit": 101}],
+)
+async def test_get_business_products_api_invalid_query(
+    mock_profile_service, override_get_service, params
+):
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        response = await ac.get(
+            "/api/v1/profiles/business/products",
+            params=params,
+            headers={"X-User-Id": str(uuid.uuid4()), "X-User-Role": "business"},
+        )
+
+    assert response.status_code == 422
+    mock_profile_service.get_business_products.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_get_business_products_api_catalog_unavailable(
+    mock_profile_service, override_get_service
+):
+    mock_profile_service.get_business_products.side_effect = RuntimeError(
+        "RPC service error [UNAVAILABLE]: down"
+    )
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        response = await ac.get(
+            "/api/v1/profiles/business/products",
+            headers={"X-User-Id": str(uuid.uuid4()), "X-User-Role": "business"},
+        )
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "Catalog service unavailable"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("headers", "expected_status"),
+    [
+        ({"X-User-Role": "customer"}, 403),
+        ({"X-User-Role": "admin"}, 403),
+        ({"X-User-Role": ""}, 401),
+        ({}, 401),
+    ],
+)
+async def test_get_business_products_api_only_business(
+    mock_profile_service, override_get_service, headers, expected_status
+):
+    """Без роли business запрос до сервиса не доходит."""
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        response = await ac.get(
+            "/api/v1/profiles/business/products",
+            headers={"X-User-Id": str(uuid.uuid4()), **headers},
+        )
+
+    assert response.status_code == expected_status
+    mock_profile_service.get_business_products.assert_not_called()

@@ -625,6 +625,7 @@ services:
 
       ORDERS_GRPC_HOST: orders-service:50052
       PAYMENTS_GRPC_HOST: payments-service:50052
+      CATALOG_GRPC_HOST: catalog-service:50053
 
       REDIS_URL: redis://:${REDIS_PASSWORD}@shop-redis:6379/0
 

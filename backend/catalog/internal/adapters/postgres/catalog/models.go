@@ -10,6 +10,7 @@ import (
 
 type productModel struct {
 	ID          uuid.UUID        `db:"product_id"`
+	BusinessID  *uuid.UUID       `db:"business_id"` // NULL у товаров, созданных до появления владельца
 	Title       string           `db:"title"`
 	Description sql.Null[string] `db:"description"`
 	Price       int64            `db:"price"`
@@ -22,7 +23,7 @@ type productModel struct {
 }
 
 func (m *productModel) toDomain() *domain.Product {
-	return &domain.Product{
+	p := &domain.Product{
 		ID:          m.ID,
 		Title:       m.Title,
 		Description: m.Description.V,
@@ -34,4 +35,10 @@ func (m *productModel) toDomain() *domain.Product {
 		Rating:         m.Rating,
 		FeedbacksCount: m.FeedbacksCount,
 	}
+
+	if m.BusinessID != nil {
+		p.BusinessID = *m.BusinessID
+	}
+
+	return p
 }

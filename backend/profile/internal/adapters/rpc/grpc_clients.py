@@ -7,6 +7,10 @@ from typing import TypeVar
 
 import grpc
 
+from internal.adapters.grpc.generated.v1.catalog import (
+    products_pb2,
+    products_pb2_grpc,
+)
 from internal.adapters.grpc.generated.v1.orders import (
     orders_pb2,
     orders_pb2_grpc,
@@ -17,7 +21,12 @@ from internal.adapters.grpc.generated.v1.payments import (
 )
 from internal.adapters.rpc.circuit_breaker import CircuitBreaker
 from internal.config.config import settings
-from internal.domain.models import BalanceDTO, OrderDTO
+from internal.domain.models import (
+    BalanceDTO,
+    BusinessProductDTO,
+    BusinessProductsPageDTO,
+    OrderDTO,
+)
 
 logger = logging.getLogger(__name__)
 GRPC_TIMEOUT = 5.0
@@ -148,3 +157,51 @@ class GrpcPaymentsClient:
 
         response = await self.circuit_breaker.call(lambda: execute_with_retry(_call))
         return BalanceDTO(amount=response.amount)
+
+
+class GrpcCatalogClient:
+    def __init__(
+        self,
+        channel: grpc.aio.Channel,
+        circuit_breaker: CircuitBreaker | None = None,
+    ):
+        self.stub = products_pb2_grpc.ProductsServiceStub(channel)
+        self.circuit_breaker = circuit_breaker or CircuitBreaker(
+            name="catalog_service",
+            failure_threshold=settings.CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+            recovery_timeout=settings.CIRCUIT_BREAKER_RECOVERY_TIMEOUT_SEC,
+        )
+
+    async def get_business_products(
+        self, business_id: uuid.UUID, cursor: str | None, limit: int
+    ) -> BusinessProductsPageDTO:
+        request = products_pb2.GetBusinessProductsRequest(
+            business_id=str(business_id), limit=limit
+        )
+        if cursor:
+            request.cursor = cursor
+
+        async def _call() -> products_pb2.GetBusinessProductsResponse:
+            return await self.stub.GetBusinessProducts(request, timeout=GRPC_TIMEOUT)
+
+        response = await self.circuit_breaker.call(lambda: execute_with_retry(_call))
+
+        return BusinessProductsPageDTO(
+            products=[
+                BusinessProductDTO(
+                    product_id=p.product_id,
+                    title=p.title,
+                    description=p.description if p.HasField("description") else None,
+                    price=p.price,
+                    image_url=p.image_url if p.HasField("image_url") else None,
+                    rating=p.rating,
+                    feedbacks_count=p.feedbacks_count,
+                    created_at=p.created_at.ToDatetime(),
+                    updated_at=p.updated_at.ToDatetime(),
+                )
+                for p in response.products
+            ],
+            next_cursor=(
+                response.next_cursor if response.HasField("next_cursor") else None
+            ),
+        )
