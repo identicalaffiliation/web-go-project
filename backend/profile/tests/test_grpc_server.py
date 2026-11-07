@@ -6,6 +6,10 @@ import grpc
 import pytest
 from google.protobuf.timestamp_pb2 import Timestamp
 
+from internal.adapters.grpc.generated.v1.catalog import (
+    products_pb2,
+    products_pb2_grpc,
+)
 from internal.adapters.grpc.generated.v1.orders import (
     orders_pb2,
     orders_pb2_grpc,
@@ -14,7 +18,11 @@ from internal.adapters.grpc.generated.v1.payments import (
     payments_pb2,
     payments_pb2_grpc,
 )
-from internal.adapters.rpc.grpc_clients import GrpcOrdersClient, GrpcPaymentsClient
+from internal.adapters.rpc.grpc_clients import (
+    GrpcCatalogClient,
+    GrpcOrdersClient,
+    GrpcPaymentsClient,
+)
 
 
 class FakeOrdersServicer(orders_pb2_grpc.OrdersServiceServicer):
@@ -47,6 +55,32 @@ class FakePaymentsServicer(payments_pb2_grpc.PaymentsServiceServicer):
         return payments_pb2.GetBalanceResponse(user_id=request.user_id, amount=100_500)
 
 
+class FakeProductsServicer(products_pb2_grpc.ProductsServiceServicer):
+    async def GetBusinessProducts(self, request, context):
+        if not request.business_id:
+            await context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT, "business_id required"
+            )
+
+        ts = Timestamp()
+        ts.GetCurrentTime()
+        # курсор и лимит возвращаются в ответе, чтобы проверить, что они дошли по wire
+        response = products_pb2.GetBusinessProductsResponse(
+            products=[
+                products_pb2.Product(
+                    product_id="prod-1",
+                    title=f"limit={request.limit}",
+                    price=1500,
+                    created_at=ts,
+                    updated_at=ts,
+                )
+            ]
+        )
+        if request.HasField("cursor"):
+            response.next_cursor = request.cursor
+        return response
+
+
 class SlowOrdersServicer(orders_pb2_grpc.OrdersServiceServicer):
     async def GetUserOrders(self, request, context):
         await asyncio.sleep(10)
@@ -73,6 +107,18 @@ async def payments_server():
     server = grpc.aio.server()
     payments_pb2_grpc.add_PaymentsServiceServicer_to_server(
         FakePaymentsServicer(), server
+    )
+    port = server.add_insecure_port("127.0.0.1:0")
+    await server.start()
+    yield f"127.0.0.1:{port}"
+    await server.stop(grace=None)
+
+
+@pytest.fixture
+async def catalog_server():
+    server = grpc.aio.server()
+    products_pb2_grpc.add_ProductsServiceServicer_to_server(
+        FakeProductsServicer(), server
     )
     port = server.add_insecure_port("127.0.0.1:0")
     await server.start()
@@ -141,3 +187,24 @@ async def test_orders_client_server_error():
             assert "boom" in str(exc.value)
     finally:
         await server.stop(grace=None)
+
+
+@pytest.mark.asyncio
+async def test_catalog_client_against_real_server(catalog_server):
+    async with grpc.aio.insecure_channel(catalog_server) as channel:
+        client = GrpcCatalogClient(channel)
+
+        page = await client.get_business_products(uuid.uuid4(), "cursor-1", 10)
+        last = await client.get_business_products(uuid.uuid4(), None, 50)
+
+    assert len(page.products) == 1
+    p = page.products[0]
+    assert p.product_id == "prod-1"
+    assert p.title == "limit=10"
+    assert p.price == 1500
+    assert p.description is None
+    assert p.image_url is None
+    assert p.created_at is not None
+    assert page.next_cursor == "cursor-1"
+
+    assert last.next_cursor is None

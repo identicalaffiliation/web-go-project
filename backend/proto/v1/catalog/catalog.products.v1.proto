@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package catalog.products.v1;
+
+option go_package = "github.com/identicalaffiliation/web-go-project/backend/catalog/gen/pb/products/v1;productsv1";
+
+import "google/protobuf/timestamp.proto";
+
+service ProductsService {
+  rpc GetBusinessProducts(GetBusinessProductsRequest) returns (GetBusinessProductsResponse);
+}
+
+message GetBusinessProductsRequest {
+  string business_id = 1; // uuid бизнеса (user_id, выложивший товары)
+  optional string cursor = 2; // next_cursor из предыдущего ответа
+  int64 limit = 3; // размер страницы, вне [1, 100] - 50
+}
+
+message GetBusinessProductsResponse {
+  repeated Product products = 1; // новые первыми
+  optional string next_cursor = 2; // нет - последняя страница
+}
+
+message Product {
+  string product_id = 1;
+  string title = 2;
+  optional string description = 3;
+  int64 price = 4; // цена 1 товара
+  optional string image_url = 5; // presigned ссылка на картинку, нет - картинка не загружена
+  double rating = 6; // средняя оценка по отзывам (0, если отзывов нет)
+  int64 feedbacks_count = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}

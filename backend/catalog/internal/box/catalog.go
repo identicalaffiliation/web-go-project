@@ -17,6 +17,7 @@ import (
 	outboxRepository "github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/outbox"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/rest"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/rpc/price"
+	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/rpc/products"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/s3"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/config"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/ports"
@@ -26,7 +27,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// SetupCatalogBox - поднимает REST, grpc (price, feedbacks) и stock outbox-воркер.
+// SetupCatalogBox - поднимает REST, grpc (price, feedbacks, products) и stock outbox-воркер.
 // Падение любого компонента или SIGINT/SIGTERM останавливает всё остальное.
 func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logger) error {
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
@@ -70,6 +71,7 @@ func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logge
 
 	feedbackService, feedbacksGRPCServer := setupFeedbacks(masterPool, replicaPool, logger)
 	priceGRPCServer := price.NewGRPCServer(catalogService)
+	productsGRPCServer := products.NewGRPCServer(catalogService)
 	httpServer := rest.SetupServer(&cfg.HTTPConfig, catalogService, feedbackService)
 
 	priceListener, err := grpcListener(&cfg.GRPCConfig)
@@ -80,6 +82,13 @@ func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logge
 	feedbacksListener, err := grpcListener(&cfg.FeedbacksGRPC)
 	if err != nil {
 		closeWithLog(logger, "price listener", priceListener.Close)
+		return err
+	}
+
+	productsListener, err := grpcListener(&cfg.ProductsGRPC)
+	if err != nil {
+		closeWithLog(logger, "price listener", priceListener.Close)
+		closeWithLog(logger, "feedbacks listener", feedbacksListener.Close)
 		return err
 	}
 
@@ -104,6 +113,7 @@ func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logge
 
 	g.Go(serveGRPC(priceGRPCServer, priceListener, "price", logger))
 	g.Go(serveGRPC(feedbacksGRPCServer, feedbacksListener, "feedbacks", logger))
+	g.Go(serveGRPC(productsGRPCServer, productsListener, "products", logger))
 
 	// graceful: ждём сигнал или падение любого компонента, затем гасим серверы
 	g.Go(func() error {
@@ -115,6 +125,7 @@ func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logge
 
 		stopGRPC(shutdownCtx, priceGRPCServer)
 		stopGRPC(shutdownCtx, feedbacksGRPCServer)
+		stopGRPC(shutdownCtx, productsGRPCServer)
 
 		if err := httpServer.Shutdown(shutdownCtx); err != nil {
 			return fmt.Errorf("http shutdown: %w", err)

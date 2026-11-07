@@ -46,7 +46,7 @@ func NewRepository(master, replica *pgxpool.Pool) *Repository {
 
 func (r *Repository) GetItemsByCursorPagination(ctx context.Context, cursor *string, limit int64) ([]*domain.Product, error) {
 	const query = `
-		SELECT c.product_id, c.title, c.description, c.price, c.image_key, c.created_at, c.updated_at,
+		SELECT c.product_id, c.business_id, c.title, c.description, c.price, c.image_key, c.created_at, c.updated_at,
 			fs.rating, fs.feedbacks_count
 		FROM catalog c` + feedbacksStats + `
 		WHERE c.product_id < COALESCE($1::uuid, 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid) -- uuid max filter
@@ -54,14 +54,9 @@ func (r *Repository) GetItemsByCursorPagination(ctx context.Context, cursor *str
 		LIMIT $2::bigint
 	`
 
-	var c any
-	if cursor != nil && *cursor != "" {
-		id, err := uuid.Parse(*cursor)
-		if err != nil {
-			return nil, ErrInvalidData
-		}
-
-		c = id
+	c, err := parseCursor(cursor)
+	if err != nil {
+		return nil, err
 	}
 
 	conn := r.getter.DefaultTrOrDB(ctx, r.poolRO)
@@ -70,9 +65,63 @@ func (r *Repository) GetItemsByCursorPagination(ctx context.Context, cursor *str
 		return nil, fmt.Errorf("error GetItemsByCursorPagination: %w", err)
 	}
 
-	t, err := pgx.CollectRows(rows, pgx.RowToStructByName[productModel])
+	models, err := collectProducts(rows)
 	if err != nil {
 		return nil, fmt.Errorf("error GetItemsByCursorPagination: %w", err)
+	}
+
+	return models, nil
+}
+
+// GetItemsByBusinessID - товары, выложенные бизнесом, новые первыми (курсор - product_id, как у общей страницы).
+func (r *Repository) GetItemsByBusinessID(ctx context.Context, businessID uuid.UUID, cursor *string, limit int64) ([]*domain.Product, error) {
+	const query = `
+		SELECT c.product_id, c.business_id, c.title, c.description, c.price, c.image_key, c.created_at, c.updated_at,
+			fs.rating, fs.feedbacks_count
+		FROM catalog c` + feedbacksStats + `
+		WHERE c.business_id = $1
+			AND c.product_id < COALESCE($2::uuid, 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid) -- uuid max filter
+		ORDER BY c.product_id DESC
+		LIMIT $3::bigint
+	`
+
+	c, err := parseCursor(cursor)
+	if err != nil {
+		return nil, err
+	}
+
+	conn := r.getter.DefaultTrOrDB(ctx, r.poolRO)
+	rows, err := conn.Query(ctx, query, businessID, c, limit)
+	if err != nil {
+		return nil, fmt.Errorf("error GetItemsByBusinessID: %w", err)
+	}
+
+	models, err := collectProducts(rows)
+	if err != nil {
+		return nil, fmt.Errorf("error GetItemsByBusinessID: %w", err)
+	}
+
+	return models, nil
+}
+
+// parseCursor - курсор страницы (product_id последнего товара). nil - первая страница.
+func parseCursor(cursor *string) (any, error) {
+	if cursor == nil || *cursor == "" {
+		return nil, nil
+	}
+
+	id, err := uuid.Parse(*cursor)
+	if err != nil {
+		return nil, ErrInvalidData
+	}
+
+	return id, nil
+}
+
+func collectProducts(rows pgx.Rows) ([]*domain.Product, error) {
+	t, err := pgx.CollectRows(rows, pgx.RowToStructByName[productModel])
+	if err != nil {
+		return nil, err
 	}
 
 	models := make([]*domain.Product, 0, len(t))
@@ -85,7 +134,7 @@ func (r *Repository) GetItemsByCursorPagination(ctx context.Context, cursor *str
 
 func (r *Repository) GetItemByID(ctx context.Context, id uuid.UUID) (*domain.Product, error) {
 	const query = `
-		SELECT c.product_id, c.title, c.description, c.price, c.image_key, c.created_at, c.updated_at,
+		SELECT c.product_id, c.business_id, c.title, c.description, c.price, c.image_key, c.created_at, c.updated_at,
 			fs.rating, fs.feedbacks_count
 		FROM catalog c` + feedbacksStats + `
 		WHERE c.product_id = $1
@@ -95,6 +144,7 @@ func (r *Repository) GetItemByID(ctx context.Context, id uuid.UUID) (*domain.Pro
 	conn := r.getter.DefaultTrOrDB(ctx, r.poolRO)
 	err := conn.QueryRow(ctx, query, id).Scan(
 		&m.ID,
+		&m.BusinessID,
 		&m.Title,
 		&m.Description,
 		&m.Price,
@@ -117,9 +167,9 @@ func (r *Repository) GetItemByID(ctx context.Context, id uuid.UUID) (*domain.Pro
 
 func (r *Repository) Insert(ctx context.Context, product *domain.Product) (*domain.Product, error) {
 	const query = `
-		INSERT INTO catalog (product_id, title, description, price)
-		VALUES ($1, $2, $3, $4) RETURNING
-		product_id, title, description, price, image_key, created_at, updated_at
+		INSERT INTO catalog (product_id, business_id, title, description, price)
+		VALUES ($1, $2, $3, $4, $5) RETURNING
+		product_id, business_id, title, description, price, image_key, created_at, updated_at
 	`
 
 	var (
@@ -136,11 +186,13 @@ func (r *Repository) Insert(ctx context.Context, product *domain.Product) (*doma
 		ctx,
 		query,
 		product.ID,
+		product.BusinessID,
 		product.Title,
 		desc,
 		product.Price,
 	).Scan(
 		&m.ID,
+		&m.BusinessID,
 		&m.Title,
 		&m.Description,
 		&m.Price,
@@ -164,9 +216,9 @@ func (r *Repository) UpdateImageKey(ctx context.Context, key string, productID u
 	const query = `
 		WITH c AS (
 			UPDATE catalog SET image_key = $1, updated_at = now() WHERE product_id = $2
-			RETURNING product_id, title, description, price, image_key, created_at, updated_at
+			RETURNING product_id, business_id, title, description, price, image_key, created_at, updated_at
 		)
-		SELECT c.product_id, c.title, c.description, c.price, c.image_key, c.created_at, c.updated_at,
+		SELECT c.product_id, c.business_id, c.title, c.description, c.price, c.image_key, c.created_at, c.updated_at,
 			fs.rating, fs.feedbacks_count
 		FROM c` + feedbacksStats
 
@@ -175,6 +227,7 @@ func (r *Repository) UpdateImageKey(ctx context.Context, key string, productID u
 	var m productModel
 	err := conn.QueryRow(ctx, query, key, productID).Scan(
 		&m.ID,
+		&m.BusinessID,
 		&m.Title,
 		&m.Description,
 		&m.Price,

@@ -12,6 +12,7 @@ from internal.config.config import settings
 from internal.domain.exceptions import ProfileAlreadyExistsError, ProfileNotFoundError
 from internal.domain.models import (
     BalanceDTO,
+    BusinessProductsPageDTO,
     LikeEvent,
     OrderDTO,
     Profile,
@@ -20,7 +21,7 @@ from internal.domain.models import (
 )
 from internal.ports.cache import ICache
 from internal.ports.repository import IProfileRepository
-from internal.ports.rpc_clients import IOrdersClient, IPaymentsClient
+from internal.ports.rpc_clients import ICatalogClient, IOrdersClient, IPaymentsClient
 from internal.ports.uow import IUnitOfWork
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ class ProfileService:
         uow: IUnitOfWork,
         orders_client: IOrdersClient,
         payments_client: IPaymentsClient,
+        catalog_client: ICatalogClient,
         event_producer: KafkaEventProducer | None = None,
         cache: ICache | None = None,
     ):
@@ -45,6 +47,7 @@ class ProfileService:
         self.uow = uow
         self.orders_client = orders_client
         self.payments_client = payments_client
+        self.catalog_client = catalog_client
         self.event_producer = event_producer
         self.cache = cache
 
@@ -200,6 +203,14 @@ class ProfileService:
 
     async def get_balance(self, user_id: uuid.UUID) -> BalanceDTO:
         return await self.payments_client.get_user_balance(user_id)
+
+    async def get_business_products(
+        self, user_id: uuid.UUID, cursor: str | None, limit: int
+    ) -> BusinessProductsPageDTO:
+        """
+        Товары, выложенные бизнесом в каталог: владелец товара - user_id бизнеса.
+        """
+        return await self.catalog_client.get_business_products(user_id, cursor, limit)
 
     async def create_business_profile(
         self, user_id: uuid.UUID, data: CreateBusinessProfileRequest

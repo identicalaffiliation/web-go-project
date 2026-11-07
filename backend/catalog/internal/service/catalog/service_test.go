@@ -62,15 +62,21 @@ func product() *domain.Product {
 
 func TestAddProductToCatalog(t *testing.T) {
 	ctx := context.Background()
+	businessID := uuid.NewV7()
 	req := func() *dto.CreateProductRequest {
-		return &dto.CreateProductRequest{Title: "title", Price: 100, Quantity: 5}
+		return &dto.CreateProductRequest{Title: "title", Price: 100, Quantity: 5, BusinessID: businessID.String()}
 	}
 
 	t.Run("ok - product and stock event in one tx", func(t *testing.T) {
 		s, d := newService(t)
 		created := product()
 
-		d.catalog.EXPECT().Insert(gomock.Any(), gomock.Any()).Return(created, nil)
+		d.catalog.EXPECT().Insert(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, p *domain.Product) (*domain.Product, error) {
+				require.Equal(t, businessID, p.BusinessID, "owner from request goes to catalog")
+				return created, nil
+			},
+		)
 		d.outbox.EXPECT().Insert(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(_ context.Context, e *domain.Event) error {
 				var p domain.Product
@@ -85,6 +91,17 @@ func TestAddProductToCatalog(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, created.ID, resp.Product.ProductID)
 		require.Nil(t, resp.Product.PresignedURL)
+	})
+
+	t.Run("invalid business id - invalid data, nothing written", func(t *testing.T) {
+		for _, id := range []string{"", "bad"} {
+			s, _ := newService(t)
+			r := req()
+			r.BusinessID = id
+
+			_, err := s.AddProductToCatalog(ctx, r)
+			require.ErrorIs(t, err, dto.ErrInvalidData)
+		}
 	})
 
 	t.Run("blank title - invalid data", func(t *testing.T) {
@@ -241,6 +258,91 @@ func TestGetItemsPage(t *testing.T) {
 		d.catalog.EXPECT().GetItemsByCursorPagination(ctx, (*string)(nil), int64(51)).Return(nil, errors.New("db down"))
 
 		_, err := s.GetItemsPage(ctx, nil, 50)
+		require.ErrorIs(t, err, ErrInternal)
+	})
+}
+
+func TestGetBusinessItems(t *testing.T) {
+	ctx := context.Background()
+	businessID := uuid.NewV7()
+
+	items := func(n int) []*domain.Product {
+		out := make([]*domain.Product, n)
+		for i := range out {
+			out[i] = product()
+			out[i].BusinessID = businessID
+		}
+		return out
+	}
+
+	t.Run("has more - next cursor", func(t *testing.T) {
+		s, d := newService(t)
+		list := items(3)
+		cursor := uuid.NewV7().String()
+
+		d.catalog.EXPECT().GetItemsByBusinessID(ctx, businessID, &cursor, int64(3)).Return(list, nil)
+		d.s3.EXPECT().FetchSignedURL(ctx, gomock.Any()).Return("http://url", nil).Times(2)
+
+		page, err := s.GetBusinessItems(ctx, businessID.String(), &cursor, 2)
+		require.NoError(t, err)
+		require.Len(t, page.Products, 2)
+		require.Equal(t, list[0].ID, page.Products[0].Product.ProductID)
+		require.Equal(t, "http://url", *page.Products[0].Product.PresignedURL)
+		require.Equal(t, list[1].ID.String(), *page.NextCursor)
+	})
+
+	t.Run("last page - no cursor", func(t *testing.T) {
+		s, d := newService(t)
+		d.catalog.EXPECT().GetItemsByBusinessID(ctx, businessID, (*string)(nil), int64(3)).Return(items(1), nil)
+		d.s3.EXPECT().FetchSignedURL(ctx, gomock.Any()).Return("", nil)
+
+		page, err := s.GetBusinessItems(ctx, businessID.String(), nil, 2)
+		require.NoError(t, err)
+		require.Len(t, page.Products, 1)
+		require.Nil(t, page.Products[0].Product.PresignedURL)
+		require.Nil(t, page.NextCursor)
+	})
+
+	t.Run("no products - empty page", func(t *testing.T) {
+		s, d := newService(t)
+		d.catalog.EXPECT().GetItemsByBusinessID(ctx, businessID, (*string)(nil), int64(51)).Return(nil, nil)
+
+		page, err := s.GetBusinessItems(ctx, businessID.String(), nil, 50)
+		require.NoError(t, err)
+		require.Empty(t, page.Products)
+		require.Nil(t, page.NextCursor)
+	})
+
+	t.Run("limit out of range - default 50", func(t *testing.T) {
+		for _, limit := range []int64{0, 1000} {
+			s, d := newService(t)
+			d.catalog.EXPECT().GetItemsByBusinessID(ctx, businessID, (*string)(nil), int64(51)).Return(nil, nil)
+
+			_, err := s.GetBusinessItems(ctx, businessID.String(), nil, limit)
+			require.NoError(t, err)
+		}
+	})
+
+	t.Run("invalid business id", func(t *testing.T) {
+		s, _ := newService(t)
+		_, err := s.GetBusinessItems(ctx, "bad", nil, 50)
+		require.ErrorIs(t, err, dto.ErrInvalidData)
+	})
+
+	t.Run("invalid cursor - invalid data", func(t *testing.T) {
+		s, d := newService(t)
+		cursor := "bad"
+		d.catalog.EXPECT().GetItemsByBusinessID(ctx, businessID, &cursor, int64(51)).Return(nil, catalogRepo.ErrInvalidData)
+
+		_, err := s.GetBusinessItems(ctx, businessID.String(), &cursor, 50)
+		require.ErrorIs(t, err, dto.ErrInvalidData)
+	})
+
+	t.Run("repo error - internal", func(t *testing.T) {
+		s, d := newService(t)
+		d.catalog.EXPECT().GetItemsByBusinessID(ctx, businessID, (*string)(nil), int64(51)).Return(nil, errors.New("db down"))
+
+		_, err := s.GetBusinessItems(ctx, businessID.String(), nil, 50)
 		require.ErrorIs(t, err, ErrInternal)
 	})
 }

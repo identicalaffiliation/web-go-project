@@ -32,6 +32,7 @@ Temporal, gRPC, Nginx, Docker Compose, k6.
    (Go, REST)     (Go, REST+gRPC)  (Python, REST)  (Go, REST+gRPC)
         │                │              │   gRPC       │  gRPC: цена товара
         │                │              ├────────────▶ orders.GetUserOrders
+        │                │              ├────────────▶ catalog.GetBusinessProducts
         │                │              └────────────▶ payments.GetBalanceByUser
         │                │                             │
         │                │                             ▼ Temporal: OrderSaga
@@ -61,8 +62,8 @@ Temporal, gRPC, Nginx, Docker Compose, k6.
 | Сервис      | Язык   | Интерфейсы                       | БД                  | Что делает |
 |-------------|--------|----------------------------------|---------------------|------------|
 | `auth`      | Go     | REST `:8080`                     | `auth-db`           | Регистрация, логин, JWT (RS256), refresh-токены с ротацией, валидация токена для gateway. Публикует `users.created`, слушает `profiles.business.created` и выдаёт роль `business`. |
-| `profile`   | Python | REST `:8000`                     | `profile-db`        | Профили пользователя (customer / business). Создаёт профиль по `users.created`, публикует `profiles.business.created`. Агрегирует заказы и баланс через gRPC. |
-| `catalog`   | Go     | REST `:8080`, gRPC `:50051`      | `catalog-db` + реплика, Redis, MinIO | Товары: создание, страница с курсором, карточка, загрузка картинки (pre-signed URL в MinIO). Кэш в Redis. Отдаёт цену по gRPC. Публикует `stock.created`. |
+| `profile`   | Python | REST `:8000`                     | `profile-db`        | Профили пользователя (customer / business). Создаёт профиль по `users.created`, публикует `profiles.business.created`. Агрегирует заказы, баланс и товары бизнеса через gRPC. |
+| `catalog`   | Go     | REST `:8080`, gRPC `:50051` (цена), `:50052` (отзывы), `:50053` (товары бизнеса) | `catalog-db` + реплика, Redis, MinIO | Товары: создание (владелец — `business_id`), страница с курсором, карточка, загрузка картинки (pre-signed URL в MinIO). Кэш в Redis. Отдаёт по gRPC цену и товары бизнеса. Публикует `stock.created`. |
 | `inventory` | Go     | Kafka consumer, Temporal worker  | `inventory-db`      | Остатки товаров. Заводит сток по `stock.created`; активити `ReserveStock` / `ReleaseStock`. |
 | `orders`    | Go     | REST `:8080`, gRPC `:50052`, Temporal worker | `orders-db` + реплика | Создание заказа (с ключом идемпотентности), запуск и ведение саги, история заказов по gRPC. |
 | `payments`  | Go     | gRPC `:50052`, Kafka consumer, Temporal worker | `payments-db` + реплика | Счета пользователей. Заводит счёт со стартовым балансом по `users.created`; активити `Charge` / `Refund`; баланс по gRPC. |
@@ -84,6 +85,7 @@ Temporal, gRPC, Nginx, Docker Compose, k6.
 | Сервис                                 | Метод                  | Кто вызывает |
 |----------------------------------------|------------------------|--------------|
 | `catalog.price.v1.PriceService`        | `GetPriceByProductId`  | orders |
+| `catalog.products.v1.ProductsService`  | `GetBusinessProducts`  | profile |
 | `orders.orders.v1.OrdersService`       | `GetUserOrders`        | profile |
 | `payments.balance.v1.PaymentsService`  | `GetBalanceByUser`     | profile |
 
@@ -103,9 +105,11 @@ Temporal, gRPC, Nginx, Docker Compose, k6.
 
 ### Выставить товар
 
-1. `POST /api/v1/catalog` (роль `business`) — catalog сохраняет товар и событие в outbox.
+1. `POST /api/v1/catalog` (роль `business`) — catalog сохраняет товар с владельцем
+   (`business_id` = `X-User-Id` бизнеса) и событие в outbox.
 2. Outbox-воркер публикует `stock.created`, inventory заводит остаток.
 3. `POST /api/v1/catalog/{productId}/image?format=png` — получить pre-signed URL и загрузить картинку в MinIO.
+4. `GET /api/v1/profiles/business/products` (роль `business`) — свои выложенные товары (profile берёт их из catalog по gRPC).
 
 ### Оформить заказ (сага)
 
@@ -216,6 +220,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost/api/v1/profiles/balance
 | POST  | `/business`         | авторизованный | Создать бизнес-профиль, `409` если уже есть |
 | GET   | `/orders`           | авторизованный | Заказы пользователя (через gRPC orders), `502` если orders недоступен |
 | GET   | `/balance`          | авторизованный | Баланс (через gRPC payments), `502` если payments недоступен |
+| GET   | `/business/products` | business       | Свои выложенные товары (через gRPC catalog): `limit` 1–100 (по умолчанию 50), `cursor` из `next_cursor`. `403` для других ролей, `502` если catalog недоступен |
 
 ### Orders — `/api/v1/orders`
 

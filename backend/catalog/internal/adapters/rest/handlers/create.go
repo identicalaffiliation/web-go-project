@@ -12,7 +12,7 @@ import (
 
 // AddItemToCatalog godoc
 // @Summary      Add item to catalog
-// @Description  Creates a new product and returns it. Requires Bearer token.
+// @Description  Creates a new product and returns it. Available for business only. Requires Bearer token. X-User-Id (product owner) is set by the gateway from the JWT.
 // @Tags         catalog
 // @Accept       json
 // @Produce      json
@@ -30,6 +30,8 @@ func AddItemToCatalog(app ports.AddToCatalogCase) echo.HandlerFunc {
 		if err := ctx.Bind(&req); err != nil {
 			return echo.ErrBadRequest
 		}
+
+		req.BusinessID = ctx.Request().Header.Get(userIDHeader)
 
 		if err := req.ValidateJSON(); err != nil {
 			return echo.ErrBadRequest

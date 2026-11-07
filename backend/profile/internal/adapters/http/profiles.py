@@ -2,11 +2,16 @@ import logging
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from internal.adapters.http.dependencies import get_current_user_id, get_profile_service
+from internal.adapters.http.dependencies import (
+    get_current_user_id,
+    get_profile_service,
+    require_roles,
+)
 from internal.adapters.http.schemas import (
     BalanceResponse,
+    BusinessProductsPageResponse,
     CreateBusinessProfileRequest,
     OrderResponse,
     ProfileResponse,
@@ -15,6 +20,7 @@ from internal.adapters.http.schemas import (
 )
 from internal.app.service import ProfileService
 from internal.domain.exceptions import ProfileAlreadyExistsError, ProfileNotFoundError
+from internal.domain.models import UserRole
 
 router = APIRouter(prefix="/profiles", tags=["Profiles"])
 
@@ -85,6 +91,35 @@ async def get_my_balance(user_id: UserIdDep, profile_service: ProfileServiceDep)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Payments service unavailable",
+        ) from None
+
+
+@router.get(
+    "/business/products",
+    response_model=BusinessProductsPageResponse,
+    dependencies=[Depends(require_roles(UserRole.BUSINESS))],
+    summary="Товары бизнеса",
+    description=(
+        "Товары, выложенные текущим пользователем в каталог, новые первыми. "
+        "Только для роли business. "
+        "Следующая страница - по next_cursor из предыдущего ответа."
+    ),
+)
+async def get_my_business_products(
+    user_id: UserIdDep,
+    profile_service: ProfileServiceDep,
+    cursor: uuid.UUID | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+):
+    try:
+        return await profile_service.get_business_products(
+            user_id, str(cursor) if cursor else None, limit
+        )
+    except RuntimeError:
+        logger.exception("Catalog service unavailable")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Catalog service unavailable",
         ) from None
 
 

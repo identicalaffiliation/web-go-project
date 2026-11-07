@@ -57,6 +57,21 @@ func (mr *MockCatalogRepositoryMockRecorder) GetItemByID(ctx, id any) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetItemByID", reflect.TypeOf((*MockCatalogRepository)(nil).GetItemByID), ctx, id)
 }
 
+// GetItemsByBusinessID mocks base method.
+func (m *MockCatalogRepository) GetItemsByBusinessID(ctx context.Context, businessID uuid.UUID, cursor *string, limit int64) ([]*domain.Product, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetItemsByBusinessID", ctx, businessID, cursor, limit)
+	ret0, _ := ret[0].([]*domain.Product)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetItemsByBusinessID indicates an expected call of GetItemsByBusinessID.
+func (mr *MockCatalogRepositoryMockRecorder) GetItemsByBusinessID(ctx, businessID, cursor, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetItemsByBusinessID", reflect.TypeOf((*MockCatalogRepository)(nil).GetItemsByBusinessID), ctx, businessID, cursor, limit)
+}
+
 // GetItemsByCursorPagination mocks base method.
 func (m *MockCatalogRepository) GetItemsByCursorPagination(ctx context.Context, cursor *string, limit int64) ([]*domain.Product, error) {
 	m.ctrl.T.Helper()

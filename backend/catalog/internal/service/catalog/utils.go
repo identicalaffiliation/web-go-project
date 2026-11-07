@@ -107,6 +107,27 @@ func (s *Service) toResponseOne(product *domain.Product, url string) *dto.Produc
 	}
 }
 
+// toPage - страница из limit+1 выбранных товаров: лишний товар значит, что есть следующая страница.
+func (s *Service) toPage(ctx context.Context, items []*domain.Product, limit int64) *dto.Page {
+	hasMore := int64(len(items)) > limit
+	if hasMore {
+		items = items[:limit]
+	}
+
+	var nextCursor *string
+	if hasMore && len(items) > 0 {
+		c := items[len(items)-1].ID.String()
+		nextCursor = &c
+	}
+
+	urls := make([]string, len(items))
+	for i, item := range items {
+		urls[i] = s.fetchImageURL(ctx, item)
+	}
+
+	return s.getPage(items, urls, nextCursor)
+}
+
 func (s *Service) getPage(products []*domain.Product, urls []string, nextCursor *string) *dto.Page {
 	m := make([]dto.ProductResponse, 0, len(products))
 	for i, v := range products {

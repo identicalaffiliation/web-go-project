@@ -6,6 +6,7 @@ import grpc
 import pytest
 from google.protobuf.timestamp_pb2 import Timestamp
 
+from internal.adapters.grpc.generated.v1.catalog import products_pb2
 from internal.adapters.grpc.generated.v1.orders import orders_pb2
 from internal.adapters.grpc.generated.v1.payments import payments_pb2
 from internal.adapters.rpc.circuit_breaker import (
@@ -14,6 +15,7 @@ from internal.adapters.rpc.circuit_breaker import (
     CircuitBreakerState,
 )
 from internal.adapters.rpc.grpc_clients import (
+    GrpcCatalogClient,
     GrpcOrdersClient,
     GrpcPaymentsClient,
     create_balanced_channel,
@@ -224,3 +226,80 @@ async def test_grpc_payments_client_circuit_breaker_blocks_requests():
             await client.get_user_balance(uuid.uuid4())
 
         assert stub_mock.GetBalanceByUser.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_grpc_catalog_client_success():
+    with patch(
+        "internal.adapters.rpc.grpc_clients.products_pb2_grpc.ProductsServiceStub"
+    ) as StubMock:
+        stub = StubMock.return_value
+        stub.GetBusinessProducts = AsyncMock()
+
+        ts = Timestamp()
+        ts.GetCurrentTime()
+        stub.GetBusinessProducts.return_value = (
+            products_pb2.GetBusinessProductsResponse(
+                products=[
+                    products_pb2.Product(
+                        product_id="prod-1",
+                        title="Чайник",
+                        description="Электрический",
+                        price=1500,
+                        image_url="http://minio/image.png",
+                        rating=4.5,
+                        feedbacks_count=2,
+                        created_at=ts,
+                        updated_at=ts,
+                    ),
+                    products_pb2.Product(
+                        product_id="prod-2", title="Без картинки", price=10
+                    ),
+                ],
+                next_cursor="prod-2",
+            )
+        )
+
+        business_id = uuid.uuid4()
+        client = GrpcCatalogClient(channel=AsyncMock())
+        page = await client.get_business_products(business_id, "cursor-1", 10)
+
+        request = stub.GetBusinessProducts.call_args[0][0]
+        assert request.business_id == str(business_id)
+        assert request.cursor == "cursor-1"
+        assert request.limit == 10
+
+        assert page.next_cursor == "prod-2"
+        assert len(page.products) == 2
+
+        full = page.products[0]
+        assert full.product_id == "prod-1"
+        assert full.description == "Электрический"
+        assert full.image_url == "http://minio/image.png"
+        assert full.rating == 4.5
+        assert full.feedbacks_count == 2
+        assert full.created_at is not None
+
+        bare = page.products[1]
+        assert bare.description is None
+        assert bare.image_url is None
+
+
+@pytest.mark.asyncio
+async def test_grpc_catalog_client_first_and_last_page():
+    """Без курсора поле cursor не выставляется; нет next_cursor - None."""
+    with patch(
+        "internal.adapters.rpc.grpc_clients.products_pb2_grpc.ProductsServiceStub"
+    ) as StubMock:
+        stub = StubMock.return_value
+        stub.GetBusinessProducts = AsyncMock(
+            return_value=products_pb2.GetBusinessProductsResponse()
+        )
+
+        client = GrpcCatalogClient(channel=AsyncMock())
+        page = await client.get_business_products(uuid.uuid4(), None, 50)
+
+        request = stub.GetBusinessProducts.call_args[0][0]
+        assert not request.HasField("cursor")
+        assert page.products == []
+        assert page.next_cursor is None

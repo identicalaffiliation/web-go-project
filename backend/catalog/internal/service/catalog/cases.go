@@ -17,10 +17,13 @@ func (s *Service) AddProductToCatalog(ctx context.Context, req *dto.CreateProduc
 		return nil, err
 	}
 
-	var created *domain.Product
-	err := s.manager.Do(ctx, func(ctx context.Context) error {
-		domainProduct := req.ToDomain()
+	domainProduct, err := req.ToDomain()
+	if err != nil {
+		return nil, err
+	}
 
+	var created *domain.Product
+	err = s.manager.Do(ctx, func(ctx context.Context) error {
 		product, err := s.catalog.Insert(ctx, domainProduct)
 		if err != nil {
 			return err
@@ -63,23 +66,34 @@ func (s *Service) GetItemsPage(ctx context.Context, cursor *string, limit int64)
 		return nil, ErrInternal
 	}
 
-	hasMore := int64(len(items)) > limit
-	if hasMore {
-		items = items[:limit]
+	return s.toPage(ctx, items, limit), nil
+}
+
+// GetBusinessItems - товары, выложенные бизнесом (businessID - его user_id), страница с курсором.
+func (s *Service) GetBusinessItems(ctx context.Context, businessID string, cursor *string, limit int64) (*dto.Page, error) {
+	id, err := uuid.Parse(businessID)
+	if err != nil {
+		return nil, dto.ErrInvalidData
 	}
 
-	var nextCursor *string
-	if hasMore && len(items) > 0 {
-		c := items[len(items)-1].ID.String()
-		nextCursor = &c
+	if limit < 1 || limit > 100 {
+		limit = 50
 	}
 
-	urls := make([]string, len(items))
-	for i, item := range items {
-		urls[i] = s.fetchImageURL(ctx, item)
+	items, err := s.catalog.GetItemsByBusinessID(ctx, id, cursor, limit+1)
+	if err != nil {
+		if errors.Is(err, catalog.ErrInvalidData) {
+			return nil, dto.ErrInvalidData
+		}
+
+		s.logger.WithError(err).Error(
+			"failed to get business items",
+			zap.String("business id", id.String()),
+		)
+		return nil, ErrInternal
 	}
 
-	return s.getPage(items, urls, nextCursor), nil
+	return s.toPage(ctx, items, limit), nil
 }
 
 func (s *Service) GetItem(ctx context.Context, id string) (*dto.ProductResponse, error) {

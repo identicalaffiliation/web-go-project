@@ -26,6 +26,7 @@ class Settings(BaseSettings):
 
     ORDERS_GRPC_HOST: str = "localhost:50051"
     PAYMENTS_GRPC_HOST: str = "localhost:50052"
+    CATALOG_GRPC_HOST: str = "localhost:50053"
 
     REDIS_URL: str = "redis://localhost:6379/0"
     CACHE_TTL_PROFILES_SEC: int = 300
