@@ -46,3 +46,11 @@ class ProfileModel(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "profile_type", name="uq_user_profile_type"),
     )
+
+
+class ProductLikeModel(Base):
+    __tablename__ = "product_likes"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())

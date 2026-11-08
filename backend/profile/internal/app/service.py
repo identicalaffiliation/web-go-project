@@ -13,9 +13,11 @@ from internal.domain.exceptions import ProfileAlreadyExistsError, ProfileNotFoun
 from internal.domain.models import (
     BalanceDTO,
     BusinessProductsPageDTO,
+    LikeEvent,
     OrderDTO,
     Profile,
     ProfileType,
+    WishlistItemDTO,
 )
 from internal.ports.cache import ICache
 from internal.ports.repository import IProfileRepository
@@ -268,3 +270,48 @@ class ProfileService:
                 )
 
         return created_profile
+
+    async def process_like_event(self, event_data: dict[str, Any]) -> None:
+        """
+        Обрабатывает событие лайка товара из Kafka (топик like.events).
+        """
+        try:
+            event = LikeEvent(**event_data)
+        except Exception:
+            logger.exception("Invalid like event received from Kafka: %s", event_data)
+            return
+
+        try:
+            if event.action == "add":
+                await self.repo.add_like(
+                    user_id=event.user_id, product_id=event.product_id
+                )
+            elif event.action == "remove":
+                await self.repo.remove_like(
+                    user_id=event.user_id, product_id=event.product_id
+                )
+            else:
+                logger.warning(
+                    "Unknown like action '%s' in event: %s", event.action, event_data
+                )
+                return
+
+            await self.uow.commit()
+            logger.info(
+                "Successfully processed like event: action=%s user_id=%s product_id=%s",
+                event.action,
+                event.user_id,
+                event.product_id,
+            )
+        except Exception:
+            await self.uow.rollback()
+            logger.exception(
+                "Failed to process like event for user %s and product %s",
+                event.user_id,
+                event.product_id,
+            )
+            raise
+
+    async def get_my_likes(self, user_id: uuid.UUID) -> list[WishlistItemDTO]:
+        """Возвращает список сохраненных товаров текущего пользователя."""
+        return await self.repo.get_likes_by_user_id(user_id)

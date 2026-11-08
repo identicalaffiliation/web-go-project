@@ -2,6 +2,10 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from typing import Literal
+from uuid import UUID
+
+from pydantic import BaseModel
 
 
 class ProfileType(str, Enum):
@@ -69,3 +73,9 @@ class BusinessProductsPageDTO:
 class WishlistItemDTO:
     product_id: str
     added_at: datetime
+
+
+class LikeEvent(BaseModel):
+    user_id: UUID
+    product_id: UUID
+    action: Literal["add", "remove"]

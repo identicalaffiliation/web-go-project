@@ -16,6 +16,7 @@ from internal.adapters.http.schemas import (
     OrderResponse,
     ProfileResponse,
     ProfileUpdateRequest,
+    WishlistItemResponse,
 )
 from internal.app.service import ProfileService
 from internal.domain.exceptions import ProfileAlreadyExistsError, ProfileNotFoundError
@@ -154,3 +155,11 @@ async def create_business_profile_endpoint(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal Server Error",
         ) from None
+
+
+@router.get(
+    "/likes", response_model=list[WishlistItemResponse], summary="Получить избранное"
+)
+async def get_my_likes(user_id: UserIdDep, profile_service: ProfileServiceDep):
+    """Возвращает список товаров, лайкнутых пользователем."""
+    return await profile_service.get_my_likes(user_id)
