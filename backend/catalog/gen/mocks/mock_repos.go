@@ -42,6 +42,20 @@ func (m *MockCatalogRepository) EXPECT() *MockCatalogRepositoryMockRecorder {
 	return m.recorder
 }
 
+// DeleteProduct mocks base method.
+func (m *MockCatalogRepository) DeleteProduct(ctx context.Context, productID, businessID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteProduct", ctx, productID, businessID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteProduct indicates an expected call of DeleteProduct.
+func (mr *MockCatalogRepositoryMockRecorder) DeleteProduct(ctx, productID, businessID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteProduct", reflect.TypeOf((*MockCatalogRepository)(nil).DeleteProduct), ctx, productID, businessID)
+}
+
 // GetItemByID mocks base method.
 func (m *MockCatalogRepository) GetItemByID(ctx context.Context, id uuid.UUID) (*domain.Product, error) {
 	m.ctrl.T.Helper()
@@ -103,18 +117,33 @@ func (mr *MockCatalogRepositoryMockRecorder) Insert(ctx, product any) *gomock.Ca
 }
 
 // UpdateImageKey mocks base method.
-func (m *MockCatalogRepository) UpdateImageKey(ctx context.Context, key string, productID uuid.UUID) (*domain.Product, error) {
+func (m *MockCatalogRepository) UpdateImageKey(ctx context.Context, key string, productID, businessID uuid.UUID) (*domain.Product, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateImageKey", ctx, key, productID)
+	ret := m.ctrl.Call(m, "UpdateImageKey", ctx, key, productID, businessID)
 	ret0, _ := ret[0].(*domain.Product)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // UpdateImageKey indicates an expected call of UpdateImageKey.
-func (mr *MockCatalogRepositoryMockRecorder) UpdateImageKey(ctx, key, productID any) *gomock.Call {
+func (mr *MockCatalogRepositoryMockRecorder) UpdateImageKey(ctx, key, productID, businessID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateImageKey", reflect.TypeOf((*MockCatalogRepository)(nil).UpdateImageKey), ctx, key, productID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateImageKey", reflect.TypeOf((*MockCatalogRepository)(nil).UpdateImageKey), ctx, key, productID, businessID)
+}
+
+// UpdateProduct mocks base method.
+func (m *MockCatalogRepository) UpdateProduct(ctx context.Context, patch *domain.ProductPatch) (*domain.Product, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateProduct", ctx, patch)
+	ret0, _ := ret[0].(*domain.Product)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateProduct indicates an expected call of UpdateProduct.
+func (mr *MockCatalogRepositoryMockRecorder) UpdateProduct(ctx, patch any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProduct", reflect.TypeOf((*MockCatalogRepository)(nil).UpdateProduct), ctx, patch)
 }
 
 // MockOutboxRepository is a mock of OutboxRepository interface.

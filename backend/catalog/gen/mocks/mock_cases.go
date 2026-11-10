@@ -198,18 +198,95 @@ func (m *MockUploadImageCase) EXPECT() *MockUploadImageCaseMockRecorder {
 }
 
 // UploadImage mocks base method.
-func (m *MockUploadImageCase) UploadImage(ctx context.Context, id string, format dto.ImageFormat) (*dto.ProductResponse, error) {
+func (m *MockUploadImageCase) UploadImage(ctx context.Context, businessID, id string, format dto.ImageFormat) (*dto.ProductResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UploadImage", ctx, id, format)
+	ret := m.ctrl.Call(m, "UploadImage", ctx, businessID, id, format)
 	ret0, _ := ret[0].(*dto.ProductResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // UploadImage indicates an expected call of UploadImage.
-func (mr *MockUploadImageCaseMockRecorder) UploadImage(ctx, id, format any) *gomock.Call {
+func (mr *MockUploadImageCaseMockRecorder) UploadImage(ctx, businessID, id, format any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadImage", reflect.TypeOf((*MockUploadImageCase)(nil).UploadImage), ctx, id, format)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadImage", reflect.TypeOf((*MockUploadImageCase)(nil).UploadImage), ctx, businessID, id, format)
+}
+
+// MockUpdateItemCase is a mock of UpdateItemCase interface.
+type MockUpdateItemCase struct {
+	ctrl     *gomock.Controller
+	recorder *MockUpdateItemCaseMockRecorder
+	isgomock struct{}
+}
+
+// MockUpdateItemCaseMockRecorder is the mock recorder for MockUpdateItemCase.
+type MockUpdateItemCaseMockRecorder struct {
+	mock *MockUpdateItemCase
+}
+
+// NewMockUpdateItemCase creates a new mock instance.
+func NewMockUpdateItemCase(ctrl *gomock.Controller) *MockUpdateItemCase {
+	mock := &MockUpdateItemCase{ctrl: ctrl}
+	mock.recorder = &MockUpdateItemCaseMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockUpdateItemCase) EXPECT() *MockUpdateItemCaseMockRecorder {
+	return m.recorder
+}
+
+// UpdateProduct mocks base method.
+func (m *MockUpdateItemCase) UpdateProduct(ctx context.Context, req *dto.UpdateProductRequest) (*dto.ProductResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateProduct", ctx, req)
+	ret0, _ := ret[0].(*dto.ProductResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateProduct indicates an expected call of UpdateProduct.
+func (mr *MockUpdateItemCaseMockRecorder) UpdateProduct(ctx, req any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProduct", reflect.TypeOf((*MockUpdateItemCase)(nil).UpdateProduct), ctx, req)
+}
+
+// MockDeleteItemCase is a mock of DeleteItemCase interface.
+type MockDeleteItemCase struct {
+	ctrl     *gomock.Controller
+	recorder *MockDeleteItemCaseMockRecorder
+	isgomock struct{}
+}
+
+// MockDeleteItemCaseMockRecorder is the mock recorder for MockDeleteItemCase.
+type MockDeleteItemCaseMockRecorder struct {
+	mock *MockDeleteItemCase
+}
+
+// NewMockDeleteItemCase creates a new mock instance.
+func NewMockDeleteItemCase(ctrl *gomock.Controller) *MockDeleteItemCase {
+	mock := &MockDeleteItemCase{ctrl: ctrl}
+	mock.recorder = &MockDeleteItemCaseMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockDeleteItemCase) EXPECT() *MockDeleteItemCaseMockRecorder {
+	return m.recorder
+}
+
+// DeleteProduct mocks base method.
+func (m *MockDeleteItemCase) DeleteProduct(ctx context.Context, businessID, productID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteProduct", ctx, businessID, productID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteProduct indicates an expected call of DeleteProduct.
+func (mr *MockDeleteItemCaseMockRecorder) DeleteProduct(ctx, businessID, productID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteProduct", reflect.TypeOf((*MockDeleteItemCase)(nil).DeleteProduct), ctx, businessID, productID)
 }
 
 // MockLikeItem is a mock of LikeItem interface.

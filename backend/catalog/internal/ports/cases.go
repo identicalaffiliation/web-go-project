@@ -28,7 +28,17 @@ type GetBusinessItemsCase interface {
 
 //go:generate mockgen -source=$GOFILE -destination=../../gen/mocks/mock_$GOFILE -package=mocks
 type UploadImageCase interface {
-	UploadImage(ctx context.Context, id string, format dto.ImageFormat) (*dto.ProductResponse, error)
+	UploadImage(ctx context.Context, businessID, id string, format dto.ImageFormat) (*dto.ProductResponse, error)
+}
+
+//go:generate mockgen -source=$GOFILE -destination=../../gen/mocks/mock_$GOFILE -package=mocks
+type UpdateItemCase interface {
+	UpdateProduct(ctx context.Context, req *dto.UpdateProductRequest) (*dto.ProductResponse, error)
+}
+
+//go:generate mockgen -source=$GOFILE -destination=../../gen/mocks/mock_$GOFILE -package=mocks
+type DeleteItemCase interface {
+	DeleteProduct(ctx context.Context, businessID, productID string) error
 }
 
 //go:generate mockgen -source=$GOFILE -destination=../../gen/mocks/mock_$GOFILE -package=mocks

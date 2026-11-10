@@ -6,6 +6,7 @@ import (
 	"testing"
 	"uuid"
 
+	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/feedbacks"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/domain"
 	"github.com/stretchr/testify/suite"
 )
@@ -100,7 +101,27 @@ func (s *DatabaseSuite) Test_CatalogRepository_FeedbacksStats() {
 	s.Require().NoError(err)
 	s.Require().Len(page, 7)
 
-	updated, err := s.catalog.UpdateImageKey(s.ctx, "new_key", withFeedbacks)
+	// у товаров фикстуры нет владельца, картинку меняет только он
+	businessID := uuid.NewV7()
+	_, err = s.pool.Exec(s.ctx, `UPDATE catalog SET business_id = $1 WHERE product_id = $2`, businessID, withFeedbacks)
+	s.Require().NoError(err)
+
+	updated, err := s.catalog.UpdateImageKey(s.ctx, "new_key", withFeedbacks, businessID)
 	s.Require().NoError(err)
 	s.Require().Equal(int64(3), updated.FeedbacksCount)
+}
+
+func (s *DatabaseSuite) Test_FeedbacksRepository_CreateFeedback_ProductMissingOrDeleted() {
+	businessID, productID := uuid.NewV7(), uuid.NewV7()
+	_, err := s.catalog.Insert(s.ctx, &domain.Product{ID: productID, BusinessID: businessID, Title: "t", Price: 100})
+	s.Require().NoError(err)
+	s.Require().NoError(s.catalog.DeleteProduct(s.ctx, productID, businessID))
+
+	for name, id := range map[string]uuid.UUID{"deleted": productID, "unknown": uuid.NewV7()} {
+		s.T().Run(name, func(t *testing.T) {
+			f, err := s.feedback.CreateFeedback(s.ctx, &domain.Feedback{ID: uuid.NewV7(), ProductID: id, UserID: uuid.NewV7(), Score: 3})
+			s.Require().ErrorIs(err, feedbacks.ErrNotFound)
+			s.Require().Nil(f)
+		})
+	}
 }

@@ -134,3 +134,45 @@ func TestCreateProductRequest_ValidateData(t *testing.T) {
 		require.ErrorIs(t, err, ErrInvalidData)
 	})
 }
+
+func TestUpdateProductRequest_ValidateJSON(t *testing.T) {
+	t.Run("valid - only passed fields", func(t *testing.T) {
+		require.NoError(t, (&UpdateProductRequest{Price: new(int64(1))}).ValidateJSON())
+		require.NoError(t, (&UpdateProductRequest{Title: new("t")}).ValidateJSON())
+		require.NoError(t, (&UpdateProductRequest{}).ValidateJSON(), "empty patch is checked by ValidateData")
+	})
+
+	t.Run("invalid", func(t *testing.T) {
+		cases := map[string]*UpdateProductRequest{
+			"zero price":     {Price: new(int64(0))},
+			"negative price": {Price: new(int64(-1))},
+			"empty title":    {Title: new("")},
+		}
+
+		for name, req := range cases {
+			t.Run(name, func(t *testing.T) {
+				require.ErrorIs(t, req.ValidateJSON(), ErrInvalidJSON)
+			})
+		}
+	})
+}
+
+func TestUpdateProductRequest_ValidateData(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		require.NoError(t, (&UpdateProductRequest{Description: new("d")}).ValidateData())
+	})
+
+	t.Run("invalid", func(t *testing.T) {
+		cases := map[string]*UpdateProductRequest{
+			"nothing to change": {},
+			"blank title":       {Title: new("  ")},
+			"blank description": {Price: new(int64(10)), Description: new(" ")},
+		}
+
+		for name, req := range cases {
+			t.Run(name, func(t *testing.T) {
+				require.ErrorIs(t, req.ValidateData(), ErrInvalidData)
+			})
+		}
+	})
+}

@@ -28,6 +28,7 @@ type S3Client interface {
 type Cache interface {
 	Set(ctx context.Context, key string, value any) error
 	Get(ctx context.Context, key string) (*domain.Product, error)
+	Delete(ctx context.Context, key string) error
 }
 
 type Producer interface {

@@ -233,6 +233,106 @@ const docTemplate = `{
                         "description": "Internal Server Error"
                     }
                 }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Removes the product from the catalog: it disappears from the list, the card and prices for orders. Available for the business that owns the product. Requires Bearer token. X-User-Id (product owner) is set by the gateway from the JWT.",
+                "tags": [
+                    "catalog"
+                ],
+                "summary": "Delete own product",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product ID",
+                        "name": "productId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Invalid product id"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "description": "Product not found, already deleted or owned by another business"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Changes title, description and/or price of the product (only passed fields, at least one). Available for the business that owns the product. Requires Bearer token. X-User-Id (product owner) is set by the gateway from the JWT.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "catalog"
+                ],
+                "summary": "Update own product",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product ID",
+                        "name": "productId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to change",
+                        "name": "item",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.UpdateProductRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.ProductResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid id or payload, no fields to change"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "description": "Product not found, deleted or owned by another business"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
             }
         },
         "/catalog/{productId}/feedbacks": {
@@ -300,7 +400,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Generates a pre-signed URL (or uploads an image) for the product. Requires Bearer token.",
+                "description": "Generates a pre-signed URL (or uploads an image) for the product. Available for the business that owns the product. Requires Bearer token. X-User-Id (product owner) is set by the gateway from the JWT.",
                 "consumes": [
                     "application/json"
                 ],
@@ -315,7 +415,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Product ID",
-                        "name": "id",
+                        "name": "productId",
                         "in": "path",
                         "required": true
                     },
@@ -347,7 +447,7 @@ const docTemplate = `{
                         "description": "Forbidden"
                     },
                     "404": {
-                        "description": "Not Found"
+                        "description": "Product not found, deleted or owned by another business"
                     },
                     "500": {
                         "description": "Internal Server Error"
@@ -517,6 +617,21 @@ const docTemplate = `{
             "properties": {
                 "product": {
                     "$ref": "#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.Product"
+                }
+            }
+        },
+        "github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.UpdateProductRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string",
+                    "minLength": 1
                 }
             }
         }

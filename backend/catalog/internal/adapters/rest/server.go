@@ -42,6 +42,12 @@ func SetupServer(cfg *config.HTTPConfig, c *catalog.Service, f FeedbackCases) *e
 			middlewares.Business,
 		),
 	)
+	internal.PATCH("/:productId", handlers.UpdateItem(c),
+		middlewares.RoleMiddleware(middlewares.Business),
+	)
+	internal.DELETE("/:productId", handlers.DeleteItem(c),
+		middlewares.RoleMiddleware(middlewares.Business),
+	)
 	internal.GET("", handlers.GetItemsPage(c))
 	internal.POST("/:productId/image", handlers.UploadImage(c),
 		middlewares.RoleMiddleware(middlewares.Business),

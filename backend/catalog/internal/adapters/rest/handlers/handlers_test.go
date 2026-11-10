@@ -174,7 +174,7 @@ func TestGetItemsPage(t *testing.T) {
 
 func TestUploadImage(t *testing.T) {
 	const route = "/catalog/:productId/image"
-	id := uuid.NewV7()
+	id, businessID := uuid.NewV7(), uuid.NewV7()
 	target := "/catalog/" + id.String() + "/image?format=png"
 
 	cases := []struct {
@@ -184,7 +184,7 @@ func TestUploadImage(t *testing.T) {
 	}{
 		{"200", nil, http.StatusOK},
 		{"400", dto.ErrInvalidData, http.StatusBadRequest},
-		{"404", catalog.ErrNotFound, http.StatusNotFound},
+		{"404 - not found or not owner", catalog.ErrNotFound, http.StatusNotFound},
 		{"500", catalog.ErrInternal, http.StatusInternalServerError},
 	}
 
@@ -195,9 +195,12 @@ func TestUploadImage(t *testing.T) {
 			if tc.err == nil {
 				resp = &dto.ProductResponse{Product: dto.Product{ProductID: id, PresignedURL: new("http://upload")}}
 			}
-			app.EXPECT().UploadImage(gomock.Any(), id.String(), dto.PNG).Return(resp, tc.err)
+			app.EXPECT().UploadImage(gomock.Any(), businessID.String(), id.String(), dto.PNG).Return(resp, tc.err)
 
-			rec := serve(http.MethodPost, route, UploadImage(app), httptest.NewRequest(http.MethodPost, target, nil))
+			req := httptest.NewRequest(http.MethodPost, target, nil)
+			req.Header.Set(userIDHeader, businessID.String())
+
+			rec := serve(http.MethodPost, route, UploadImage(app), req)
 			require.Equal(t, tc.code, rec.Code)
 		})
 	}
@@ -354,4 +357,88 @@ func TestGetProductFeedbacks(t *testing.T) {
 		rec := serve(http.MethodGet, route, GetProductFeedbacks(app), httptest.NewRequest(http.MethodGet, target, nil))
 		require.Equal(t, http.StatusInternalServerError, rec.Code)
 	})
+}
+
+func TestUpdateItem(t *testing.T) {
+	const route = "/catalog/:productId"
+	id, businessID := uuid.NewV7(), uuid.NewV7()
+	target := "/catalog/" + id.String()
+
+	t.Run("200 - ids taken from path and header", func(t *testing.T) {
+		app := mocks.NewMockUpdateItemCase(gomock.NewController(t))
+		app.EXPECT().UpdateProduct(gomock.Any(), &dto.UpdateProductRequest{
+			Title:      new("new"),
+			Price:      new(int64(200)),
+			ProductID:  id.String(),
+			BusinessID: businessID.String(),
+		}).Return(&dto.ProductResponse{Product: dto.Product{ProductID: id, Title: "new", Price: 200}}, nil)
+
+		req := jsonRequest(http.MethodPatch, target, `{"title":"new","price":200}`)
+		req.Header.Set(userIDHeader, businessID.String())
+
+		rec := serve(http.MethodPatch, route, UpdateItem(app), req)
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var resp dto.ProductResponse
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+		require.Equal(t, int64(200), resp.Product.Price)
+	})
+
+	t.Run("400 - bad payload, app not called", func(t *testing.T) {
+		for _, body := range []string{`{bad`, `{"price":0}`, `{"title":""}`, `{"price":"10"}`} {
+			app := mocks.NewMockUpdateItemCase(gomock.NewController(t))
+			rec := serve(http.MethodPatch, route, UpdateItem(app), jsonRequest(http.MethodPatch, target, body))
+			require.Equal(t, http.StatusBadRequest, rec.Code, body)
+		}
+	})
+
+	cases := []struct {
+		name string
+		err  error
+		code int
+	}{
+		{"400 - invalid data", dto.ErrInvalidData, http.StatusBadRequest},
+		{"404 - not found or not owner", catalog.ErrNotFound, http.StatusNotFound},
+		{"500", catalog.ErrInternal, http.StatusInternalServerError},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			app := mocks.NewMockUpdateItemCase(gomock.NewController(t))
+			app.EXPECT().UpdateProduct(gomock.Any(), gomock.Any()).Return(nil, tc.err)
+
+			rec := serve(http.MethodPatch, route, UpdateItem(app), jsonRequest(http.MethodPatch, target, `{"price":10}`))
+			require.Equal(t, tc.code, rec.Code)
+		})
+	}
+}
+
+func TestDeleteItem(t *testing.T) {
+	const route = "/catalog/:productId"
+	id, businessID := uuid.NewV7(), uuid.NewV7()
+	target := "/catalog/" + id.String()
+
+	cases := []struct {
+		name string
+		err  error
+		code int
+	}{
+		{"204", nil, http.StatusNoContent},
+		{"400", dto.ErrInvalidData, http.StatusBadRequest},
+		{"404 - not found or not owner", catalog.ErrNotFound, http.StatusNotFound},
+		{"500", catalog.ErrInternal, http.StatusInternalServerError},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			app := mocks.NewMockDeleteItemCase(gomock.NewController(t))
+			app.EXPECT().DeleteProduct(gomock.Any(), businessID.String(), id.String()).Return(tc.err)
+
+			req := httptest.NewRequest(http.MethodDelete, target, nil)
+			req.Header.Set(userIDHeader, businessID.String())
+
+			rec := serve(http.MethodDelete, route, DeleteItem(app), req)
+			require.Equal(t, tc.code, rec.Code)
+		})
+	}
 }

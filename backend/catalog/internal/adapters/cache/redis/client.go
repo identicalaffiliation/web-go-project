@@ -28,7 +28,7 @@ func NewClient(cfg *config.RedisConfig) *Client {
 		DB:       0,
 	})
 
-	return &Client{client: pool}
+	return &Client{client: pool, ttl: cfg.TTL}
 }
 
 func (c *Client) Set(ctx context.Context, key string, value any) error {
@@ -56,6 +56,11 @@ func (c *Client) Get(ctx context.Context, key string) (*domain.Product, error) {
 	}
 
 	return &p, nil
+}
+
+// Delete - удаление ключа из кэша, отсутствие ключа ошибкой не считается.
+func (c *Client) Delete(ctx context.Context, key string) error {
+	return c.client.Del(ctx, key).Err()
 }
 
 func (c *Client) Close(_ context.Context) error {

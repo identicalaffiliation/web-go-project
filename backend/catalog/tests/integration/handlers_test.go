@@ -238,9 +238,12 @@ func (s *HandlersSuite) Test_GetPageHandler() {
 }
 
 func (s *HandlersSuite) Test_UploadImageHandler() {
+	businessID := uuid.NewV7().String()
+
 	s.T().Run("success - jpeg", func(t *testing.T) {
 		id := uuid.NewV7()
 		request := httptest.NewRequest(http.MethodPost, "/catalog/"+id.String()+"/image?format=jpeg", nil)
+		request.Header.Set("X-User-Id", businessID)
 		response := httptest.NewRecorder()
 
 		url := "https://s3.example.com/test-bucket/image/test.jpg"
@@ -255,7 +258,7 @@ func (s *HandlersSuite) Test_UploadImageHandler() {
 			},
 		}
 
-		s.uploadPort.EXPECT().UploadImage(gomock.Any(), id.String(), dto.JPEG).
+		s.uploadPort.EXPECT().UploadImage(gomock.Any(), businessID, id.String(), dto.JPEG).
 			Return(p, nil).
 			Times(1)
 
@@ -268,6 +271,7 @@ func (s *HandlersSuite) Test_UploadImageHandler() {
 	s.T().Run("success - png", func(t *testing.T) {
 		id := uuid.NewV7()
 		request := httptest.NewRequest(http.MethodPost, "/catalog/"+id.String()+"/image?format=png", nil)
+		request.Header.Set("X-User-Id", businessID)
 		response := httptest.NewRecorder()
 
 		url := "https://s3.example.com/test-bucket/image/test.png"
@@ -282,7 +286,7 @@ func (s *HandlersSuite) Test_UploadImageHandler() {
 			},
 		}
 
-		s.uploadPort.EXPECT().UploadImage(gomock.Any(), id.String(), dto.PNG).
+		s.uploadPort.EXPECT().UploadImage(gomock.Any(), businessID, id.String(), dto.PNG).
 			Return(p, nil).
 			Times(1)
 
@@ -293,9 +297,10 @@ func (s *HandlersSuite) Test_UploadImageHandler() {
 
 	s.T().Run("bad request - invalid id param", func(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/catalog/invalid-uuid/image?format=png", nil)
+		request.Header.Set("X-User-Id", businessID)
 		response := httptest.NewRecorder()
 
-		s.uploadPort.EXPECT().UploadImage(gomock.Any(), "invalid-uuid", dto.PNG).
+		s.uploadPort.EXPECT().UploadImage(gomock.Any(), businessID, "invalid-uuid", dto.PNG).
 			Return(nil, dto.ErrInvalidData).
 			Times(1)
 
@@ -306,9 +311,10 @@ func (s *HandlersSuite) Test_UploadImageHandler() {
 	s.T().Run("bad request - invalid format", func(t *testing.T) {
 		id := uuid.NewV7()
 		request := httptest.NewRequest(http.MethodPost, "/catalog/"+id.String()+"/image?format=gif", nil)
+		request.Header.Set("X-User-Id", businessID)
 		response := httptest.NewRecorder()
 
-		s.uploadPort.EXPECT().UploadImage(gomock.Any(), id.String(), dto.ImageFormat("gif")).
+		s.uploadPort.EXPECT().UploadImage(gomock.Any(), businessID, id.String(), dto.ImageFormat("gif")).
 			Return(nil, dto.ErrInvalidData).
 			Times(1)
 
@@ -319,9 +325,10 @@ func (s *HandlersSuite) Test_UploadImageHandler() {
 	s.T().Run("bad request - missing format", func(t *testing.T) {
 		id := uuid.NewV7()
 		request := httptest.NewRequest(http.MethodPost, "/catalog/"+id.String()+"/image", nil)
+		request.Header.Set("X-User-Id", businessID)
 		response := httptest.NewRecorder()
 
-		s.uploadPort.EXPECT().UploadImage(gomock.Any(), id.String(), dto.ImageFormat("")).
+		s.uploadPort.EXPECT().UploadImage(gomock.Any(), businessID, id.String(), dto.ImageFormat("")).
 			Return(nil, dto.ErrInvalidData).
 			Times(1)
 
@@ -332,9 +339,10 @@ func (s *HandlersSuite) Test_UploadImageHandler() {
 	s.T().Run("not found - product does not exist", func(t *testing.T) {
 		id := uuid.NewV7()
 		request := httptest.NewRequest(http.MethodPost, "/catalog/"+id.String()+"/image?format=png", nil)
+		request.Header.Set("X-User-Id", businessID)
 		response := httptest.NewRecorder()
 
-		s.uploadPort.EXPECT().UploadImage(gomock.Any(), id.String(), dto.PNG).
+		s.uploadPort.EXPECT().UploadImage(gomock.Any(), businessID, id.String(), dto.PNG).
 			Return(nil, catalog.ErrNotFound).
 			Times(1)
 
@@ -345,9 +353,10 @@ func (s *HandlersSuite) Test_UploadImageHandler() {
 	s.T().Run("internal server error", func(t *testing.T) {
 		id := uuid.NewV7()
 		request := httptest.NewRequest(http.MethodPost, "/catalog/"+id.String()+"/image?format=png", nil)
+		request.Header.Set("X-User-Id", businessID)
 		response := httptest.NewRecorder()
 
-		s.uploadPort.EXPECT().UploadImage(gomock.Any(), id.String(), dto.PNG).
+		s.uploadPort.EXPECT().UploadImage(gomock.Any(), businessID, id.String(), dto.PNG).
 			Return(nil, catalog.ErrInternal).
 			Times(1)
 

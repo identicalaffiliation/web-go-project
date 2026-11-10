@@ -63,7 +63,7 @@ Temporal, gRPC, Nginx, Docker Compose, k6.
 |-------------|--------|----------------------------------|---------------------|------------|
 | `auth`      | Go     | REST `:8080`                     | `auth-db`           | Регистрация, логин, JWT (RS256), refresh-токены с ротацией, валидация токена для gateway. Публикует `users.created`, слушает `profiles.business.created` и выдаёт роль `business`. |
 | `profile`   | Python | REST `:8000`                     | `profile-db`        | Профили пользователя (customer / business). Создаёт профиль по `users.created`, публикует `profiles.business.created`. Агрегирует заказы, баланс и товары бизнеса через gRPC. |
-| `catalog`   | Go     | REST `:8080`, gRPC `:50051` (цена), `:50052` (отзывы), `:50053` (товары бизнеса) | `catalog-db` + реплика, Redis, MinIO | Товары: создание (владелец — `business_id`), страница с курсором, карточка, загрузка картинки (pre-signed URL в MinIO). Кэш в Redis. Отдаёт по gRPC цену и товары бизнеса. Публикует `stock.created`. |
+| `catalog`   | Go     | REST `:8080`, gRPC `:50051` (цена), `:50052` (отзывы), `:50053` (товары бизнеса) | `catalog-db` + реплика, Redis, MinIO | Товары: создание (владелец — `business_id`), изменение и мягкое удаление владельцем, страница с курсором, карточка, загрузка картинки (pre-signed URL в MinIO). Кэш в Redis. Отдаёт по gRPC цену и товары бизнеса. Публикует `stock.created`. |
 | `inventory` | Go     | Kafka consumer, Temporal worker  | `inventory-db`      | Остатки товаров. Заводит сток по `stock.created`; активити `ReserveStock` / `ReleaseStock`. |
 | `orders`    | Go     | REST `:8080`, gRPC `:50052`, Temporal worker | `orders-db` + реплика | Создание заказа (с ключом идемпотентности), запуск и ведение саги, история заказов по gRPC. |
 | `payments`  | Go     | gRPC `:50052`, Kafka consumer, Temporal worker | `payments-db` + реплика | Счета пользователей. Заводит счёт со стартовым балансом по `users.created`; активити `Charge` / `Refund`; баланс по gRPC. |
@@ -110,6 +110,8 @@ Temporal, gRPC, Nginx, Docker Compose, k6.
 2. Outbox-воркер публикует `stock.created`, inventory заводит остаток.
 3. `POST /api/v1/catalog/{productId}/image?format=png` — получить pre-signed URL и загрузить картинку в MinIO.
 4. `GET /api/v1/profiles/business/products` (роль `business`) — свои выложенные товары (profile берёт их из catalog по gRPC).
+5. `PATCH /api/v1/catalog/{productId}` — изменить название, описание или цену; `DELETE /api/v1/catalog/{productId}` — убрать товар
+   из каталога. Обе ручки — только владельцу (`business_id` = `X-User-Id`).
 
 ### Оформить заказ (сага)
 
@@ -209,7 +211,9 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost/api/v1/profiles/balance
 | GET   | `/`                         | публичный            | Страница товаров: `limit` (по умолчанию 50), `cursor` из предыдущего ответа |
 | GET   | `/{productId}`              | customer, business   | Карточка товара |
 | POST  | `/`                         | business             | Создать товар: `title`, `description?`, `price > 0`, `quantity` 1–99 |
-| POST  | `/{productId}/image`        | business             | Pre-signed URL для загрузки картинки, `format=jpeg\|png` |
+| PATCH | `/{productId}`              | business (владелец)  | Изменить свой товар: `title?`, `description?`, `price? > 0`, хотя бы одно поле. `404` — товара нет, он удалён или чужой |
+| DELETE | `/{productId}`              | business (владелец)  | Удалить свой товар, `204`. Мягкое удаление: товар пропадает из каталога, карточки и цены для заказов, отзывы остаются. `404` — нет, уже удалён или чужой |
+| POST  | `/{productId}/image`        | business (владелец)  | Pre-signed URL для загрузки картинки своего товара, `format=jpeg\|png`. `404` — нет, удалён или чужой |
 
 ### Profile — `/api/v1/profiles`
 
