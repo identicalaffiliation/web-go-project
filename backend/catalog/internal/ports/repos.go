@@ -13,7 +13,9 @@ type CatalogRepository interface {
 	GetItemByID(ctx context.Context, id uuid.UUID) (*domain.Product, error)
 	GetItemsByCursorPagination(ctx context.Context, cursor *string, limit int64) ([]*domain.Product, error)
 	GetItemsByBusinessID(ctx context.Context, businessID uuid.UUID, cursor *string, limit int64) ([]*domain.Product, error)
-	UpdateImageKey(ctx context.Context, key string, productID uuid.UUID) (*domain.Product, error)
+	UpdateImageKey(ctx context.Context, key string, productID, businessID uuid.UUID) (*domain.Product, error)
+	UpdateProduct(ctx context.Context, patch *domain.ProductPatch) (*domain.Product, error)
+	DeleteProduct(ctx context.Context, productID, businessID uuid.UUID) error
 }
 
 type OutboxRepository interface {

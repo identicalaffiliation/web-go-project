@@ -35,6 +35,30 @@ func (req *CreateProductRequest) ValidateData() error {
 	return nil
 }
 
+func (req *UpdateProductRequest) ValidateJSON() error {
+	if err := validate().Struct(req); err != nil {
+		return ErrInvalidJSON
+	}
+
+	return nil
+}
+
+func (req *UpdateProductRequest) ValidateData() error {
+	if req.Title == nil && req.Description == nil && req.Price == nil {
+		return ErrInvalidData
+	}
+
+	if req.Title != nil && len(strings.TrimSpace(*req.Title)) == 0 {
+		return ErrInvalidData
+	}
+
+	if req.Description != nil && len(strings.TrimSpace(*req.Description)) == 0 {
+		return ErrInvalidData
+	}
+
+	return nil
+}
+
 func (req *FeedbackCreateRequest) Validate() error {
 	if err := validate().Struct(req); err != nil {
 		return ErrInvalidJSON

@@ -28,9 +28,13 @@ func NewRepository(master, replica *pgxpool.Pool) *Repository {
 	}
 }
 
+// CreateFeedback - отзыв только на неудалённый товар: FK удалённый (deleted_at) товар пропускает,
+// поэтому отсутствующий или удалённый товар - ErrNotFound.
 func (r *Repository) CreateFeedback(ctx context.Context, f *domain.Feedback) (*domain.Feedback, error) {
 	const query = `INSERT INTO feedbacks (id, product_id, user_id, score, description)
-		VALUES ($1, $2, $3, $4, $5) RETURNING *`
+		SELECT $1::uuid, $2::uuid, $3::uuid, $4::smallint, $5::text
+		WHERE EXISTS (SELECT 1 FROM catalog WHERE product_id = $2::uuid AND deleted_at IS NULL)
+		RETURNING *`
 
 	conn := r.txGetter.DefaultTrOrDB(ctx, r.pool)
 
@@ -44,6 +48,10 @@ func (r *Repository) CreateFeedback(ctx context.Context, f *domain.Feedback) (*d
 		&m.CreatedAt,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+
 		return nil, fmt.Errorf("error CreateFeedback: %w", err)
 	}
 

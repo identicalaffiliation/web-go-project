@@ -79,6 +79,42 @@ func (req *CreateProductRequest) ToDomain() (*domain.Product, error) {
 	return model, nil
 }
 
+// UpdateProductRequest - DTO JSON запроса изменения товара бизнесом-владельцем.
+// Передаются только меняемые поля, хотя бы одно обязательно.
+// Поля:
+// Title - новое название товара, минимальная длина - 1, поле опционально.
+// Description - новое описание товара, поле опционально.
+// Price - новая цена товара, больше 0, поле опционально.
+// ProductID - из пути, BusinessID - из X-User-Id (gateway), из тела не читаются.
+type UpdateProductRequest struct {
+	Title       *string `json:"title,omitempty" validate:"omitempty,min=1"`
+	Description *string `json:"description,omitempty"`
+	Price       *int64  `json:"price,omitempty" validate:"omitempty,gt=0"`
+	ProductID   string  `json:"-"`
+	BusinessID  string  `json:"-"`
+}
+
+// ToDomain - метод преобразования DTO в domain структуру изменения товара.
+func (req *UpdateProductRequest) ToDomain() (*domain.ProductPatch, error) {
+	productID, err := uuid.Parse(req.ProductID)
+	if err != nil {
+		return nil, ErrInvalidData
+	}
+
+	businessID, err := uuid.Parse(req.BusinessID)
+	if err != nil {
+		return nil, ErrInvalidData
+	}
+
+	return &domain.ProductPatch{
+		ProductID:   productID,
+		BusinessID:  businessID,
+		Title:       req.Title,
+		Description: req.Description,
+		Price:       req.Price,
+	}, nil
+}
+
 // LikeProductRequest - DTO запроса лайка товара.
 // ID - идентификатор товара (UUID), поле обязательно.
 // Action - тип события: add - поставить лайк, remove - убрать лайк, поле обязательно.

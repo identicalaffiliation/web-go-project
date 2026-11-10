@@ -17,6 +17,7 @@ import (
 type CacheSuite struct {
 	suite.Suite
 	container *tcredis.RedisContainer
+	cfg       *config.RedisConfig
 	client    *cacheredis.Client
 	rdb       *goredis.Client
 }
@@ -39,6 +40,7 @@ func (s *CacheSuite) SetupSuite() {
 		Port: int(port.Num()),
 	}
 
+	s.cfg = cfg
 	s.client = cacheredis.NewClient(cfg)
 	s.rdb = goredis.NewClient(&goredis.Options{
 		Addr: host + ":" + port.Port(),

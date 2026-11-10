@@ -2,8 +2,10 @@ package feedbacks
 
 import (
 	"context"
+	"errors"
 	"uuid"
 
+	feedbacksRepo "github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/feedbacks"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/utils"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/domain"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/dto"
@@ -35,8 +37,8 @@ func (s *FeedbackService) CreateFeedback(ctx context.Context, req *dto.FeedbackC
 
 	created, err := s.repo.CreateFeedback(ctx, f)
 	if err != nil {
-		// FK - товара нет, check - score вне 1..5
-		if utils.IsForeignConstraint(err) || utils.IsCheckConstraint(err) {
+		// not found / FK - товара нет или он удалён, check - score вне 1..5
+		if errors.Is(err, feedbacksRepo.ErrNotFound) || utils.IsForeignConstraint(err) || utils.IsCheckConstraint(err) {
 			return nil, dto.ErrInvalidData
 		}
 

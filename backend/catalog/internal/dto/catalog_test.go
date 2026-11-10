@@ -44,3 +44,40 @@ func TestToDomain(t *testing.T) {
 		}
 	})
 }
+
+func TestUpdateProductRequest_ToDomain(t *testing.T) {
+	productID, businessID := uuid.NewV7(), uuid.NewV7()
+
+	t.Run("ok", func(t *testing.T) {
+		r := &UpdateProductRequest{
+			Title:      new("t"),
+			Price:      new(int64(10)),
+			ProductID:  productID.String(),
+			BusinessID: businessID.String(),
+		}
+
+		p, err := r.ToDomain()
+		require.NoError(t, err)
+		require.Equal(t, productID, p.ProductID)
+		require.Equal(t, businessID, p.BusinessID)
+		require.Equal(t, "t", *p.Title)
+		require.Equal(t, int64(10), *p.Price)
+		require.Nil(t, p.Description, "not passed field stays nil")
+	})
+
+	t.Run("invalid ids", func(t *testing.T) {
+		cases := map[string]*UpdateProductRequest{
+			"bad product id":  {ProductID: "bad", BusinessID: businessID.String()},
+			"no business id":  {ProductID: productID.String()},
+			"bad business id": {ProductID: productID.String(), BusinessID: "bad"},
+		}
+
+		for name, r := range cases {
+			t.Run(name, func(t *testing.T) {
+				p, err := r.ToDomain()
+				require.ErrorIs(t, err, ErrInvalidData)
+				require.Nil(t, p)
+			})
+		}
+	})
+}

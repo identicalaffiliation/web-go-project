@@ -19,3 +19,12 @@ type Product struct {
 	Rating         float64 `json:"rating"`
 	FeedbacksCount int64   `json:"feedbacksCount"`
 }
+
+// ProductPatch - изменение товара бизнесом-владельцем. nil-поле не меняется.
+type ProductPatch struct {
+	ProductID   uuid.UUID
+	BusinessID  uuid.UUID
+	Title       *string
+	Description *string
+	Price       *int64
+}

@@ -139,7 +139,14 @@ func (s *Service) GetItem(ctx context.Context, id string) (*dto.ProductResponse,
 	return s.toResponseOne(item, s.fetchImageURL(ctx, item)), nil
 }
 
-func (s *Service) UploadImage(ctx context.Context, id string, format dto.ImageFormat) (*dto.ProductResponse, error) {
+// UploadImage - pre-signed URL для загрузки картинки товара его владельцем (бизнесом).
+// Чужой или удалённый товар - ErrNotFound.
+func (s *Service) UploadImage(ctx context.Context, businessID, id string, format dto.ImageFormat) (*dto.ProductResponse, error) {
+	bID, err := uuid.Parse(businessID)
+	if err != nil {
+		return nil, dto.ErrInvalidData
+	}
+
 	productID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, dto.ErrInvalidData
@@ -152,7 +159,7 @@ func (s *Service) UploadImage(ctx context.Context, id string, format dto.ImageFo
 
 	imageKey := buildImageKey(ext)
 
-	product, err := s.catalog.UpdateImageKey(ctx, imageKey, productID)
+	product, err := s.catalog.UpdateImageKey(ctx, imageKey, productID, bID)
 	if err != nil {
 		if errors.Is(err, catalog.ErrNotFound) {
 			return nil, ErrNotFound
@@ -179,6 +186,81 @@ func (s *Service) UploadImage(ctx context.Context, id string, format dto.ImageFo
 	}
 
 	return s.toResponseOne(product, url), nil
+}
+
+// UpdateProduct - изменение названия, описания или цены товара его владельцем (бизнесом).
+// Чужой или удалённый товар - ErrNotFound. Кэш карточки перезаписывается сразу: из него orders берут цену.
+func (s *Service) UpdateProduct(ctx context.Context, req *dto.UpdateProductRequest) (*dto.ProductResponse, error) {
+	if err := req.ValidateData(); err != nil {
+		return nil, err
+	}
+
+	patch, err := req.ToDomain()
+	if err != nil {
+		return nil, err
+	}
+
+	product, err := s.catalog.UpdateProduct(ctx, patch)
+	if err != nil {
+		if errors.Is(err, catalog.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+
+		if errors.Is(err, catalog.ErrInvalidData) {
+			return nil, dto.ErrInvalidData
+		}
+
+		s.logger.WithError(err).Error(
+			"failed to update product",
+			zap.String("product id", patch.ProductID.String()),
+		)
+		return nil, ErrInternal
+	}
+
+	if err := s.cache.Set(ctx, product.ID.String(), product); err != nil {
+		s.logger.WithError(err).Error(
+			"failed to set product to cache",
+			zap.String("product id", product.ID.String()),
+		)
+	}
+
+	return s.toResponseOne(product, s.fetchImageURL(ctx, product)), nil
+}
+
+// DeleteProduct - мягкое удаление товара его владельцем (бизнесом): товар пропадает из каталога,
+// карточки и цены для заказов. Чужой или уже удалённый товар - ErrNotFound.
+func (s *Service) DeleteProduct(ctx context.Context, businessID, productID string) error {
+	bID, err := uuid.Parse(businessID)
+	if err != nil {
+		return dto.ErrInvalidData
+	}
+
+	pID, err := uuid.Parse(productID)
+	if err != nil {
+		return dto.ErrInvalidData
+	}
+
+	if err := s.catalog.DeleteProduct(ctx, pID, bID); err != nil {
+		if errors.Is(err, catalog.ErrNotFound) {
+			return ErrNotFound
+		}
+
+		s.logger.WithError(err).Error(
+			"failed to delete product",
+			zap.String("product id", pID.String()),
+		)
+		return ErrInternal
+	}
+
+	// товар уже удалён в БД - ошибка кэша не откатывает удаление, карточка уйдёт из кэша по TTL
+	if err := s.cache.Delete(ctx, pID.String()); err != nil {
+		s.logger.WithError(err).Error(
+			"failed to delete product from cache",
+			zap.String("product id", pID.String()),
+		)
+	}
+
+	return nil
 }
 
 func (s *Service) LikeItem(ctx context.Context, id string, action dto.LikeAction) error {

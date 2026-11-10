@@ -10,6 +10,7 @@ import (
 	"uuid"
 
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/gen/mocks"
+	feedbacksRepo "github.com/identicalaffiliation/web-go-project/backend/catalog/internal/adapters/postgres/feedbacks"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/domain"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/internal/dto"
 	"github.com/identicalaffiliation/web-go-project/backend/catalog/pkg/logger"
@@ -91,6 +92,14 @@ func TestCreateFeedback(t *testing.T) {
 				require.True(t, errors.Is(err, dto.ErrInvalidData) || errors.Is(err, dto.ErrInvalidJSON), err)
 			})
 		}
+	})
+
+	t.Run("product not found or deleted", func(t *testing.T) {
+		s, repo := newService(t)
+		repo.EXPECT().CreateFeedback(ctx, gomock.Any()).Return(nil, feedbacksRepo.ErrNotFound)
+
+		_, err := s.CreateFeedback(ctx, validReq())
+		require.ErrorIs(t, err, dto.ErrInvalidData)
 	})
 
 	t.Run("product not found - FK violation", func(t *testing.T) {

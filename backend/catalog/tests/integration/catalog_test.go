@@ -199,3 +199,160 @@ func (s *DatabaseSuite) Test_CatalogRepository_GetItemsByBusinessID() {
 		s.Require().Nil(items)
 	})
 }
+
+func (s *DatabaseSuite) Test_CatalogRepository_UpdateProduct() {
+	businessID := uuid.NewV7()
+	id := uuid.NewV7()
+	_, err := s.catalog.Insert(s.ctx, &domain.Product{ID: id, BusinessID: businessID, Title: "old", Description: "old desc", Price: 100})
+	s.Require().NoError(err)
+
+	s.T().Run("only passed fields change", func(t *testing.T) {
+		actual, err := s.catalog.UpdateProduct(s.ctx, &domain.ProductPatch{
+			ProductID:  id,
+			BusinessID: businessID,
+			Price:      new(int64(250)),
+		})
+		s.Require().NoError(err)
+		s.Require().Equal(id, actual.ID)
+		s.Require().Equal(businessID, actual.BusinessID)
+		s.Require().Equal(int64(250), actual.Price)
+		s.Require().Equal("old", actual.Title)
+		s.Require().Equal("old desc", actual.Description)
+
+		actual, err = s.catalog.UpdateProduct(s.ctx, &domain.ProductPatch{
+			ProductID:   id,
+			BusinessID:  businessID,
+			Title:       new("new"),
+			Description: new("new desc"),
+		})
+		s.Require().NoError(err)
+		s.Require().Equal("new", actual.Title)
+		s.Require().Equal("new desc", actual.Description)
+		s.Require().Equal(int64(250), actual.Price)
+
+		stored, err := s.catalog.GetItemByID(s.ctx, id)
+		s.Require().NoError(err)
+		s.Require().Equal("new", stored.Title)
+		s.Require().Equal(int64(250), stored.Price)
+	})
+
+	s.T().Run("feedback stats in result", func(t *testing.T) {
+		_, err := s.feedback.CreateFeedback(s.ctx, &domain.Feedback{ID: uuid.NewV7(), ProductID: id, UserID: uuid.NewV7(), Score: 4})
+		s.Require().NoError(err)
+
+		actual, err := s.catalog.UpdateProduct(s.ctx, &domain.ProductPatch{ProductID: id, BusinessID: businessID, Price: new(int64(300))})
+		s.Require().NoError(err)
+		s.Require().Equal(4.0, actual.Rating)
+		s.Require().Equal(int64(1), actual.FeedbacksCount)
+	})
+
+	s.T().Run("other business - not found, product untouched", func(t *testing.T) {
+		actual, err := s.catalog.UpdateProduct(s.ctx, &domain.ProductPatch{ProductID: id, BusinessID: uuid.NewV7(), Price: new(int64(1))})
+		s.Require().ErrorIs(err, catalog.ErrNotFound)
+		s.Require().Nil(actual)
+
+		stored, err := s.catalog.GetItemByID(s.ctx, id)
+		s.Require().NoError(err)
+		s.Require().Equal(int64(300), stored.Price)
+	})
+
+	s.T().Run("unknown product - not found", func(t *testing.T) {
+		_, err := s.catalog.UpdateProduct(s.ctx, &domain.ProductPatch{ProductID: uuid.NewV7(), BusinessID: businessID, Price: new(int64(1))})
+		s.Require().ErrorIs(err, catalog.ErrNotFound)
+	})
+
+	s.T().Run("check constraint - invalid data", func(t *testing.T) {
+		_, err := s.catalog.UpdateProduct(s.ctx, &domain.ProductPatch{ProductID: id, BusinessID: businessID, Price: new(int64(0))})
+		s.Require().ErrorIs(err, catalog.ErrInvalidData)
+
+		_, err = s.catalog.UpdateProduct(s.ctx, &domain.ProductPatch{ProductID: id, BusinessID: businessID, Title: new("")})
+		s.Require().ErrorIs(err, catalog.ErrInvalidData)
+	})
+
+	s.T().Run("deleted product - not found", func(t *testing.T) {
+		s.Require().NoError(s.catalog.DeleteProduct(s.ctx, id, businessID))
+
+		_, err := s.catalog.UpdateProduct(s.ctx, &domain.ProductPatch{ProductID: id, BusinessID: businessID, Price: new(int64(1))})
+		s.Require().ErrorIs(err, catalog.ErrNotFound)
+	})
+}
+
+func (s *DatabaseSuite) Test_CatalogRepository_DeleteProduct() {
+	businessID := uuid.NewV7()
+	// id по возрастанию: выдача идёт по product_id DESC
+	kept := uuid.MustParse("01a30000-0000-7000-8000-000000000001")
+	deleted := uuid.MustParse("01a30000-0000-7000-8000-000000000002")
+	for _, id := range []uuid.UUID{kept, deleted} {
+		_, err := s.catalog.Insert(s.ctx, &domain.Product{ID: id, BusinessID: businessID, Title: "own", Price: 100})
+		s.Require().NoError(err)
+	}
+
+	_, err := s.feedback.CreateFeedback(s.ctx, &domain.Feedback{ID: uuid.NewV7(), ProductID: deleted, UserID: uuid.NewV7(), Score: 5})
+	s.Require().NoError(err)
+
+	s.T().Run("other business - not found, product kept", func(t *testing.T) {
+		s.Require().ErrorIs(s.catalog.DeleteProduct(s.ctx, deleted, uuid.NewV7()), catalog.ErrNotFound)
+
+		_, err := s.catalog.GetItemByID(s.ctx, deleted)
+		s.Require().NoError(err)
+	})
+
+	s.T().Run("owner deletes product with feedbacks", func(t *testing.T) {
+		s.Require().NoError(s.catalog.DeleteProduct(s.ctx, deleted, businessID))
+	})
+
+	s.T().Run("deleted product hidden everywhere", func(t *testing.T) {
+		_, err := s.catalog.GetItemByID(s.ctx, deleted)
+		s.Require().ErrorIs(err, catalog.ErrNotFound)
+
+		items, err := s.catalog.GetItemsByBusinessID(s.ctx, businessID, nil, 10)
+		s.Require().NoError(err)
+		s.Require().Len(items, 1)
+		s.Require().Equal(kept, items[0].ID)
+
+		items, err = s.catalog.GetItemsByCursorPagination(s.ctx, nil, 10)
+		s.Require().NoError(err)
+		s.Require().Len(items, 1)
+		s.Require().Equal(kept, items[0].ID)
+
+		_, err = s.catalog.UpdateImageKey(s.ctx, "image/deleted.png", deleted, businessID)
+		s.Require().ErrorIs(err, catalog.ErrNotFound)
+	})
+
+	s.T().Run("second delete - not found", func(t *testing.T) {
+		s.Require().ErrorIs(s.catalog.DeleteProduct(s.ctx, deleted, businessID), catalog.ErrNotFound)
+	})
+
+	s.T().Run("unknown product - not found", func(t *testing.T) {
+		s.Require().ErrorIs(s.catalog.DeleteProduct(s.ctx, uuid.NewV7(), businessID), catalog.ErrNotFound)
+	})
+}
+
+func (s *DatabaseSuite) Test_CatalogRepository_UpdateImageKey() {
+	businessID, id := uuid.NewV7(), uuid.NewV7()
+	_, err := s.catalog.Insert(s.ctx, &domain.Product{ID: id, BusinessID: businessID, Title: "t", Price: 100})
+	s.Require().NoError(err)
+
+	s.T().Run("owner - key updated", func(t *testing.T) {
+		actual, err := s.catalog.UpdateImageKey(s.ctx, "image/own.png", id, businessID)
+		s.Require().NoError(err)
+		s.Require().Equal("image/own.png", actual.ImageKey)
+	})
+
+	s.T().Run("other business - not found, key untouched", func(t *testing.T) {
+		actual, err := s.catalog.UpdateImageKey(s.ctx, "image/other.png", id, uuid.NewV7())
+		s.Require().ErrorIs(err, catalog.ErrNotFound)
+		s.Require().Nil(actual)
+
+		stored, err := s.catalog.GetItemByID(s.ctx, id)
+		s.Require().NoError(err)
+		s.Require().Equal("image/own.png", stored.ImageKey)
+	})
+
+	s.T().Run("product without owner - not found", func(t *testing.T) {
+		s.Require().NoError(s.loadFixtures("items_list.sql"))
+
+		_, err := s.catalog.UpdateImageKey(s.ctx, "image/legacy.png", uuid.MustParse("01a10112-c339-715d-8feb-4751a1ced5ef"), businessID)
+		s.Require().ErrorIs(err, catalog.ErrNotFound)
+	})
+}

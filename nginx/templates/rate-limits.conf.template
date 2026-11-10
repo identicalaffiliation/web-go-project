@@ -30,6 +30,8 @@ map $request_method $rl_catalog_write {
 # лимит на клиента в каталоге - только на запись
 map $request_method $rl_catalog_write_user {
     POST    $http_authorization;
+    PATCH   $http_authorization;
+    DELETE  $http_authorization;
     default "";
 }
 

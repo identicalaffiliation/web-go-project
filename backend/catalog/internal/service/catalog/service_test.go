@@ -349,13 +349,14 @@ func TestGetBusinessItems(t *testing.T) {
 
 func TestUploadImage(t *testing.T) {
 	ctx := context.Background()
+	businessID := uuid.NewV7()
 
-	t.Run("ok - key updated, cache refreshed", func(t *testing.T) {
+	t.Run("ok - key updated by owner, cache refreshed", func(t *testing.T) {
 		s, d := newService(t)
 		p := product()
 
-		d.catalog.EXPECT().UpdateImageKey(ctx, gomock.Any(), p.ID).DoAndReturn(
-			func(_ context.Context, key string, _ uuid.UUID) (*domain.Product, error) {
+		d.catalog.EXPECT().UpdateImageKey(ctx, gomock.Any(), p.ID, businessID).DoAndReturn(
+			func(_ context.Context, key string, _, _ uuid.UUID) (*domain.Product, error) {
 				require.Regexp(t, `^image/\d{4}/\w+/[0-9a-f-]+\.png$`, key)
 				return p, nil
 			},
@@ -363,40 +364,48 @@ func TestUploadImage(t *testing.T) {
 		d.cache.EXPECT().Set(ctx, p.ID.String(), p).Return(nil)
 		d.s3.EXPECT().GetPresignedURL(ctx, p).Return("http://upload", nil)
 
-		resp, err := s.UploadImage(ctx, p.ID.String(), dto.PNG)
+		resp, err := s.UploadImage(ctx, businessID.String(), p.ID.String(), dto.PNG)
 		require.NoError(t, err)
 		require.Equal(t, "http://upload", *resp.Product.PresignedURL)
 	})
 
 	t.Run("invalid id", func(t *testing.T) {
 		s, _ := newService(t)
-		_, err := s.UploadImage(ctx, "bad", dto.PNG)
+		_, err := s.UploadImage(ctx, businessID.String(), "bad", dto.PNG)
 		require.ErrorIs(t, err, dto.ErrInvalidData)
+	})
+
+	t.Run("invalid business id", func(t *testing.T) {
+		s, _ := newService(t)
+		for _, id := range []string{"", "bad"} {
+			_, err := s.UploadImage(ctx, id, uuid.NewV7().String(), dto.PNG)
+			require.ErrorIs(t, err, dto.ErrInvalidData)
+		}
 	})
 
 	t.Run("invalid format", func(t *testing.T) {
 		s, _ := newService(t)
-		_, err := s.UploadImage(ctx, uuid.NewV7().String(), "gif")
+		_, err := s.UploadImage(ctx, businessID.String(), uuid.NewV7().String(), "gif")
 		require.ErrorIs(t, err, dto.ErrInvalidData)
 	})
 
-	t.Run("not found", func(t *testing.T) {
+	t.Run("not found or not owner", func(t *testing.T) {
 		s, d := newService(t)
 		id := uuid.NewV7()
-		d.catalog.EXPECT().UpdateImageKey(ctx, gomock.Any(), id).Return(nil, catalogRepo.ErrNotFound)
+		d.catalog.EXPECT().UpdateImageKey(ctx, gomock.Any(), id, businessID).Return(nil, catalogRepo.ErrNotFound)
 
-		_, err := s.UploadImage(ctx, id.String(), dto.JPEG)
+		_, err := s.UploadImage(ctx, businessID.String(), id.String(), dto.JPEG)
 		require.ErrorIs(t, err, ErrNotFound)
 	})
 
 	t.Run("presign error - internal", func(t *testing.T) {
 		s, d := newService(t)
 		p := product()
-		d.catalog.EXPECT().UpdateImageKey(ctx, gomock.Any(), p.ID).Return(p, nil)
+		d.catalog.EXPECT().UpdateImageKey(ctx, gomock.Any(), p.ID, businessID).Return(p, nil)
 		d.cache.EXPECT().Set(ctx, p.ID.String(), p).Return(nil)
 		d.s3.EXPECT().GetPresignedURL(ctx, p).Return("", errors.New("minio down"))
 
-		_, err := s.UploadImage(ctx, p.ID.String(), dto.JPEG)
+		_, err := s.UploadImage(ctx, businessID.String(), p.ID.String(), dto.JPEG)
 		require.ErrorIs(t, err, ErrInternal)
 	})
 }
@@ -439,5 +448,143 @@ func TestLikeItem(t *testing.T) {
 		s, d := newService(t)
 		d.likes.EXPECT().Insert(ctx, gomock.Any()).Return(errors.New("db down"))
 		require.Error(t, s.LikeItem(ctx, productID.String(), dto.LikeAdd))
+	})
+}
+
+func TestUpdateProduct(t *testing.T) {
+	ctx := context.Background()
+	businessID := uuid.NewV7()
+	req := func(id uuid.UUID) *dto.UpdateProductRequest {
+		return &dto.UpdateProductRequest{
+			Price:      new(int64(250)),
+			ProductID:  id.String(),
+			BusinessID: businessID.String(),
+		}
+	}
+
+	t.Run("ok - owner patch, cache refreshed", func(t *testing.T) {
+		s, d := newService(t)
+		p := product()
+		p.Price = 250
+
+		d.catalog.EXPECT().UpdateProduct(ctx, gomock.Any()).DoAndReturn(
+			func(_ context.Context, patch *domain.ProductPatch) (*domain.Product, error) {
+				require.Equal(t, p.ID, patch.ProductID)
+				require.Equal(t, businessID, patch.BusinessID, "owner from request goes to catalog")
+				require.Equal(t, int64(250), *patch.Price)
+				require.Nil(t, patch.Title)
+				require.Nil(t, patch.Description)
+				return p, nil
+			},
+		)
+		d.cache.EXPECT().Set(ctx, p.ID.String(), p).Return(nil)
+		d.s3.EXPECT().FetchSignedURL(ctx, p.ImageKey).Return("http://url", nil)
+
+		resp, err := s.UpdateProduct(ctx, req(p.ID))
+		require.NoError(t, err)
+		require.Equal(t, p.ID, resp.Product.ProductID)
+		require.Equal(t, int64(250), resp.Product.Price)
+		require.Equal(t, "http://url", *resp.Product.PresignedURL)
+	})
+
+	t.Run("cache error is not fatal", func(t *testing.T) {
+		s, d := newService(t)
+		p := product()
+
+		d.catalog.EXPECT().UpdateProduct(ctx, gomock.Any()).Return(p, nil)
+		d.cache.EXPECT().Set(ctx, p.ID.String(), p).Return(errors.New("redis down"))
+		d.s3.EXPECT().FetchSignedURL(ctx, p.ImageKey).Return("", nil)
+
+		resp, err := s.UpdateProduct(ctx, req(p.ID))
+		require.NoError(t, err)
+		require.Equal(t, p.ID, resp.Product.ProductID)
+	})
+
+	t.Run("invalid - repo not called", func(t *testing.T) {
+		cases := map[string]*dto.UpdateProductRequest{
+			"nothing to change": {ProductID: uuid.NewV7().String(), BusinessID: businessID.String()},
+			"bad product id":    {Price: new(int64(1)), ProductID: "bad", BusinessID: businessID.String()},
+			"no business id":    {Price: new(int64(1)), ProductID: uuid.NewV7().String()},
+		}
+
+		for name, r := range cases {
+			t.Run(name, func(t *testing.T) {
+				s, _ := newService(t)
+				_, err := s.UpdateProduct(ctx, r)
+				require.ErrorIs(t, err, dto.ErrInvalidData)
+			})
+		}
+	})
+
+	t.Run("not found or not owner", func(t *testing.T) {
+		s, d := newService(t)
+		d.catalog.EXPECT().UpdateProduct(ctx, gomock.Any()).Return(nil, catalogRepo.ErrNotFound)
+
+		_, err := s.UpdateProduct(ctx, req(uuid.NewV7()))
+		require.ErrorIs(t, err, ErrNotFound)
+	})
+
+	t.Run("check constraint - invalid", func(t *testing.T) {
+		s, d := newService(t)
+		d.catalog.EXPECT().UpdateProduct(ctx, gomock.Any()).Return(nil, catalogRepo.ErrInvalidData)
+
+		_, err := s.UpdateProduct(ctx, req(uuid.NewV7()))
+		require.ErrorIs(t, err, dto.ErrInvalidData)
+	})
+
+	t.Run("db error - internal", func(t *testing.T) {
+		s, d := newService(t)
+		d.catalog.EXPECT().UpdateProduct(ctx, gomock.Any()).Return(nil, errors.New("db down"))
+
+		_, err := s.UpdateProduct(ctx, req(uuid.NewV7()))
+		require.ErrorIs(t, err, ErrInternal)
+	})
+}
+
+func TestDeleteProduct(t *testing.T) {
+	ctx := context.Background()
+	businessID := uuid.NewV7()
+
+	t.Run("ok - deleted and evicted from cache", func(t *testing.T) {
+		s, d := newService(t)
+		id := uuid.NewV7()
+
+		d.catalog.EXPECT().DeleteProduct(ctx, id, businessID).Return(nil)
+		d.cache.EXPECT().Delete(ctx, id.String()).Return(nil)
+
+		require.NoError(t, s.DeleteProduct(ctx, businessID.String(), id.String()))
+	})
+
+	t.Run("cache error is not fatal", func(t *testing.T) {
+		s, d := newService(t)
+		id := uuid.NewV7()
+
+		d.catalog.EXPECT().DeleteProduct(ctx, id, businessID).Return(nil)
+		d.cache.EXPECT().Delete(ctx, id.String()).Return(errors.New("redis down"))
+
+		require.NoError(t, s.DeleteProduct(ctx, businessID.String(), id.String()))
+	})
+
+	t.Run("invalid ids", func(t *testing.T) {
+		s, _ := newService(t)
+		require.ErrorIs(t, s.DeleteProduct(ctx, "bad", uuid.NewV7().String()), dto.ErrInvalidData)
+		require.ErrorIs(t, s.DeleteProduct(ctx, "", uuid.NewV7().String()), dto.ErrInvalidData)
+		require.ErrorIs(t, s.DeleteProduct(ctx, businessID.String(), "bad"), dto.ErrInvalidData)
+	})
+
+	t.Run("not found or not owner - cache untouched", func(t *testing.T) {
+		s, d := newService(t)
+		id := uuid.NewV7()
+		d.catalog.EXPECT().DeleteProduct(ctx, id, businessID).Return(catalogRepo.ErrNotFound)
+
+		require.ErrorIs(t, s.DeleteProduct(ctx, businessID.String(), id.String()), ErrNotFound)
+	})
+
+	t.Run("db error - internal", func(t *testing.T) {
+		s, d := newService(t)
+		id := uuid.NewV7()
+		d.catalog.EXPECT().DeleteProduct(ctx, id, businessID).Return(errors.New("db down"))
+
+		require.ErrorIs(t, s.DeleteProduct(ctx, businessID.String(), id.String()), ErrInternal)
 	})
 }
