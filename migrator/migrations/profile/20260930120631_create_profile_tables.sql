@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS product_likes (
 CREATE INDEX IF NOT EXISTS idx_product_likes_user_id ON product_likes (user_id);
 
 -- +goose Down
+DROP INDEX IF EXISTS idx_product_likes_user_created_at;
 DROP TABLE IF EXISTS profiles;
 DROP TABLE IF EXISTS product_likes;
 DROP TYPE IF EXISTS profile_type;
+

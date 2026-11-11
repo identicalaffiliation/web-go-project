@@ -4,7 +4,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from aiokafka import AIOKafkaConsumer
+from aiokafka import AIOKafkaConsumer, TopicPartition
 
 from internal.ports.message_broker import IEventConsumer
 
@@ -62,7 +62,9 @@ class KafkaUserRegisteredConsumer(IEventConsumer):
                     logger.exception(
                         "Error processing Kafka message %s: %s", msg.value, e
                     )
-                    await self.consumer.seek(msg.topic, msg.partition, msg.offset)
+                    await self.consumer.seek(
+                        TopicPartition(msg.topic, msg.partition), msg.offset
+                    )
                     await asyncio.sleep(1)
         except asyncio.CancelledError:
             logger.info("Kafka consume loop cancelled (shutdown signal received).")
@@ -118,7 +120,9 @@ class KafkaLikesConsumer(IEventConsumer):
                     logger.exception(
                         "Error processing like Kafka message %s: %s", msg.value, e
                     )
-                    await self.consumer.seek(msg.topic, msg.partition, msg.offset)
+                    await self.consumer.seek(
+                        TopicPartition(msg.topic, msg.partition), msg.offset
+                    )
                     await asyncio.sleep(1)
         except asyncio.CancelledError:
             logger.info("Kafka likes consume loop cancelled.")
