@@ -86,6 +86,7 @@ async def process_kafka_like_message(msg_data: dict) -> None:
             uow=uow,
             orders_client=grpc_orders_client,
             payments_client=grpc_payments_client,
+            catalog_client=grpc_catalog_client,
             event_producer=kafka_producer,
             cache=redis_cache,
         )
@@ -99,10 +100,13 @@ async def lifespan(app: FastAPI):
         kafka_producer, \
         kafka_likes_consumer, \
         orders_channel, \
-        payments_channel
-    global kafka_consumer, kafka_producer, orders_channel, payments_channel
-    global catalog_channel, grpc_catalog_client
-    global grpc_orders_client, grpc_payments_client, redis_client, redis_cache
+        payments_channel, \
+        catalog_channel, \
+        grpc_catalog_client, \
+        grpc_orders_client, \
+        grpc_payments_client, \
+        redis_client, \
+        redis_cache
 
     logger.info("Starting Profile Service...")
 
@@ -119,14 +123,6 @@ async def lifespan(app: FastAPI):
 
     kafka_producer = KafkaEventProducer(settings.KAFKA_BOOTSTRAP_SERVERS)
     await kafka_producer.start()
-
-    kafka_likes_consumer = KafkaLikesConsumer(
-        bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
-        group_id=settings.KAFKA_LIKES_CONSUMER_GROUP,
-        topic=settings.KAFKA_LIKE_EVENTS_TOPIC,
-        process_callback=process_kafka_like_message,
-    )
-    await kafka_likes_consumer.start()
 
     kafka_consumer = KafkaUserRegisteredConsumer(
         bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
