@@ -63,19 +63,9 @@ func CreateFeedback(app ports.CreateFeedbackCase) echo.HandlerFunc {
 // @Router       /catalog/{productId}/feedbacks [get]
 func GetProductFeedbacks(app ports.GetProductFeedbacksCase) echo.HandlerFunc {
 	return func(ctx echo.Context) error {
-		limit := int64(20)
-		if v := ctx.QueryParam(limitQuery); v != "" {
-			n, err := strconv.ParseInt(v, 10, 64)
-			if err != nil {
-				return echo.ErrBadRequest
-			}
-
-			limit = n
-		}
-
-		var cursor *string
-		if v := ctx.QueryParam(cursorQuery); v != "" {
-			cursor = &v
+		cursor, limit, err := pageParams(ctx)
+		if err != nil {
+			return echo.ErrBadRequest
 		}
 
 		page, err := app.GetProductFeedbacks(ctx.Request().Context(), ctx.Param(idMux), cursor, limit)
@@ -89,4 +79,85 @@ func GetProductFeedbacks(app ports.GetProductFeedbacksCase) echo.HandlerFunc {
 
 		return ctx.JSON(http.StatusOK, page)
 	}
+}
+
+// GetMyFeedbacks godoc
+// @Summary      List my feedbacks
+// @Description  Returns all feedbacks left by the current user, newest first. Available for customers only. Requires Bearer token. X-User-Id is set by the gateway from the JWT.
+// @Tags         feedbacks
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  dto.FeedbacksPage
+// @Failure      400  "Invalid X-User-Id"
+// @Failure      401
+// @Failure      403
+// @Failure      500
+// @Router       /catalog/feedbacks/my [get]
+func GetMyFeedbacks(app ports.GetMyFeedbacksCase) echo.HandlerFunc {
+	return func(ctx echo.Context) error {
+		feedbacks, err := app.GetMyCreatedFeedbacks(ctx.Request().Context(), ctx.Request().Header.Get(userIDHeader))
+		if err != nil {
+			if errors.Is(err, dto.ErrInvalidData) {
+				return echo.ErrBadRequest
+			}
+
+			return echo.ErrInternalServerError
+		}
+
+		return ctx.JSON(http.StatusOK, &dto.FeedbacksPage{Feedbacks: feedbacks})
+	}
+}
+
+// GetBusinessFeedbacks godoc
+// @Summary      List feedbacks on my products (cursor pagination)
+// @Description  Returns a page of feedbacks on products of the current business, newest first. Deleted products are skipped. Use `nextCursor` from the previous response to fetch the next page. Available for business only. Requires Bearer token. X-User-Id is set by the gateway from the JWT.
+// @Tags         feedbacks
+// @Produce      json
+// @Security     BearerAuth
+// @Param        limit      query  int     false  "Page size (default 20, max 100)"
+// @Param        cursor     query  string  false  "Cursor from previous response"
+// @Success      200  {object}  dto.FeedbacksPage
+// @Failure      400  "Invalid X-User-Id, limit or cursor"
+// @Failure      401
+// @Failure      403
+// @Failure      500
+// @Router       /catalog/feedbacks/business [get]
+func GetBusinessFeedbacks(app ports.GetBusinessFeedbacksCase) echo.HandlerFunc {
+	return func(ctx echo.Context) error {
+		cursor, limit, err := pageParams(ctx)
+		if err != nil {
+			return echo.ErrBadRequest
+		}
+
+		page, err := app.GetBusinessFeedbacks(ctx.Request().Context(), ctx.Request().Header.Get(userIDHeader), cursor, limit)
+		if err != nil {
+			if errors.Is(err, dto.ErrInvalidData) {
+				return echo.ErrBadRequest
+			}
+
+			return echo.ErrInternalServerError
+		}
+
+		return ctx.JSON(http.StatusOK, page)
+	}
+}
+
+// pageParams - курсор и размер страницы из query, по умолчанию 20 записей.
+func pageParams(ctx echo.Context) (*string, int64, error) {
+	limit := int64(20)
+	if v := ctx.QueryParam(limitQuery); v != "" {
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		limit = n
+	}
+
+	var cursor *string
+	if v := ctx.QueryParam(cursorQuery); v != "" {
+		cursor = &v
+	}
+
+	return cursor, limit, nil
 }

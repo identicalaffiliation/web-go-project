@@ -765,6 +765,15 @@ services:
       - orders-service
       - frontend
 
+  e2e:
+    profiles: [e2e]
+    build: ./backend/e2e
+    environment:
+      E2E_BASE_URL: ${E2E_BASE_URL:-http://gateway}
+      E2E_EMAIL: ${E2E_EMAIL:-}
+      E2E_PASSWORD: ${E2E_PASSWORD:-}
+      E2E_PRODUCT_ID: ${E2E_PRODUCT_ID:-}
+
 volumes:
   auth_postgres_data:
   profile_postgres_data:

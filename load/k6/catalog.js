@@ -1,25 +1,9 @@
 // Нагрузка на catalog: все ручки, по умолчанию 2000 rps суммарно.
-//
-//   page           600 rps  GET  /api/v1/catalog?limit=20[&cursor=]   публичная
-//   item           600 rps  GET  /api/v1/catalog/{id}
-//   feedbacks      300 rps  GET  /api/v1/catalog/{id}/feedbacks
-//   like           200 rps  POST /api/v1/catalog/like                 customer
-//   createFeedback 150 rps  POST /api/v1/catalog/feedbacks            customer
-//   create         100 rps  POST /api/v1/catalog                      business
-//   image           50 rps  POST /api/v1/catalog/{id}/image           business
-//
-// Все ручки, кроме page, проходят через auth_request в gateway: auth получает ~1400 rps validate.
-//
-// Запуск: k6 run load/k6/catalog.js
-// Параметры (-e):
-//   RATE=2000 DURATION=1m - общий rps (делится по долям выше) и длительность
-//   PRODUCTS=50           - сколько товаров создать заранее для чтения, лайков и отзывов
-//   CUSTOMERS=20          - сколько покупателей (лайки, отзывы, карточки)
 import http from 'k6/http';
-import { check } from 'k6';
 import {
   BASE_URL,
   authHeaders,
+  checkStatus,
   createProduct,
   pick,
   registerAndLogin,
@@ -62,7 +46,7 @@ export function page(data) {
   const res = http.get(`${BASE_URL}/api/v1/catalog?limit=20${cursor}`, {
     tags: { name: 'GET /catalog' },
   });
-  check(res, { 'page 200': (r) => r.status === 200 });
+  checkStatus(res, 'page', 200);
 }
 
 export function item(data) {
@@ -70,7 +54,7 @@ export function item(data) {
     headers: authHeaders(pick(data.customers)),
     tags: { name: 'GET /catalog/{id}' },
   });
-  check(res, { 'item 200': (r) => r.status === 200 });
+  checkStatus(res, 'item', 200);
 }
 
 export function feedbacks(data) {
@@ -78,7 +62,7 @@ export function feedbacks(data) {
     headers: authHeaders(pick(data.customers)),
     tags: { name: 'GET /catalog/{id}/feedbacks' },
   });
-  check(res, { 'feedbacks 200': (r) => r.status === 200 });
+  checkStatus(res, 'feedbacks', 200);
 }
 
 export function like(data) {
@@ -87,7 +71,7 @@ export function like(data) {
     JSON.stringify({ id: pick(data.productIds), action: Math.random() < 0.7 ? 'add' : 'remove' }),
     { headers: authHeaders(pick(data.customers)), tags: { name: 'POST /catalog/like' } },
   );
-  check(res, { 'like 201': (r) => r.status === 201 });
+  checkStatus(res, 'like', 201);
 }
 
 export function createFeedback(data) {
@@ -100,7 +84,7 @@ export function createFeedback(data) {
     }),
     { headers: authHeaders(pick(data.customers)), tags: { name: 'POST /catalog/feedbacks' } },
   );
-  check(res, { 'feedback 201': (r) => r.status === 201 });
+  checkStatus(res, 'feedback', 201);
 }
 
 export function create(data) {
@@ -113,5 +97,5 @@ export function image(data) {
     null,
     { headers: authHeaders(data.sellerToken), tags: { name: 'POST /catalog/{id}/image' } },
   );
-  check(res, { 'image 200': (r) => r.status === 200 });
+  checkStatus(res, 'image', 200);
 }

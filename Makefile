@@ -41,7 +41,8 @@ SERVICES := \
 	inventory-service \
 	profile-service \
 	orders-service \
-	payments-service
+	payments-service \
+	likes-outbox-worker
 
 .DEFAULT_GOAL := help
 
@@ -128,6 +129,10 @@ test: unit integrations ## все тесты
 	else \
 		echo "profile: no tests found, skipping"; \
 	fi
+
+.PHONY: e2e
+e2e: ## e2e тесты в Docker против запущенного gateway
+	docker compose run --build --rm --no-deps -T e2e
 
 .PHONY: unit
 unit: ## unit тесты go сервисов

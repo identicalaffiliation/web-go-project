@@ -69,7 +69,7 @@ func SetupCatalogBox(ctx context.Context, cfg *config.Config, logger ports.Logge
 		redisClient,
 	)
 
-	feedbackService, feedbacksGRPCServer := setupFeedbacks(masterPool, replicaPool, logger)
+	feedbackService, feedbacksGRPCServer := setupFeedbacks(masterPool, replicaPool, redisClient, logger)
 	priceGRPCServer := price.NewGRPCServer(catalogService)
 	productsGRPCServer := products.NewGRPCServer(catalogService)
 	httpServer := rest.SetupServer(&cfg.HTTPConfig, catalogService, feedbackService)

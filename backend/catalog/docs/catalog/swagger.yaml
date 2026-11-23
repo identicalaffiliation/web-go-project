@@ -395,12 +395,73 @@ paths:
       summary: Leave feedback on product
       tags:
       - feedbacks
+  /catalog/feedbacks/business:
+    get:
+      description: Returns a page of feedbacks on products of the current business,
+        newest first. Deleted products are skipped. Use `nextCursor` from the previous
+        response to fetch the next page. Available for business only. Requires Bearer
+        token. X-User-Id is set by the gateway from the JWT.
+      parameters:
+      - description: Page size (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Cursor from previous response
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.FeedbacksPage'
+        "400":
+          description: Invalid X-User-Id, limit or cursor
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: List feedbacks on my products (cursor pagination)
+      tags:
+      - feedbacks
+  /catalog/feedbacks/my:
+    get:
+      description: Returns all feedbacks left by the current user, newest first. Available
+        for customers only. Requires Bearer token. X-User-Id is set by the gateway
+        from the JWT.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.FeedbacksPage'
+        "400":
+          description: Invalid X-User-Id
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: List my feedbacks
+      tags:
+      - feedbacks
   /catalog/like:
     post:
       consumes:
       - application/json
       description: Puts (action=add) or removes (action=remove) a like on the product.
-        Available for customers only. Requires Bearer token.
+        Available for customers only. Requires Bearer token. X-User-Id is set by the
+        gateway from the JWT.
       parameters:
       - description: Product and like action
         in: body

@@ -266,6 +266,21 @@ func (mr *MockFeedbackRepositoryMockRecorder) DeleteFeedback(ctx, id any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFeedback", reflect.TypeOf((*MockFeedbackRepository)(nil).DeleteFeedback), ctx, id)
 }
 
+// GetBusinessFeedbacks mocks base method.
+func (m *MockFeedbackRepository) GetBusinessFeedbacks(ctx context.Context, businessID uuid.UUID, cursor *uuid.UUID, limit int64) ([]*domain.Feedback, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBusinessFeedbacks", ctx, businessID, cursor, limit)
+	ret0, _ := ret[0].([]*domain.Feedback)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBusinessFeedbacks indicates an expected call of GetBusinessFeedbacks.
+func (mr *MockFeedbackRepositoryMockRecorder) GetBusinessFeedbacks(ctx, businessID, cursor, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBusinessFeedbacks", reflect.TypeOf((*MockFeedbackRepository)(nil).GetBusinessFeedbacks), ctx, businessID, cursor, limit)
+}
+
 // GetMyCreatedFeedbacks mocks base method.
 func (m *MockFeedbackRepository) GetMyCreatedFeedbacks(ctx context.Context, userId uuid.UUID) ([]*domain.Feedback, error) {
 	m.ctrl.T.Helper()

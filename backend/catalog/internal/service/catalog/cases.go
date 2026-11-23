@@ -263,7 +263,12 @@ func (s *Service) DeleteProduct(ctx context.Context, businessID, productID strin
 	return nil
 }
 
-func (s *Service) LikeItem(ctx context.Context, id string, action dto.LikeAction) error {
+func (s *Service) LikeItem(ctx context.Context, userID, id string, action dto.LikeAction) error {
+	uID, err := uuid.Parse(userID)
+	if err != nil {
+		return ErrInvalid
+	}
+
 	productID, err := uuid.Parse(id)
 	if err != nil {
 		return ErrInvalid
@@ -273,7 +278,7 @@ func (s *Service) LikeItem(ctx context.Context, id string, action dto.LikeAction
 		return ErrInvalid
 	}
 
-	event, err := s.toLikeEvent(productID, action)
+	event, err := s.toLikeEvent(uID, productID, action)
 	if err != nil {
 		s.logger.WithError(err).Error("failed to mapping event")
 		return err

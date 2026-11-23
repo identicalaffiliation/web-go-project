@@ -59,8 +59,9 @@ func (s *Service) toEvent(product *domain.Product) (*domain.Event, error) {
 }
 
 // toLikeEvent - метод формирования события лайка товара (поставлен/убран) для отправки в Kafka.
-func (s *Service) toLikeEvent(id uuid.UUID, action dto.LikeAction) (*domain.Event, error) {
+func (s *Service) toLikeEvent(userID, id uuid.UUID, action dto.LikeAction) (*domain.Event, error) {
 	payload, err := json.Marshal(domain.LikePayload{
+		UserID:    userID,
 		ProductID: id,
 		Action:    string(action),
 	})

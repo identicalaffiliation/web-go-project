@@ -20,8 +20,15 @@ import (
 )
 
 func newService(t *testing.T) (*FeedbackService, *mocks.MockFeedbackRepository) {
-	repo := mocks.NewMockFeedbackRepository(gomock.NewController(t))
-	return NewService(repo, logger.NewNop()), repo
+	s, repo, _ := newServiceWithCache(t)
+	return s, repo
+}
+
+func newServiceWithCache(t *testing.T) (*FeedbackService, *mocks.MockFeedbackRepository, *mocks.MockCache) {
+	ctrl := gomock.NewController(t)
+	repo := mocks.NewMockFeedbackRepository(ctrl)
+	cache := mocks.NewMockCache(ctrl)
+	return NewService(repo, cache, logger.NewNop()), repo, cache
 }
 
 func feedbacksN(productID uuid.UUID, n int) []*domain.Feedback {
@@ -46,9 +53,11 @@ func TestCreateFeedback(t *testing.T) {
 		}
 	}
 
-	t.Run("ok", func(t *testing.T) {
-		s, repo := newService(t)
+	t.Run("ok - product card dropped from cache", func(t *testing.T) {
+		s, repo, cache := newServiceWithCache(t)
 		now := time.Now()
+
+		cache.EXPECT().Delete(ctx, productID.String()).Return(nil)
 
 		repo.EXPECT().CreateFeedback(ctx, gomock.Any()).DoAndReturn(
 			func(_ context.Context, f *domain.Feedback) (*domain.Feedback, error) {
@@ -69,6 +78,19 @@ func TestCreateFeedback(t *testing.T) {
 		require.Equal(t, userID, resp.UserID)
 		require.Equal(t, "good", *resp.Description)
 		require.Equal(t, now, resp.CreatedAt)
+	})
+
+	t.Run("ok - cache error does not fail feedback", func(t *testing.T) {
+		s, repo, cache := newServiceWithCache(t)
+
+		repo.EXPECT().CreateFeedback(ctx, gomock.Any()).DoAndReturn(
+			func(_ context.Context, f *domain.Feedback) (*domain.Feedback, error) { return f, nil },
+		)
+		cache.EXPECT().Delete(ctx, productID.String()).Return(errors.New("redis down"))
+
+		resp, err := s.CreateFeedback(ctx, validReq())
+		require.NoError(t, err)
+		require.Equal(t, productID, resp.ProductID)
 	})
 
 	t.Run("invalid - validation fails before repo", func(t *testing.T) {
@@ -220,6 +242,54 @@ func TestGetProductFeedbacks(t *testing.T) {
 		repo.EXPECT().GetProductFeedbacks(ctx, productID, (*uuid.UUID)(nil), int64(21)).Return(nil, errors.New("db down"))
 
 		_, err := s.GetProductFeedbacks(ctx, productID.String(), nil, 20)
+		require.Error(t, err)
+	})
+}
+
+func TestGetBusinessFeedbacks(t *testing.T) {
+	ctx := context.Background()
+	businessID := uuid.NewV7()
+
+	t.Run("has more - next cursor is last id", func(t *testing.T) {
+		s, repo := newService(t)
+		items := feedbacksN(uuid.NewV7(), 3)
+		repo.EXPECT().GetBusinessFeedbacks(ctx, businessID, (*uuid.UUID)(nil), int64(3)).Return(items, nil)
+
+		page, err := s.GetBusinessFeedbacks(ctx, businessID.String(), nil, 2)
+		require.NoError(t, err)
+		require.Len(t, page.Feedbacks, 2)
+		require.NotNil(t, page.NextCursor)
+		require.Equal(t, items[1].ID.String(), *page.NextCursor)
+	})
+
+	t.Run("cursor passed to repo, empty page is []", func(t *testing.T) {
+		s, repo := newService(t)
+		cursor := uuid.NewV7()
+		repo.EXPECT().GetBusinessFeedbacks(ctx, businessID, &cursor, int64(21)).Return(nil, nil)
+
+		page, err := s.GetBusinessFeedbacks(ctx, businessID.String(), new(cursor.String()), 0)
+		require.NoError(t, err)
+		require.NotNil(t, page.Feedbacks)
+		require.Nil(t, page.NextCursor)
+	})
+
+	t.Run("invalid business id", func(t *testing.T) {
+		s, _ := newService(t)
+		_, err := s.GetBusinessFeedbacks(ctx, "", nil, 20)
+		require.ErrorIs(t, err, dto.ErrInvalidData)
+	})
+
+	t.Run("invalid cursor", func(t *testing.T) {
+		s, _ := newService(t)
+		_, err := s.GetBusinessFeedbacks(ctx, businessID.String(), new("bad"), 20)
+		require.ErrorIs(t, err, dto.ErrInvalidData)
+	})
+
+	t.Run("repo error", func(t *testing.T) {
+		s, repo := newService(t)
+		repo.EXPECT().GetBusinessFeedbacks(ctx, businessID, (*uuid.UUID)(nil), int64(21)).Return(nil, errors.New("db down"))
+
+		_, err := s.GetBusinessFeedbacks(ctx, businessID.String(), nil, 20)
 		require.Error(t, err)
 	})
 }

@@ -9,9 +9,13 @@ import (
 	"google.golang.org/grpc"
 )
 
-func setupFeedbacks(master, replica *pgxpool.Pool, logger ports.Logger) (*feedbacks.FeedbackService, *grpc.Server) {
+func setupFeedbacks(
+	master, replica *pgxpool.Pool,
+	cache ports.Cache,
+	logger ports.Logger,
+) (*feedbacks.FeedbackService, *grpc.Server) {
 	repo := feedbacksRepository.NewRepository(master, replica)
-	service := feedbacks.NewService(repo, logger)
+	service := feedbacks.NewService(repo, cache, logger)
 
 	return service, feedbacksRPC.NewGRPCServer(service)
 }

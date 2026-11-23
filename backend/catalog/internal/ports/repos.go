@@ -29,4 +29,5 @@ type FeedbackRepository interface {
 	GetMyCreatedFeedbacks(ctx context.Context, userId uuid.UUID) ([]*domain.Feedback, error)
 	DeleteFeedback(ctx context.Context, id uuid.UUID) error
 	GetProductFeedbacks(ctx context.Context, productID uuid.UUID, cursor *uuid.UUID, limit int64) ([]*domain.Feedback, error)
+	GetBusinessFeedbacks(ctx context.Context, businessID uuid.UUID, cursor *uuid.UUID, limit int64) ([]*domain.Feedback, error)
 }

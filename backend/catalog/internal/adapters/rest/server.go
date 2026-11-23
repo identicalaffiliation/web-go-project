@@ -17,6 +17,8 @@ import (
 type FeedbackCases interface {
 	ports.CreateFeedbackCase
 	ports.GetProductFeedbacksCase
+	ports.GetMyFeedbacksCase
+	ports.GetBusinessFeedbacksCase
 }
 
 func SetupServer(cfg *config.HTTPConfig, c *catalog.Service, f FeedbackCases) *echo.Echo {
@@ -62,6 +64,10 @@ func SetupServer(cfg *config.HTTPConfig, c *catalog.Service, f FeedbackCases) *e
 	)
 	internal.POST("/feedbacks", handlers.CreateFeedback(f),
 		middlewares.RoleMiddleware(middlewares.Customer))
+	internal.GET("/feedbacks/my", handlers.GetMyFeedbacks(f),
+		middlewares.RoleMiddleware(middlewares.Customer))
+	internal.GET("/feedbacks/business", handlers.GetBusinessFeedbacks(f),
+		middlewares.RoleMiddleware(middlewares.Business))
 
 	return e
 }

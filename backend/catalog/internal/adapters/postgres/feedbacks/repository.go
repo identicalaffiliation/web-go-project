@@ -58,8 +58,9 @@ func (r *Repository) CreateFeedback(ctx context.Context, f *domain.Feedback) (*d
 	return m.toDomain(), nil
 }
 
+// GetMyCreatedFeedbacks - отзывы пользователя, новые первыми (id - uuid v7, упорядочен по времени).
 func (r *Repository) GetMyCreatedFeedbacks(ctx context.Context, userId uuid.UUID) ([]*domain.Feedback, error) {
-	const query = `SELECT * FROM feedbacks WHERE user_id = $1`
+	const query = `SELECT * FROM feedbacks WHERE user_id = $1 ORDER BY id DESC`
 
 	conn := r.txGetter.DefaultTrOrDB(ctx, r.poolRO)
 
@@ -101,6 +102,38 @@ func (r *Repository) GetProductFeedbacks(ctx context.Context, productID uuid.UUI
 	t, err := pgx.CollectRows(rows, pgx.RowToStructByName[feedbackModel])
 	if err != nil {
 		return nil, fmt.Errorf("error GetProductFeedbacks: %w", err)
+	}
+
+	feedbacks := make([]*domain.Feedback, 0, len(t))
+	for _, v := range t {
+		feedbacks = append(feedbacks, v.toDomain())
+	}
+
+	return feedbacks, nil
+}
+
+// GetBusinessFeedbacks - отзывы на неудалённые товары бизнеса, курсор - id последнего отзыва.
+func (r *Repository) GetBusinessFeedbacks(ctx context.Context, businessID uuid.UUID, cursor *uuid.UUID, limit int64) ([]*domain.Feedback, error) {
+	const query = `
+		SELECT f.* FROM feedbacks f
+		JOIN catalog c ON c.product_id = f.product_id
+		WHERE c.business_id = $1
+			AND c.deleted_at IS NULL
+			AND f.id < COALESCE($2::uuid, 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid) -- uuid max filter
+		ORDER BY f.id DESC
+		LIMIT $3::bigint
+	`
+
+	conn := r.txGetter.DefaultTrOrDB(ctx, r.poolRO)
+
+	rows, err := conn.Query(ctx, query, businessID, cursor, limit)
+	if err != nil {
+		return nil, fmt.Errorf("error GetBusinessFeedbacks: %w", err)
+	}
+
+	t, err := pgx.CollectRows(rows, pgx.RowToStructByName[feedbackModel])
+	if err != nil {
+		return nil, fmt.Errorf("error GetBusinessFeedbacks: %w", err)
 	}
 
 	feedbacks := make([]*domain.Feedback, 0, len(t))

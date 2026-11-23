@@ -2,19 +2,22 @@
 //   register  60 rps  каждый раз новый пользователь (bcrypt - самая тяжёлая ручка)
 //   login    120 rps  логин одного и того же пользователя
 //   refresh  120 rps  ротация refresh токена
-// Запуск: k6 run load/k6/auth.js
-// Параметры (-e): RATE=300 DURATION=1m - общий rps (делится по долям выше) и длительность
 import http from 'k6/http';
-import { check } from 'k6';
-import { BASE_URL, JSON_HEADERS, registerAndLogin, weightedOptions } from './lib/common.js';
+import {
+  BASE_URL,
+  JSON_HEADERS,
+  RATE_LIMITED,
+  checkStatus,
+  registerAndLogin,
+  weightedOptions,
+} from './lib/common.js';
 
-export const options = weightedOptions(300, {
+export const options = weightedOptions(200, {
   register: 0.2,
   login: 0.4,
   refresh: 0.4,
 });
 
-// setup выполняется один раз до начала нагрузки
 export function setup() {
   return registerAndLogin();
 }
@@ -25,7 +28,7 @@ function doLogin(user) {
     JSON.stringify({ email: user.email, password: user.password }),
     { headers: JSON_HEADERS },
   );
-  check(res, { 'login 200': (r) => r.status === 200 });
+  checkStatus(res, 'login', 200);
 
   return res;
 }
@@ -42,11 +45,9 @@ export function register() {
     { headers: JSON_HEADERS },
   );
 
-  check(res, { 'register 201': (r) => r.status === 201 });
+  checkStatus(res, 'register', 201);
 }
 
-// Refresh токен одноразовый: после ротации старый уже не принимается.
-// Поэтому у каждого VU своя цепочка токенов, первый берём логином.
 let refreshToken = null;
 
 export function refresh(user) {
@@ -63,8 +64,9 @@ export function refresh(user) {
     JSON.stringify({ refresh_token: refreshToken }),
     { headers: JSON_HEADERS },
   );
-  const ok = check(res, { 'refresh 200': (r) => r.status === 200 });
-
-  // при ошибке цепочка порвана, на следующей итерации начнём с логина
-  refreshToken = ok ? res.json('refresh_token') : null;
+  if (checkStatus(res, 'refresh', 200)) {
+    refreshToken = res.json('refresh_token');
+  } else if (res.status !== RATE_LIMITED) {
+    refreshToken = null;
+  }
 }

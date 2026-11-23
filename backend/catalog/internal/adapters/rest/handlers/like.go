@@ -12,7 +12,7 @@ import (
 
 // LikeProduct godoc
 // @Summary      Like or unlike product
-// @Description  Puts (action=add) or removes (action=remove) a like on the product. Available for customers only. Requires Bearer token.
+// @Description  Puts (action=add) or removes (action=remove) a like on the product. Available for customers only. Requires Bearer token. X-User-Id is set by the gateway from the JWT.
 // @Tags         catalog
 // @Accept       json
 // @Security     BearerAuth
@@ -31,7 +31,8 @@ func LikeProduct(usecase ports.LikeItem) echo.HandlerFunc {
 		}
 
 		reqCtx := ctx.Request().Context()
-		if err := usecase.LikeItem(reqCtx, req.ID, req.Action); err != nil {
+		userID := ctx.Request().Header.Get(userIDHeader)
+		if err := usecase.LikeItem(reqCtx, userID, req.ID, req.Action); err != nil {
 			if errors.Is(err, catalog.ErrInvalid) {
 				return echo.ErrBadRequest
 			}

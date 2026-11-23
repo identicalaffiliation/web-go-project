@@ -43,7 +43,7 @@ type DeleteItemCase interface {
 
 //go:generate mockgen -source=$GOFILE -destination=../../gen/mocks/mock_$GOFILE -package=mocks
 type LikeItem interface {
-	LikeItem(ctx context.Context, id string, action dto.LikeAction) error
+	LikeItem(ctx context.Context, userID, id string, action dto.LikeAction) error
 }
 
 //go:generate mockgen -source=$GOFILE -destination=../../gen/mocks/mock_$GOFILE -package=mocks
@@ -54,6 +54,16 @@ type CreateFeedbackCase interface {
 //go:generate mockgen -source=$GOFILE -destination=../../gen/mocks/mock_$GOFILE -package=mocks
 type GetProductFeedbacksCase interface {
 	GetProductFeedbacks(ctx context.Context, productID string, cursor *string, limit int64) (*dto.FeedbacksPage, error)
+}
+
+//go:generate mockgen -source=$GOFILE -destination=../../gen/mocks/mock_$GOFILE -package=mocks
+type GetMyFeedbacksCase interface {
+	GetMyCreatedFeedbacks(ctx context.Context, userID string) ([]*dto.FeedbackResponse, error)
+}
+
+//go:generate mockgen -source=$GOFILE -destination=../../gen/mocks/mock_$GOFILE -package=mocks
+type GetBusinessFeedbacksCase interface {
+	GetBusinessFeedbacks(ctx context.Context, businessID string, cursor *string, limit int64) (*dto.FeedbacksPage, error)
 }
 
 //go:generate mockgen -source=$GOFILE -destination=../../gen/mocks/mock_$GOFILE -package=mocks

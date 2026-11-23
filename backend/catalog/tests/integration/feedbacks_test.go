@@ -24,6 +24,48 @@ func (s *DatabaseSuite) Test_FeedbacksRepository_GetMyCreatedFeedbacks() {
 	s.Require().NoError(err)
 	s.Require().NotNil(feedbacks)
 	s.Require().Len(feedbacks, 2)
+	// новые первыми
+	s.Require().Equal("01a10112-c339-715d-8feb-4751a1ced5ef", feedbacks[0].ID.String())
+	s.Require().Equal("01a10112-c339-715d-8feb-4751a1cdd5ef", feedbacks[1].ID.String())
+}
+
+func (s *DatabaseSuite) Test_FeedbacksRepository_GetBusinessFeedbacks() {
+	s.Require().NoError(s.loadFixtures("items_list.sql"))
+	s.Require().NoError(s.loadFixtures("feedbacks_list.sql"))
+
+	// у товаров фикстуры нет владельца: отдаём бизнесу оба товара с отзывами
+	businessID := uuid.NewV7()
+	withThree := uuid.MustParse("01a10112-c339-715d-8feb-4751a1ced5ef")
+	withOne := uuid.MustParse("01a10113-2a74-70cb-843e-ae2f1af18182")
+	_, err := s.pool.Exec(s.ctx, `UPDATE catalog SET business_id = $1 WHERE product_id = ANY($2)`, businessID, []uuid.UUID{withThree, withOne})
+	s.Require().NoError(err)
+
+	first, err := s.feedback.GetBusinessFeedbacks(s.ctx, businessID, nil, 3)
+	s.Require().NoError(err)
+	s.Require().Len(first, 3)
+	s.Require().Equal("01a10112-c339-715d-8feb-4751a1ded5ef", first[0].ID.String())
+	s.Require().Equal("01a10112-c339-715d-8feb-4751a1ced5ef", first[1].ID.String())
+	s.Require().Equal("01a10112-c339-715d-8feb-4751a1cdd5ef", first[2].ID.String())
+
+	cursor := first[2].ID
+	second, err := s.feedback.GetBusinessFeedbacks(s.ctx, businessID, &cursor, 3)
+	s.Require().NoError(err)
+	s.Require().Len(second, 1)
+	s.Require().Equal("01a10112-b339-715d-8feb-4751a1ced5ef", second[0].ID.String())
+
+	// чужому бизнесу отзывов нет
+	other, err := s.feedback.GetBusinessFeedbacks(s.ctx, uuid.NewV7(), nil, 10)
+	s.Require().NoError(err)
+	s.Require().Empty(other)
+
+	// отзывы удалённого товара не отдаются
+	s.Require().NoError(s.catalog.DeleteProduct(s.ctx, withOne, businessID))
+	all, err := s.feedback.GetBusinessFeedbacks(s.ctx, businessID, nil, 10)
+	s.Require().NoError(err)
+	s.Require().Len(all, 3)
+	for _, f := range all {
+		s.Require().Equal(withThree, f.ProductID)
+	}
 }
 
 func (s *DatabaseSuite) Test_FeedbacksRepository_DeleteFeedback() {

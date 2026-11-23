@@ -211,11 +211,15 @@ func TestLikeProduct(t *testing.T) {
 	id := uuid.NewV7().String()
 	body := `{"id":"` + id + `","action":"add"}`
 
-	t.Run("201", func(t *testing.T) {
+	t.Run("201 - user id taken from header", func(t *testing.T) {
+		userID := uuid.NewV7().String()
 		app := mocks.NewMockLikeItem(gomock.NewController(t))
-		app.EXPECT().LikeItem(gomock.Any(), id, dto.LikeAdd).Return(nil)
+		app.EXPECT().LikeItem(gomock.Any(), userID, id, dto.LikeAdd).Return(nil)
 
-		rec := serve(http.MethodPost, route, LikeProduct(app), jsonRequest(http.MethodPost, route, body))
+		req := jsonRequest(http.MethodPost, route, body)
+		req.Header.Set(userIDHeader, userID)
+
+		rec := serve(http.MethodPost, route, LikeProduct(app), req)
 		require.Equal(t, http.StatusCreated, rec.Code)
 	})
 
@@ -227,7 +231,7 @@ func TestLikeProduct(t *testing.T) {
 
 	t.Run("400 - invalid from service", func(t *testing.T) {
 		app := mocks.NewMockLikeItem(gomock.NewController(t))
-		app.EXPECT().LikeItem(gomock.Any(), id, dto.LikeAdd).Return(catalog.ErrInvalid)
+		app.EXPECT().LikeItem(gomock.Any(), gomock.Any(), id, dto.LikeAdd).Return(catalog.ErrInvalid)
 
 		rec := serve(http.MethodPost, route, LikeProduct(app), jsonRequest(http.MethodPost, route, body))
 		require.Equal(t, http.StatusBadRequest, rec.Code)
@@ -235,7 +239,7 @@ func TestLikeProduct(t *testing.T) {
 
 	t.Run("500", func(t *testing.T) {
 		app := mocks.NewMockLikeItem(gomock.NewController(t))
-		app.EXPECT().LikeItem(gomock.Any(), id, dto.LikeAdd).Return(errors.New("db down"))
+		app.EXPECT().LikeItem(gomock.Any(), gomock.Any(), id, dto.LikeAdd).Return(errors.New("db down"))
 
 		rec := serve(http.MethodPost, route, LikeProduct(app), jsonRequest(http.MethodPost, route, body))
 		require.Equal(t, http.StatusInternalServerError, rec.Code)
@@ -355,6 +359,95 @@ func TestGetProductFeedbacks(t *testing.T) {
 		app.EXPECT().GetProductFeedbacks(gomock.Any(), productID, gomock.Any(), gomock.Any()).Return(nil, errors.New("db down"))
 
 		rec := serve(http.MethodGet, route, GetProductFeedbacks(app), httptest.NewRequest(http.MethodGet, target, nil))
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+}
+
+func TestGetMyFeedbacks(t *testing.T) {
+	const route = "/catalog/feedbacks/my"
+	userID := uuid.NewV7().String()
+
+	request := func() *http.Request {
+		req := httptest.NewRequest(http.MethodGet, route, nil)
+		req.Header.Set(userIDHeader, userID)
+		return req
+	}
+
+	t.Run("200 - user id taken from header", func(t *testing.T) {
+		app := mocks.NewMockGetMyFeedbacksCase(gomock.NewController(t))
+		app.EXPECT().GetMyCreatedFeedbacks(gomock.Any(), userID).Return([]*dto.FeedbackResponse{}, nil)
+
+		rec := serve(http.MethodGet, route, GetMyFeedbacks(app), request())
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.JSONEq(t, `{"feedbacks":[]}`, rec.Body.String())
+	})
+
+	t.Run("400 - invalid from service", func(t *testing.T) {
+		app := mocks.NewMockGetMyFeedbacksCase(gomock.NewController(t))
+		app.EXPECT().GetMyCreatedFeedbacks(gomock.Any(), userID).Return(nil, dto.ErrInvalidData)
+
+		rec := serve(http.MethodGet, route, GetMyFeedbacks(app), request())
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("500", func(t *testing.T) {
+		app := mocks.NewMockGetMyFeedbacksCase(gomock.NewController(t))
+		app.EXPECT().GetMyCreatedFeedbacks(gomock.Any(), userID).Return(nil, errors.New("db down"))
+
+		rec := serve(http.MethodGet, route, GetMyFeedbacks(app), request())
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+}
+
+func TestGetBusinessFeedbacks(t *testing.T) {
+	const route = "/catalog/feedbacks/business"
+	businessID := uuid.NewV7().String()
+
+	request := func(target string) *http.Request {
+		req := httptest.NewRequest(http.MethodGet, target, nil)
+		req.Header.Set(userIDHeader, businessID)
+		return req
+	}
+
+	t.Run("200 - defaults, business id taken from header", func(t *testing.T) {
+		app := mocks.NewMockGetBusinessFeedbacksCase(gomock.NewController(t))
+		app.EXPECT().GetBusinessFeedbacks(gomock.Any(), businessID, (*string)(nil), int64(20)).
+			Return(&dto.FeedbacksPage{Feedbacks: []*dto.FeedbackResponse{}}, nil)
+
+		rec := serve(http.MethodGet, route, GetBusinessFeedbacks(app), request(route))
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.JSONEq(t, `{"feedbacks":[]}`, rec.Body.String())
+	})
+
+	t.Run("200 - limit and cursor passed", func(t *testing.T) {
+		app := mocks.NewMockGetBusinessFeedbacksCase(gomock.NewController(t))
+		app.EXPECT().GetBusinessFeedbacks(gomock.Any(), businessID, new("c1"), int64(5)).
+			Return(&dto.FeedbacksPage{Feedbacks: []*dto.FeedbackResponse{}, NextCursor: new("c2")}, nil)
+
+		rec := serve(http.MethodGet, route, GetBusinessFeedbacks(app), request(route+"?limit=5&cursor=c1"))
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.Contains(t, rec.Body.String(), `"nextCursor":"c2"`)
+	})
+
+	t.Run("400 - bad limit", func(t *testing.T) {
+		app := mocks.NewMockGetBusinessFeedbacksCase(gomock.NewController(t))
+		rec := serve(http.MethodGet, route, GetBusinessFeedbacks(app), request(route+"?limit=x"))
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("400 - invalid from service", func(t *testing.T) {
+		app := mocks.NewMockGetBusinessFeedbacksCase(gomock.NewController(t))
+		app.EXPECT().GetBusinessFeedbacks(gomock.Any(), businessID, gomock.Any(), gomock.Any()).Return(nil, dto.ErrInvalidData)
+
+		rec := serve(http.MethodGet, route, GetBusinessFeedbacks(app), request(route))
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("500", func(t *testing.T) {
+		app := mocks.NewMockGetBusinessFeedbacksCase(gomock.NewController(t))
+		app.EXPECT().GetBusinessFeedbacks(gomock.Any(), businessID, gomock.Any(), gomock.Any()).Return(nil, errors.New("db down"))
+
+		rec := serve(http.MethodGet, route, GetBusinessFeedbacks(app), request(route))
 		require.Equal(t, http.StatusInternalServerError, rec.Code)
 	})
 }

@@ -2,19 +2,39 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import encoding from 'k6/encoding';
+import { Rate } from 'k6/metrics';
 
 // Адрес gateway. Переопределяется так: k6 run -e BASE_URL=http://host script.js
 export const BASE_URL = __ENV.BASE_URL || 'http://localhost';
 
-// rate у каждого скрипта свой (catalog 500, остальные 50), по умолчанию 1 минута.
-// Перебить: k6 run -e RATE=100 -e DURATION=30s script.js
+// 429 от rate limit gateway - штатный ответ: лимитер сработал, до сервиса запрос не дошёл.
+export const RATE_LIMITED = 429;
+http.setResponseCallback(http.expectedStatuses({ min: 200, max: 399 }, RATE_LIMITED));
+
+const rateLimited = new Rate('rate_limited');
+
+export function checkStatus(res, name, status) {
+  const limited = res.status === RATE_LIMITED;
+  rateLimited.add(limited);
+
+  check(res, { [`${name} ${status} or 429`]: (r) => r.status === status || limited });
+  if (limited) {
+    check(res, {
+      'rate limit: Retry-After': (r) => !!r.headers['Retry-After'],
+      'rate limit: gateway body': (r) => r.json('message') === 'too many requests',
+    });
+  }
+
+  return res.status === status;
+}
+
 export function loadOptions(rate) {
   return {
-    setupTimeout: '2m', // в setup ждём, пока auth выдаст роль business
+    setupTimeout: '2m',
     scenarios: {
       load: {
-        executor: 'constant-arrival-rate', // держим постоянный rps, не зависящий от скорости ответа
-        rate: Number(__ENV.RATE || rate), // сколько итераций в секунду
+        executor: 'constant-arrival-rate',
+        rate: Number(__ENV.RATE || rate),
         timeUnit: '1s',
         duration: __ENV.DURATION || '1m',
         preAllocatedVUs: 100, // сколько виртуальных юзеров создать заранее
@@ -30,10 +50,6 @@ export function loadOptions(rate) {
 
 export const DURATION = __ENV.DURATION || '1m';
 
-// Опции для нескольких ручек под общий rps: total делится по долям weights, у каждой ручки
-// свой constant-arrival-rate сценарий. Медленная ручка не съедает rps соседних, а в отчёте
-// пороги и метрики видны по каждой ручке (тег scenario). Имя сценария = имя exec функции.
-// Общий rps перебивается -e RATE=..., доли при этом сохраняются.
 export function weightedOptions(total, weights) {
   const rps = Number(__ENV.RATE || total);
   const scenarios = {};
@@ -65,9 +81,6 @@ export function pick(arr) {
 
 export const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
-// POST для setup: при 429 от rate limit gateway ждёт Retry-After и повторяет.
-// Подготовка данных (регистрации, товары) так проходит и при включённых лимитах,
-// а в самой нагрузке 429 остаётся ошибкой - значит, лимиты для прогона не подняты.
 function postRetry(url, body, params) {
   for (let i = 0; i < 60; i++) {
     const res = http.post(url, body, params);
@@ -90,12 +103,11 @@ function login(email, password) {
     JSON.stringify({ email, password }),
     { headers: JSON_HEADERS },
   );
-  check(res, { 'login 200': (r) => r.status === 200 });
+  checkStatus(res, 'login', 200);
 
   return res.json('access_token');
 }
 
-// Достаёт роль из access token (JWT: header.payload.signature, payload в base64url)
 function tokenRole(token) {
   const payload = JSON.parse(encoding.b64decode(token.split('.')[1], 'rawurl', 's'));
   return payload.role;
@@ -112,7 +124,7 @@ export function registerAndLogin() {
     JSON.stringify({ email, password }),
     { headers: JSON_HEADERS },
   );
-  check(reg, { 'register 201': (r) => r.status === 201 });
+  checkStatus(reg, 'register', 201);
 
   return { email, password, token: login(email, password) };
 }
@@ -126,7 +138,7 @@ export function becomeBusiness(user) {
     JSON.stringify({ company_name: 'k6 company' }),
     { headers: authHeaders(user.token) },
   );
-  check(res, { 'business profile 201': (r) => r.status === 201 });
+  checkStatus(res, 'business profile', 201);
 
   for (let i = 0; i < 30; i++) {
     const token = login(user.email, user.password);
@@ -145,7 +157,6 @@ export function registerBusiness() {
 }
 
 // Создаёт товар от имени business пользователя. Возвращает id товара.
-// retry - повторять на 429 (для setup); в нагрузке 429 - ошибка, как у остальных ручек.
 export function createProduct(token, retry = true) {
   const post = retry ? postRetry : (url, body, params) => http.post(url, body, params);
   const res = post(
@@ -153,7 +164,7 @@ export function createProduct(token, retry = true) {
     JSON.stringify({ title: 'k6 product', price: 100, quantity: 99 }),
     { headers: authHeaders(token) },
   );
-  check(res, { 'create product 201': (r) => r.status === 201 });
+  checkStatus(res, 'create product', 201);
 
   return res.json('product.productId');
 }

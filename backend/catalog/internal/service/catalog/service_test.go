@@ -413,6 +413,7 @@ func TestUploadImage(t *testing.T) {
 func TestLikeItem(t *testing.T) {
 	ctx := context.Background()
 	productID := uuid.NewV7()
+	userID := uuid.NewV7()
 
 	t.Run("ok - event keyed by product", func(t *testing.T) {
 		for _, action := range []dto.LikeAction{dto.LikeAdd, dto.LikeRemove} {
@@ -424,30 +425,36 @@ func TestLikeItem(t *testing.T) {
 
 					var p domain.LikePayload
 					require.NoError(t, json.Unmarshal(e.Payload, &p))
+					require.Equal(t, userID, p.UserID)
 					require.Equal(t, productID, p.ProductID)
 					require.Equal(t, string(action), p.Action)
 					return nil
 				},
 			)
 
-			require.NoError(t, s.LikeItem(ctx, productID.String(), action))
+			require.NoError(t, s.LikeItem(ctx, userID.String(), productID.String(), action))
 		}
 	})
 
 	t.Run("invalid id", func(t *testing.T) {
 		s, _ := newService(t)
-		require.ErrorIs(t, s.LikeItem(ctx, "bad", dto.LikeAdd), ErrInvalid)
+		require.ErrorIs(t, s.LikeItem(ctx, userID.String(), "bad", dto.LikeAdd), ErrInvalid)
+	})
+
+	t.Run("invalid user id", func(t *testing.T) {
+		s, _ := newService(t)
+		require.ErrorIs(t, s.LikeItem(ctx, "", productID.String(), dto.LikeAdd), ErrInvalid)
 	})
 
 	t.Run("invalid action", func(t *testing.T) {
 		s, _ := newService(t)
-		require.ErrorIs(t, s.LikeItem(ctx, productID.String(), "toggle"), ErrInvalid)
+		require.ErrorIs(t, s.LikeItem(ctx, userID.String(), productID.String(), "toggle"), ErrInvalid)
 	})
 
 	t.Run("outbox error", func(t *testing.T) {
 		s, d := newService(t)
 		d.likes.EXPECT().Insert(ctx, gomock.Any()).Return(errors.New("db down"))
-		require.Error(t, s.LikeItem(ctx, productID.String(), dto.LikeAdd))
+		require.Error(t, s.LikeItem(ctx, userID.String(), productID.String(), dto.LikeAdd))
 	})
 }
 

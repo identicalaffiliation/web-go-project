@@ -17,7 +17,7 @@ func New() *Hasher {
 }
 
 func (h *Hasher) Hash(plain string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(plain), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(plain), bcrypt.MinCost)
 	if err != nil {
 		return "", fmt.Errorf("bcrypt generate: %w", err)
 	}

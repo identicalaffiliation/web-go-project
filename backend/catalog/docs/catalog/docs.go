@@ -152,6 +152,94 @@ const docTemplate = `{
                 }
             }
         },
+        "/catalog/feedbacks/business": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a page of feedbacks on products of the current business, newest first. Deleted products are skipped. Use ` + "`" + `nextCursor` + "`" + ` from the previous response to fetch the next page. Available for business only. Requires Bearer token. X-User-Id is set by the gateway from the JWT.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "feedbacks"
+                ],
+                "summary": "List feedbacks on my products (cursor pagination)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 20, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Cursor from previous response",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.FeedbacksPage"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid X-User-Id, limit or cursor"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/catalog/feedbacks/my": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all feedbacks left by the current user, newest first. Available for customers only. Requires Bearer token. X-User-Id is set by the gateway from the JWT.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "feedbacks"
+                ],
+                "summary": "List my feedbacks",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_identicalaffiliation_web-go-project_backend_catalog_internal_dto.FeedbacksPage"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid X-User-Id"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
         "/catalog/like": {
             "post": {
                 "security": [
@@ -159,7 +247,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Puts (action=add) or removes (action=remove) a like on the product. Available for customers only. Requires Bearer token.",
+                "description": "Puts (action=add) or removes (action=remove) a like on the product. Available for customers only. Requires Bearer token. X-User-Id is set by the gateway from the JWT.",
                 "consumes": [
                     "application/json"
                 ],
